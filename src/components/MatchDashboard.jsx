@@ -40,27 +40,47 @@ function GameRow({
   onShuffleGame,
   isAdmin,
 }) {
-  const [scoreA, setScoreA] = useState(game.scoreA);
-  const [scoreB, setScoreB] = useState(game.scoreB);
+  const [scoreA, setScoreA] = useState(game.saved ? String(game.scoreA) : (game.scoreA === 0 ? '' : String(game.scoreA)));
+  const [scoreB, setScoreB] = useState(game.saved ? String(game.scoreB) : (game.scoreB === 0 ? '' : String(game.scoreB)));
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
-    setScoreA(game.scoreA);
-    setScoreB(game.scoreB);
-  }, [game.scoreA, game.scoreB]);
+    setScoreA(game.saved ? String(game.scoreA) : (game.scoreA === 0 ? '' : String(game.scoreA)));
+    setScoreB(game.saved ? String(game.scoreB) : (game.scoreB === 0 ? '' : String(game.scoreB)));
+  }, [game.scoreA, game.scoreB, game.saved]);
 
   const label = (ids) => (ids || []).map((id) => playersById[id] || `Player ${id}`).join(' & ');
   const aWon = game.saved && game.scoreA > game.scoreB;
   const bWon = game.saved && game.scoreB > game.scoreA;
 
+  function parseScore(val) {
+    if (val === '' || val === null || val === undefined) return 0;
+    const num = Number(val);
+    return isNaN(num) ? 0 : Math.max(0, num);
+  }
+
+  function handleScoreChange(val, setter) {
+    if (val === '') {
+      setter('');
+    } else {
+      const digitsOnly = val.replace(/\D/g, '');
+      if (digitsOnly === '') {
+        setter('');
+      } else {
+        const stripped = digitsOnly.replace(/^0+(?=\d)/, '');
+        setter(stripped);
+      }
+    }
+  }
+
   function handleSaveClick() {
-    onSave(scoreA, scoreB);
+    onSave(parseScore(scoreA), parseScore(scoreB));
     setIsEditing(false);
   }
 
   function handleCancelClick() {
-    setScoreA(game.scoreA);
-    setScoreB(game.scoreB);
+    setScoreA(game.saved ? String(game.scoreA) : (game.scoreA === 0 ? '' : String(game.scoreA)));
+    setScoreB(game.saved ? String(game.scoreB) : (game.scoreB === 0 ? '' : String(game.scoreB)));
     setIsEditing(false);
   }
 
@@ -182,23 +202,29 @@ function GameRow({
             <div>
               <label className="text-slate-400 text-xs font-semibold block mb-1 truncate">{teamA.name}</label>
               <input
-                type="number"
-                min={0}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="0"
                 disabled={(!isEditing && game.saved) || !isAdmin}
                 value={scoreA}
-                onChange={(e) => setScoreA(Number(e.target.value))}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-xl font-bold text-center disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => handleScoreChange(e.target.value, setScoreA)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-xl font-bold text-center disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#d7f24c] placeholder:text-slate-600"
               />
             </div>
             <div>
               <label className="text-slate-400 text-xs font-semibold block mb-1 truncate">{teamB.name}</label>
               <input
-                type="number"
-                min={0}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                placeholder="0"
                 disabled={(!isEditing && game.saved) || !isAdmin}
                 value={scoreB}
-                onChange={(e) => setScoreB(Number(e.target.value))}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-xl font-bold text-center disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => handleScoreChange(e.target.value, setScoreB)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2.5 text-white text-xl font-bold text-center disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-[#d7f24c] placeholder:text-slate-600"
               />
             </div>
           </div>

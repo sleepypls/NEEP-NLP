@@ -420,12 +420,20 @@ export function SetupView({
           ))}
         </div>
         <input
-          type="number"
-          min={1}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
           disabled={!isAdmin}
-          value={goalScore}
-          onChange={(e) => setGoalScore(Math.max(1, Number(e.target.value)))}
-          placeholder="Custom score limit"
+          value={goalScore === '' ? '' : goalScore}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            setGoalScore(val === '' ? '' : Number(val));
+          }}
+          onBlur={() => {
+            if (!goalScore || Number(goalScore) < 1) setGoalScore(11);
+          }}
+          placeholder="Custom score limit (e.g. 11)"
           className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
         />
       </div>
@@ -455,12 +463,20 @@ export function SetupView({
           ))}
         </div>
         <input
-          type="number"
-          min={1}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
           disabled={!isAdmin}
-          value={dreambreakerScore}
-          onChange={(e) => setDreambreakerScore(Math.max(1, Number(e.target.value)))}
-          placeholder="Custom Dreambreaker limit"
+          value={dreambreakerScore === '' ? '' : dreambreakerScore}
+          onFocus={(e) => e.target.select()}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, '');
+            setDreambreakerScore(val === '' ? '' : Number(val));
+          }}
+          onBlur={() => {
+            if (!dreambreakerScore || Number(dreambreakerScore) < 1) setDreambreakerScore(21);
+          }}
+          placeholder="Custom Dreambreaker limit (e.g. 21)"
           className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-60"
         />
       </div>
