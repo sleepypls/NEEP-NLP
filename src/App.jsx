@@ -44,59 +44,107 @@ import {
   sanitizeRoomId,
 } from './utils/room';
 
-function getTournStorageKey(rid) {
-  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-tournament-state-v1' : `neep_tourn_${rid}_v1`;
+function getInitialRoomId() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const urlRoom = params.get('room');
+    if (urlRoom) return sanitizeRoomId(urlRoom);
+    const savedRoom = localStorage.getItem('neep_current_room');
+    if (savedRoom) return sanitizeRoomId(savedRoom);
+  } catch (e) {}
+  return DEFAULT_ROOM_ID;
 }
-function getStatsStorageKey(rid) {
-  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-global-stats-v1' : `neep_stats_${rid}_v1`;
+
+function loadSavedTournament(rid) {
+  try {
+    const raw = localStorage.getItem(getTournStorageKey(rid));
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn('Error reading saved tournament from storage:', e);
+  }
+  return null;
 }
-function getPairsStorageKey(rid) {
-  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-partnerships-v1' : `neep_pairs_${rid}_v1`;
-}
-const STORAGE_KEY_KNOWN_PLAYERS = 'neep-pickleball-known-players-v1';
 
 export default function App() {
-  const [view, setView] = useState('setup');
-  const [playerPool, setPlayerPool] = useState([]);
-  const [nextPlayerId, setNextPlayerId] = useState(1);
-  const [numTeams, setNumTeams] = useState(4);
-  const [goalScore, setGoalScore] = useState(11);
-  const [dreambreakerScore, setDreambreakerScore] = useState(21);
-  const [allowUneven, setAllowUneven] = useState(true);
+  const initialRoomId = getInitialRoomId();
+  const initialSaved = loadSavedTournament(initialRoomId);
 
-  const [teams, setTeams] = useState([]);
-  const [playersById, setPlayersById] = useState({});
-  const [remainingPool, setRemainingPool] = useState([]);
-  const [pickSequence, setPickSequence] = useState([]);
-  const [pickPointer, setPickPointer] = useState(0);
-  const [sittingOut, setSittingOut] = useState([]);
-  const [captainMode, setCaptainMode] = useState('random');
-  const [selectedCaptainIds, setSelectedCaptainIds] = useState([]);
-  const [matchupConfig, setMatchupConfig] = useState({ preset: 'adjacent', customSlotPairs: [] });
-
-  const [bracket, setBracket] = useState(null);
-  const [activePath, setActivePath] = useState(null);
-
-  const [globalStats, setGlobalStats] = useState({});
-  const [partnershipStats, setPartnershipStats] = useState({});
-  const [priorStats, setPriorStats] = useState({});
-  const [priorPartnershipStats, setPriorPartnershipStats] = useState({});
-  const [savedPlayers, setSavedPlayers] = useState([]);
-  // Room & Admin State
-  const [roomId, setRoomId] = useState(() => {
+  const [roomId, setRoomId] = useState(initialRoomId);
+  const [adminPin, setAdminPin] = useState(() => initialSaved?.adminPin || DEFAULT_ADMIN_PIN);
+  const [isAdmin, setIsAdmin] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const urlRoom = params.get('room');
-      if (urlRoom) return sanitizeRoomId(urlRoom);
-      const savedRoom = localStorage.getItem('neep_current_room');
-      if (savedRoom) return sanitizeRoomId(savedRoom);
+      const mode = params.get('mode');
+      const pin = params.get('pin');
+      if (mode === 'spectator') return false;
+      if (mode === 'admin') {
+        const expectedPin = initialSaved?.adminPin || DEFAULT_ADMIN_PIN;
+        return !pin || pin === expectedPin;
+      }
     } catch (e) {}
-    return DEFAULT_ROOM_ID;
+    return true;
   });
 
-  // Role: Admin vs Spectator
-  const [isAdmin, setIsAdmin] = useState(true);
-  const [adminPin, setAdminPin] = useState(DEFAULT_ADMIN_PIN);
+  const [view, setView] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode');
+      if (mode === 'spectator' && initialSaved?.bracket) {
+        return 'bracket';
+      }
+    } catch (e) {}
+    return initialSaved?.view || 'setup';
+  });
+  const [playerPool, setPlayerPool] = useState(() => initialSaved?.playerPool || []);
+  const [nextPlayerId, setNextPlayerId] = useState(() => initialSaved?.nextPlayerId || (initialSaved?.playerPool?.length ? Math.max(...initialSaved.playerPool.map((p) => p.id)) + 1 : 1));
+  const [numTeams, setNumTeams] = useState(() => initialSaved?.numTeams || 4);
+  const [goalScore, setGoalScore] = useState(() => initialSaved?.goalScore || 11);
+  const [dreambreakerScore, setDreambreakerScore] = useState(() => initialSaved?.dreambreakerScore || 21);
+  const [allowUneven, setAllowUneven] = useState(() => (initialSaved?.allowUneven !== undefined ? initialSaved.allowUneven : true));
+  const [captainMode, setCaptainMode] = useState(() => initialSaved?.captainMode || 'random');
+  const [selectedCaptainIds, setSelectedCaptainIds] = useState(() => initialSaved?.selectedCaptainIds || []);
+  const [matchupConfig, setMatchupConfig] = useState(() => initialSaved?.matchupConfig || { preset: 'adjacent', customSlotPairs: [] });
+
+  const [teams, setTeams] = useState(() => initialSaved?.teams || []);
+  const [playersById, setPlayersById] = useState(() => initialSaved?.playersById || {});
+  const [remainingPool, setRemainingPool] = useState(() => initialSaved?.remainingPool || []);
+  const [pickSequence, setPickSequence] = useState(() => initialSaved?.pickSequence || []);
+  const [pickPointer, setPickPointer] = useState(() => initialSaved?.pickPointer || 0);
+  const [sittingOut, setSittingOut] = useState(() => initialSaved?.sittingOut || []);
+
+  const [bracket, setBracket] = useState(() => initialSaved?.bracket || null);
+  const [activePath, setActivePath] = useState(() => initialSaved?.activePath || null);
+
+  const [globalStats, setGlobalStats] = useState(() => {
+    try {
+      const raw = localStorage.getItem(getStatsStorageKey(initialRoomId));
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  });
+  const [partnershipStats, setPartnershipStats] = useState(() => {
+    try {
+      const raw = localStorage.getItem(getPairsStorageKey(initialRoomId));
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  });
+  const [priorStats, setPriorStats] = useState(() => {
+    try {
+      const raw = localStorage.getItem(getStatsStorageKey(initialRoomId));
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  });
+  const [priorPartnershipStats, setPriorPartnershipStats] = useState(() => {
+    try {
+      const raw = localStorage.getItem(getPairsStorageKey(initialRoomId));
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  });
+  const [savedPlayers, setSavedPlayers] = useState(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY_KNOWN_PLAYERS);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  });
 
   // Modals
   const [modal, setModal] = useState(null);
@@ -108,36 +156,30 @@ export default function App() {
   const [editingMatchupGame, setEditingMatchupGame] = useState(null);
   const [showRotateBanner, setShowRotateBanner] = useState(false);
   const rotateTimeoutRef = useRef(null);
-  const hydrated = useRef(false);
 
-  // 1. Parse URL for room, mode & PIN on load
+  // 1. Keep active room and mode in URL bar so refresh preserves it
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const mode = params.get('mode');
-    const pin = params.get('pin');
-    const urlRoom = params.get('room');
-
-    if (urlRoom) {
-      const cleanRoom = sanitizeRoomId(urlRoom);
-      if (cleanRoom && cleanRoom !== roomId) {
-        setRoomId(cleanRoom);
+    try {
+      const url = new URL(window.location.href);
+      let changed = false;
+      if (url.searchParams.get('room') !== roomId) {
+        url.searchParams.set('room', roomId);
+        changed = true;
       }
-    }
-
-    if (mode === 'spectator') {
-      setIsAdmin(false);
-    } else if (mode === 'admin') {
-      if (pin === adminPin || !pin) {
-        setIsAdmin(true);
+      if (!isAdmin && url.searchParams.get('mode') !== 'spectator') {
+        url.searchParams.set('mode', 'spectator');
+        changed = true;
       }
-    }
-  }, [adminPin]);
+      if (changed) {
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch (e) {}
+  }, [roomId, isAdmin]);
 
-  // 2. Load LocalStorage & Setup Listeners for Active Room
+  // 2. Load Stats & Setup Cloud Listeners for Active Room
   useEffect(() => {
     try {
       localStorage.setItem('neep_current_room', roomId);
-      const tournKey = getTournStorageKey(roomId);
       const statsKey = getStatsStorageKey(roomId);
       const pairsKey = getPairsStorageKey(roomId);
 
@@ -155,48 +197,9 @@ export default function App() {
       const knownFromStats = Object.values(pStats).map((p) => p.name);
       const combinedKnown = Array.from(new Set([...savedKnown, ...knownFromStats].filter(Boolean)));
       setSavedPlayers(combinedKnown);
-
-      const rawTourn = localStorage.getItem(tournKey);
-      if (rawTourn) {
-        const saved = JSON.parse(rawTourn);
-        setView(saved.view || 'setup');
-        setPlayerPool(saved.playerPool || []);
-        setNextPlayerId(saved.nextPlayerId || (saved.playerPool?.length ? Math.max(...saved.playerPool.map((p) => p.id)) + 1 : 1));
-        setNumTeams(saved.numTeams || 4);
-        setGoalScore(saved.goalScore || 11);
-        setDreambreakerScore(saved.dreambreakerScore || 21);
-        setAllowUneven(saved.allowUneven !== undefined ? saved.allowUneven : true);
-        setCaptainMode(saved.captainMode || 'random');
-        setSelectedCaptainIds(saved.selectedCaptainIds || []);
-        setMatchupConfig(saved.matchupConfig || { preset: 'adjacent', customSlotPairs: [] });
-        setTeams(saved.teams || []);
-        setPlayersById(saved.playersById || {});
-        setRemainingPool(saved.remainingPool || []);
-        setPickSequence(saved.pickSequence || []);
-        setPickPointer(saved.pickPointer || 0);
-        setSittingOut(saved.sittingOut || []);
-        setBracket(saved.bracket || null);
-        setActivePath(saved.activePath || null);
-        if (saved.adminPin) setAdminPin(saved.adminPin);
-      } else {
-        setView('setup');
-        setPlayerPool([]);
-        setNextPlayerId(1);
-        setMatchupConfig({ preset: 'adjacent', customSlotPairs: [] });
-        setTeams([]);
-        setPlayersById({});
-        setRemainingPool([]);
-        setPickSequence([]);
-        setPickPointer(0);
-        setSittingOut([]);
-        setBracket(null);
-        setActivePath(null);
-      }
     } catch (e) {
-      console.warn('Error loading room state:', e);
+      console.warn('Error loading room stats:', e);
     }
-
-    hydrated.current = true;
 
     // Connect Firebase Realtime listeners for this roomId
     let unsubTourn = () => {};
@@ -206,7 +209,6 @@ export default function App() {
     if (isCloudEnabled()) {
       unsubTourn = subscribeToActiveTournament(roomId, (cloudTourn) => {
         if (cloudTourn) {
-          if (cloudTourn.view) setView(cloudTourn.view);
           if (cloudTourn.playerPool) setPlayerPool(cloudTourn.playerPool);
           if (cloudTourn.nextPlayerId) setNextPlayerId(cloudTourn.nextPlayerId);
           if (cloudTourn.numTeams) setNumTeams(cloudTourn.numTeams);
@@ -222,9 +224,17 @@ export default function App() {
           if (cloudTourn.pickSequence) setPickSequence(cloudTourn.pickSequence);
           if (cloudTourn.pickPointer !== undefined) setPickPointer(cloudTourn.pickPointer);
           if (cloudTourn.sittingOut) setSittingOut(cloudTourn.sittingOut);
-          if (cloudTourn.bracket) setBracket(cloudTourn.bracket);
-          if (cloudTourn.activePath !== undefined) setActivePath(cloudTourn.activePath);
+          if (cloudTourn.bracket) {
+            setBracket(cloudTourn.bracket);
+            // Spectator smart routing: if spectator arrives and bracket exists while still on setup, route to bracket!
+            setView((curr) => (curr === 'setup' ? 'bracket' : curr));
+          }
           if (cloudTourn.adminPin) setAdminPin(cloudTourn.adminPin);
+
+          // If admin, sync view if cloud had a progression
+          if (isAdmin && cloudTourn.view) {
+            setView((curr) => (curr === 'setup' && cloudTourn.bracket ? 'bracket' : curr));
+          }
         }
       });
 
@@ -246,11 +256,10 @@ export default function App() {
       unsubPlayers();
       if (rotateTimeoutRef.current) clearTimeout(rotateTimeoutRef.current);
     };
-  }, [roomId]);
+  }, [roomId, isAdmin]);
 
   // 3. LocalStorage persistence on change
   useEffect(() => {
-    if (!hydrated.current) return;
     try {
       localStorage.setItem(
         getTournStorageKey(roomId),
@@ -266,6 +275,7 @@ export default function App() {
       // ignore
     }
   }, [roomId, adminPin, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
     const computed = computeAllStats(priorStats, priorPartnershipStats, currentBracket, currentTeams, currentPlayers);
@@ -775,6 +785,35 @@ export default function App() {
     if (willRotate && !isWin) triggerRotateBanner();
   }
 
+  function handleUpdateNumTeams(val) {
+    setNumTeams(val);
+    broadcastTournamentChange({ numTeams: val });
+  }
+  function handleUpdateGoalScore(val) {
+    setGoalScore(val);
+    broadcastTournamentChange({ goalScore: val });
+  }
+  function handleUpdateDreambreakerScore(val) {
+    setDreambreakerScore(val);
+    broadcastTournamentChange({ dreambreakerScore: val });
+  }
+  function handleUpdateAllowUneven(val) {
+    setAllowUneven(val);
+    broadcastTournamentChange({ allowUneven: val });
+  }
+  function handleUpdateCaptainMode(val) {
+    setCaptainMode(val);
+    broadcastTournamentChange({ captainMode: val });
+  }
+  function handleUpdateSelectedCaptainIds(val) {
+    setSelectedCaptainIds(val);
+    broadcastTournamentChange({ selectedCaptainIds: val });
+  }
+  function handleUpdateMatchupConfig(val) {
+    setMatchupConfig(val);
+    broadcastTournamentChange({ matchupConfig: val });
+  }
+
   function handleSwitchRoom(newRoomId, pin) {
     const cleanRoom = sanitizeRoomId(newRoomId);
     if (!cleanRoom) return;
@@ -789,7 +828,53 @@ export default function App() {
     window.history.replaceState({}, '', url.toString());
 
     setRoomId(cleanRoom);
-    if (pin && pin === adminPin) {
+    try {
+      localStorage.setItem('neep_current_room', cleanRoom);
+    } catch (e) {}
+
+    const saved = loadSavedTournament(cleanRoom);
+    if (saved) {
+      setView(saved.view || 'setup');
+      setPlayerPool(saved.playerPool || []);
+      setNextPlayerId(saved.nextPlayerId || (saved.playerPool?.length ? Math.max(...saved.playerPool.map((p) => p.id)) + 1 : 1));
+      setNumTeams(saved.numTeams || 4);
+      setGoalScore(saved.goalScore || 11);
+      setDreambreakerScore(saved.dreambreakerScore || 21);
+      setAllowUneven(saved.allowUneven !== undefined ? saved.allowUneven : true);
+      setCaptainMode(saved.captainMode || 'random');
+      setSelectedCaptainIds(saved.selectedCaptainIds || []);
+      setMatchupConfig(saved.matchupConfig || { preset: 'adjacent', customSlotPairs: [] });
+      setTeams(saved.teams || []);
+      setPlayersById(saved.playersById || {});
+      setRemainingPool(saved.remainingPool || []);
+      setPickSequence(saved.pickSequence || []);
+      setPickPointer(saved.pickPointer || 0);
+      setSittingOut(saved.sittingOut || []);
+      setBracket(saved.bracket || null);
+      setActivePath(saved.activePath || null);
+      if (saved.adminPin) setAdminPin(saved.adminPin);
+    } else {
+      setView('setup');
+      setPlayerPool([]);
+      setNextPlayerId(1);
+      setNumTeams(4);
+      setGoalScore(11);
+      setDreambreakerScore(21);
+      setAllowUneven(true);
+      setCaptainMode('random');
+      setSelectedCaptainIds([]);
+      setMatchupConfig({ preset: 'adjacent', customSlotPairs: [] });
+      setTeams([]);
+      setPlayersById({});
+      setRemainingPool([]);
+      setPickSequence([]);
+      setPickPointer(0);
+      setSittingOut([]);
+      setBracket(null);
+      setActivePath(null);
+    }
+
+    if (pin && pin === (saved?.adminPin || adminPin)) {
       setIsAdmin(true);
     }
   }
@@ -799,10 +884,20 @@ export default function App() {
     setRoomId(cleanRoom);
     setAdminPin(newPin);
     setIsAdmin(true);
+    try {
+      localStorage.setItem('neep_current_room', cleanRoom);
+    } catch (e) {}
 
     setView('setup');
     setPlayerPool([]);
     setNextPlayerId(1);
+    setNumTeams(4);
+    setGoalScore(11);
+    setDreambreakerScore(21);
+    setAllowUneven(true);
+    setCaptainMode('random');
+    setSelectedCaptainIds([]);
+    setMatchupConfig({ preset: 'adjacent', customSlotPairs: [] });
     setTeams([]);
     setPlayersById({});
     setRemainingPool([]);
@@ -831,6 +926,7 @@ export default function App() {
         allowUneven: true,
         captainMode: 'random',
         selectedCaptainIds: [],
+        matchupConfig: { preset: 'adjacent', customSlotPairs: [] },
         teams: [],
         playersById: {},
         remainingPool: [],
@@ -870,7 +966,7 @@ export default function App() {
           setActivePath(null);
           setView('setup');
           try {
-            localStorage.removeItem(STORAGE_KEY_TOURNAMENT);
+            localStorage.removeItem(getTournStorageKey(roomId));
           } catch (e) {}
           broadcastTournamentChange({
             teams: [],
@@ -906,7 +1002,7 @@ export default function App() {
         setActivePath(null);
         setView('setup');
         try {
-          localStorage.removeItem(STORAGE_KEY_TOURNAMENT);
+          localStorage.removeItem(getTournStorageKey(roomId));
         } catch (e) {}
         broadcastTournamentChange({
           playerPool: [],
@@ -933,8 +1029,8 @@ export default function App() {
       confirmLabel: 'Wipe Stats',
       onConfirm: () => {
         try {
-          localStorage.setItem(STORAGE_KEY_STATS, JSON.stringify({}));
-          localStorage.setItem(STORAGE_KEY_PARTNERSHIPS, JSON.stringify({}));
+          localStorage.setItem(getStatsStorageKey(roomId), JSON.stringify({}));
+          localStorage.setItem(getPairsStorageKey(roomId), JSON.stringify({}));
         } catch (e) {}
         setGlobalStats({});
         setPartnershipStats({});
@@ -984,19 +1080,19 @@ export default function App() {
             onAddAllSavedPlayers={handleAddAllSavedPlayers}
             onRemoveSavedPlayer={handleRemoveSavedPlayer}
             numTeams={numTeams}
-            setNumTeams={setNumTeams}
+            setNumTeams={handleUpdateNumTeams}
             goalScore={goalScore}
-            setGoalScore={setGoalScore}
+            setGoalScore={handleUpdateGoalScore}
             dreambreakerScore={dreambreakerScore}
-            setDreambreakerScore={setDreambreakerScore}
+            setDreambreakerScore={handleUpdateDreambreakerScore}
             allowUneven={allowUneven}
-            setAllowUneven={setAllowUneven}
+            setAllowUneven={handleUpdateAllowUneven}
             captainMode={captainMode}
-            setCaptainMode={setCaptainMode}
+            setCaptainMode={handleUpdateCaptainMode}
             selectedCaptainIds={selectedCaptainIds}
-            setSelectedCaptainIds={setSelectedCaptainIds}
+            setSelectedCaptainIds={handleUpdateSelectedCaptainIds}
             matchupConfig={matchupConfig}
-            setMatchupConfig={setMatchupConfig}
+            setMatchupConfig={handleUpdateMatchupConfig}
             roomId={roomId}
             setRoomId={(newId) => handleSwitchRoom(newId, adminPin)}
             adminPin={adminPin}

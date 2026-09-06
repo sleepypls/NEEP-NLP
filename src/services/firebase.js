@@ -95,7 +95,8 @@ export function subscribeToActiveTournament(clubId = DEFAULT_CLUB_ID, onUpdate, 
     tournamentDocRef,
     (snap) => {
       if (snap.exists()) {
-        onUpdate(snap.data());
+        const raw = snap.data();
+        onUpdate(decodeStateFromFirestore(raw));
       } else {
         onUpdate(null);
       }
@@ -148,50 +149,120 @@ export function subscribeToKnownPlayers(clubId = DEFAULT_CLUB_ID, onUpdate) {
   );
 }
 
+// ---------------- Document Sanitizer & Codec ----------------
+
+export function sanitizeForFirestore(val) {
+  if (val === undefined) return null;
+  if (val === null || typeof val !== 'object') return val;
+
+  if (Array.isArray(val)) {
+    return val.map((item) => (item === undefined ? null : sanitizeForFirestore(item)));
+  }
+
+  const clean = {};
+  for (const [key, value] of Object.entries(val)) {
+    if (value !== undefined) {
+      clean[key] = sanitizeForFirestore(value);
+    }
+  }
+  return clean;
+}
+
+export function encodeStateForFirestore(state) {
+  if (!state) return state;
+  const clone = JSON.parse(JSON.stringify(state));
+  // Firestore doesn't support nested arrays (bracket.rounds = [[...]], matchupConfig.customSlotPairs = [[1,2]])
+  if (clone.bracket && Array.isArray(clone.bracket.rounds)) {
+    clone.bracket = {
+      ...clone.bracket,
+      rounds: clone.bracket.rounds.map((round) => ({
+        matches: Array.isArray(round) ? round : [],
+      })),
+    };
+  }
+  if (clone.matchupConfig && Array.isArray(clone.matchupConfig.customSlotPairs)) {
+    clone.matchupConfig = {
+      ...clone.matchupConfig,
+      customSlotPairs: clone.matchupConfig.customSlotPairs.map((pair) => ({
+        slots: Array.isArray(pair) ? pair : [],
+      })),
+    };
+  }
+  return clone;
+}
+
+export function decodeStateFromFirestore(data) {
+  if (!data) return data;
+  const clone = { ...data };
+  if (clone.bracket && Array.isArray(clone.bracket.rounds)) {
+    clone.bracket = {
+      ...clone.bracket,
+      rounds: clone.bracket.rounds.map((r) => (r && r.matches ? r.matches : r)),
+    };
+  }
+  if (clone.matchupConfig && Array.isArray(clone.matchupConfig.customSlotPairs)) {
+    clone.matchupConfig = {
+      ...clone.matchupConfig,
+      customSlotPairs: clone.matchupConfig.customSlotPairs.map((p) => (p && p.slots ? p.slots : p)),
+    };
+  }
+  return clone;
+}
+
 // ---------------- Document Writers ----------------
 
 export async function saveTournamentToCloud(clubId = DEFAULT_CLUB_ID, tournamentState) {
   const db = getDb();
-  if (!db || !tournamentState) return;
+  if (!db || !tournamentState) return false;
 
   try {
     const tournamentDocRef = doc(db, 'clubs', clubId, 'tournaments', 'active');
-    await setDoc(tournamentDocRef, {
-      ...tournamentState,
+    const prepared = encodeStateForFirestore(tournamentState);
+    const sanitized = sanitizeForFirestore({
+      ...prepared,
       updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    });
+    await setDoc(tournamentDocRef, sanitized, { merge: true });
+    return true;
   } catch (err) {
-    console.warn('[Firebase] Error saving tournament to cloud:', err);
+    console.error('[Firebase] Error saving tournament to cloud:', err);
+    return false;
   }
 }
 
 export async function saveStatsToCloud(clubId = DEFAULT_CLUB_ID, playerStats, partnershipStats) {
   const db = getDb();
-  if (!db) return;
+  if (!db) return false;
 
   try {
     const statsDocRef = doc(db, 'clubs', clubId, 'data', 'stats');
-    await setDoc(statsDocRef, {
+    const sanitized = sanitizeForFirestore({
       playerStats: playerStats || {},
       partnershipStats: partnershipStats || {},
       updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    });
+    await setDoc(statsDocRef, sanitized, { merge: true });
+    return true;
   } catch (err) {
-    console.warn('[Firebase] Error saving stats to cloud:', err);
+    console.error('[Firebase] Error saving stats to cloud:', err);
+    return false;
   }
 }
 
 export async function saveKnownPlayersToCloud(clubId = DEFAULT_CLUB_ID, roster) {
   const db = getDb();
-  if (!db) return;
+  if (!db) return false;
 
   try {
     const playersDocRef = doc(db, 'clubs', clubId, 'data', 'players');
-    await setDoc(playersDocRef, {
+    const sanitized = sanitizeForFirestore({
       roster: roster || [],
       updatedAt: new Date().toISOString(),
-    }, { merge: true });
+    });
+    await setDoc(playersDocRef, sanitized, { merge: true });
+    return true;
   } catch (err) {
-    console.warn('[Firebase] Error saving players to cloud:', err);
+    console.error('[Firebase] Error saving players to cloud:', err);
+    return false;
   }
 }
