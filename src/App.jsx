@@ -470,6 +470,47 @@ export default function App() {
     }
   }
 
+  function handleRenameDirectoryPlayer(oldName, newName) {
+    const cleanOld = String(oldName || '').trim();
+    const cleanNew = String(newName || '').trim();
+    if (!cleanOld || !cleanNew || cleanOld.toLowerCase() === cleanNew.toLowerCase()) return;
+
+    // 1. Update savedPlayers in active room directory
+    const updatedKnown = Array.from(
+      new Set(
+        savedPlayers.map((n) => (n.trim().toLowerCase() === cleanOld.toLowerCase() ? cleanNew : n))
+      )
+    );
+    setSavedPlayers(updatedKnown);
+    try {
+      localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(updatedKnown));
+    } catch (e) {}
+    if (isCloudEnabled()) {
+      saveKnownPlayersToCloud(roomId, updatedKnown);
+    }
+
+    // 2. If this player is currently in the active tournament pool, rename them in tournament as well
+    const poolPlayer = playerPool.find((p) => p.name.trim().toLowerCase() === cleanOld.toLowerCase());
+    if (poolPlayer) {
+      const updatedPool = playerPool.map((p) =>
+        p.id === poolPlayer.id ? { ...p, name: cleanNew } : p
+      );
+      setPlayerPool(updatedPool);
+
+      const updatedPlayersById = { ...playersById, [poolPlayer.id]: cleanNew };
+      setPlayersById(updatedPlayersById);
+
+      if (bracket) {
+        syncTournamentStats(bracket, teams, updatedPlayersById);
+      }
+
+      broadcastTournamentChange({
+        playerPool: updatedPool,
+        playersById: updatedPlayersById,
+      });
+    }
+  }
+
   function handleInitializeDraft() {
     const captainsToUse = captainMode === 'manual' ? selectedCaptainIds : [];
     const result = initializeDraftState(playerPool, numTeams, allowUneven, captainsToUse);
@@ -1191,6 +1232,7 @@ export default function App() {
             onAddAllSavedPlayers={handleAddAllSavedPlayers}
             onRemoveSavedPlayer={handleRemoveSavedPlayer}
             onAddDirectoryPlayer={handleAddPlayerToDirectory}
+            onRenameDirectoryPlayer={handleRenameDirectoryPlayer}
             onImportFromMainDirectory={handleImportFromMainDirectory}
             numTeams={numTeams}
             setNumTeams={handleUpdateNumTeams}

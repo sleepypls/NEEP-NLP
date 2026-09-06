@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2 } from 'lucide-react';
+import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
 import { getDefaultSlotPairs } from '../utils/tournament';
 
@@ -12,6 +12,7 @@ export function SetupView({
   onAddAllSavedPlayers,
   onRemoveSavedPlayer,
   onAddDirectoryPlayer,
+  onRenameDirectoryPlayer,
   onImportFromMainDirectory,
   numTeams,
   setNumTeams,
@@ -36,6 +37,8 @@ export function SetupView({
 }) {
   const [nameInput, setNameInput] = useState('');
   const [directoryNameInput, setDirectoryNameInput] = useState('');
+  const [editingDirectoryName, setEditingDirectoryName] = useState(null);
+  const [editDirectoryValue, setEditDirectoryValue] = useState('');
 
   function toggleCaptain(id) {
     if (!isAdmin) return;
@@ -236,6 +239,52 @@ export function SetupView({
                       const isInPool = playerPool.some(
                         (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
                       );
+
+                      if (editingDirectoryName === name) {
+                        return (
+                          <form
+                            key={name}
+                            onSubmit={(e) => {
+                              e.preventDefault();
+                              const trimmed = editDirectoryValue.trim();
+                              if (trimmed && trimmed.toLowerCase() !== name.toLowerCase() && onRenameDirectoryPlayer) {
+                                onRenameDirectoryPlayer(name, trimmed);
+                              }
+                              setEditingDirectoryName(null);
+                            }}
+                            className="inline-flex items-center gap-1 bg-slate-900 border border-[#d7f24c] rounded-full pl-2.5 pr-1 py-0.5 text-xs shadow-lg ring-1 ring-[#d7f24c]/40 animate-in fade-in duration-100"
+                          >
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editDirectoryValue}
+                              onChange={(e) => setEditDirectoryValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') setEditingDirectoryName(null);
+                              }}
+                              className="bg-transparent text-white text-xs font-semibold focus:outline-none w-20 sm:w-28 px-0.5"
+                              placeholder="Name"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!editDirectoryValue.trim()}
+                              className="text-emerald-400 hover:text-emerald-300 p-0.5 rounded-full transition disabled:opacity-40"
+                              title="Save renamed player"
+                            >
+                              <Check size={12} className="stroke-[3]" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingDirectoryName(null)}
+                              className="text-slate-400 hover:text-slate-200 p-0.5 rounded-full transition"
+                              title="Cancel"
+                            >
+                              <X size={12} />
+                            </button>
+                          </form>
+                        );
+                      }
+
                       return (
                         <span
                           key={name}
@@ -247,8 +296,14 @@ export function SetupView({
                         >
                           {isInPool ? (
                             <span
+                              onDoubleClick={() => {
+                                if (isAdmin) {
+                                  setEditingDirectoryName(name);
+                                  setEditDirectoryValue(name);
+                                }
+                              }}
                               className="font-medium flex items-center gap-1 text-emerald-300 cursor-default"
-                              title={`${name} is currently in the active tournament`}
+                              title={`${name} is in tournament (double-click to rename)`}
                             >
                               <Check size={11} className="stroke-[3] text-emerald-400" />
                               <span>{name}</span>
@@ -256,20 +311,46 @@ export function SetupView({
                           ) : (
                             <button
                               onClick={() => onAddSavedPlayer(name)}
+                              onDoubleClick={() => {
+                                if (isAdmin) {
+                                  setEditingDirectoryName(name);
+                                  setEditDirectoryValue(name);
+                                }
+                              }}
                               className="font-medium hover:text-white flex items-center gap-1"
-                              title={`Add ${name} to tournament pool`}
+                              title={`Add ${name} to tournament pool (double-click to rename)`}
                             >
                               <span>{name}</span>
                               <span className="text-[#d7f24c] font-bold text-sm leading-none">+</span>
                             </button>
                           )}
-                          <button
-                            onClick={() => onRemoveSavedPlayer(name)}
-                            className="text-slate-500 hover:text-red-400 p-0.5 rounded-full transition"
-                            title={`Remove ${name} from room directory`}
-                          >
-                            <X size={11} />
-                          </button>
+                          {isAdmin && (
+                            <div className="flex items-center gap-0.5 opacity-70 group-hover:opacity-100 transition">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingDirectoryName(name);
+                                  setEditDirectoryValue(name);
+                                }}
+                                className="text-slate-400 hover:text-[#d7f24c] p-0.5 rounded-full transition"
+                                title={`Rename ${name} in directory`}
+                              >
+                                <Pencil size={10} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRemoveSavedPlayer(name);
+                                }}
+                                className="text-slate-500 hover:text-red-400 p-0.5 rounded-full transition"
+                                title={`Remove ${name} from room directory`}
+                              >
+                                <X size={11} />
+                              </button>
+                            </div>
+                          )}
                         </span>
                       );
                     })}
