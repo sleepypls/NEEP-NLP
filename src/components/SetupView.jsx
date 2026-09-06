@@ -11,6 +11,8 @@ export function SetupView({
   onAddSavedPlayer,
   onAddAllSavedPlayers,
   onRemoveSavedPlayer,
+  onAddDirectoryPlayer,
+  onImportFromMainDirectory,
   numTeams,
   setNumTeams,
   goalScore,
@@ -33,6 +35,7 @@ export function SetupView({
   isAdmin,
 }) {
   const [nameInput, setNameInput] = useState('');
+  const [directoryNameInput, setDirectoryNameInput] = useState('');
 
   function toggleCaptain(id) {
     if (!isAdmin) return;
@@ -156,44 +159,103 @@ export function SetupView({
           </div>
         )}
 
-        {/* Saved Players Tray */}
-        {isAdmin && availableSaved.length > 0 && (
+        {/* Saved Players Tray (Per-Room Directory) */}
+        {isAdmin && (
           <div className="mt-4 pt-3.5 border-t border-slate-800/80">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-                <Users size={13} className="text-[#d7f24c]" /> Saved Players ({availableSaved.length})
-              </span>
-              <button
-                onClick={onAddAllSavedPlayers}
-                className="text-xs font-bold text-[#d7f24c] hover:underline flex items-center gap-1 active:scale-95 transition"
-              >
-                <UserPlus size={13} /> + Add All ({availableSaved.length})
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {availableSaved.map((name) => (
-                <span
-                  key={name}
-                  className="group inline-flex items-center gap-1.5 bg-slate-800/70 hover:bg-slate-750 border border-slate-700/60 rounded-full pl-2.5 pr-1 py-0.5 text-slate-300 text-xs transition"
-                >
-                  <button
-                    onClick={() => onAddSavedPlayer(name)}
-                    className="font-medium hover:text-white flex items-center gap-1"
-                    title={`Add ${name} to tournament`}
-                  >
-                    <span>{name}</span>
-                    <span className="text-emerald-400 font-bold text-sm leading-none">+</span>
-                  </button>
-                  <button
-                    onClick={() => onRemoveSavedPlayer(name)}
-                    className="text-slate-600 hover:text-red-400 p-0.5 rounded-full transition"
-                    title={`Remove ${name} from saved list`}
-                  >
-                    <X size={11} />
-                  </button>
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Users size={13} className="text-[#d7f24c] shrink-0" />
+                <span className="text-slate-300 text-xs font-bold uppercase tracking-wider truncate">
+                  Directory ({savedPlayers.length})
                 </span>
-              ))}
+                <span className="text-[10px] font-mono font-bold bg-slate-850 text-[#d7f24c] border border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[120px]">
+                  {roomId || 'Main'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {availableSaved.length > 0 && (
+                  <button
+                    onClick={onAddAllSavedPlayers}
+                    className="text-xs font-bold text-[#d7f24c] hover:underline flex items-center gap-1 active:scale-95 transition"
+                  >
+                    <UserPlus size={13} /> + Add All ({availableSaved.length})
+                  </button>
+                )}
+                {onImportFromMainDirectory && roomId && roomId !== 'neep-main' && savedPlayers.length === 0 && (
+                  <button
+                    onClick={onImportFromMainDirectory}
+                    title="Copy player names from the main room directory into this room"
+                    className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 active:scale-95 transition"
+                  >
+                    <Plus size={12} /> Import from Main
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Quick add to this room's directory */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const trimmed = directoryNameInput.trim();
+                if (trimmed && onAddDirectoryPlayer) {
+                  onAddDirectoryPlayer(trimmed);
+                  setDirectoryNameInput('');
+                }
+              }}
+              className="flex items-center gap-1.5 mb-2.5"
+            >
+              <input
+                type="text"
+                value={directoryNameInput}
+                onChange={(e) => setDirectoryNameInput(e.target.value)}
+                placeholder={`Save name to ${roomId || 'room'} directory...`}
+                className="flex-1 bg-slate-950/70 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+              />
+              <button
+                type="submit"
+                disabled={!directoryNameInput.trim()}
+                className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] font-bold text-xs border border-slate-700 disabled:opacity-40 transition shrink-0"
+              >
+                + Save
+              </button>
+            </form>
+
+            {/* List of saved names in this room */}
+            {availableSaved.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {availableSaved.map((name) => (
+                  <span
+                    key={name}
+                    className="group inline-flex items-center gap-1.5 bg-slate-800/70 hover:bg-slate-750 border border-slate-700/60 rounded-full pl-2.5 pr-1 py-0.5 text-slate-300 text-xs transition"
+                  >
+                    <button
+                      onClick={() => onAddSavedPlayer(name)}
+                      className="font-medium hover:text-white flex items-center gap-1"
+                      title={`Add ${name} to tournament`}
+                    >
+                      <span>{name}</span>
+                      <span className="text-emerald-400 font-bold text-sm leading-none">+</span>
+                    </button>
+                    <button
+                      onClick={() => onRemoveSavedPlayer(name)}
+                      className="text-slate-600 hover:text-red-400 p-0.5 rounded-full transition"
+                      title={`Remove ${name} from saved list`}
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : savedPlayers.length === 0 ? (
+              <p className="text-[11px] text-slate-500 italic">
+                No saved players in this room directory yet. Names entered in tournaments or saved above will be stored here.
+              </p>
+            ) : (
+              <p className="text-[11px] text-slate-500 italic">
+                All {savedPlayers.length} directory players have been added to the active tournament pool.
+              </p>
+            )}
           </div>
         )}
       </div>

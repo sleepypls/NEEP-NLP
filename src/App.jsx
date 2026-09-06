@@ -44,6 +44,20 @@ import {
   sanitizeRoomId,
 } from './utils/room';
 
+function getTournStorageKey(rid) {
+  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-tournament-state-v1' : `neep_tourn_${rid}_v1`;
+}
+function getStatsStorageKey(rid) {
+  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-global-stats-v1' : `neep_stats_${rid}_v1`;
+}
+function getPairsStorageKey(rid) {
+  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-partnerships-v1' : `neep_pairs_${rid}_v1`;
+}
+function getKnownPlayersStorageKey(rid) {
+  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-known-players-v1' : `neep_players_${rid}_v1`;
+}
+const DEFAULT_STORAGE_KEY_KNOWN_PLAYERS = 'neep-pickleball-known-players-v1';
+
 function getInitialRoomId() {
   try {
     const params = new URLSearchParams(window.location.search);
@@ -63,6 +77,19 @@ function loadSavedTournament(rid) {
     console.warn('Error reading saved tournament from storage:', e);
   }
   return null;
+}
+
+function loadKnownPlayers(rid) {
+  try {
+    const raw = localStorage.getItem(getKnownPlayersStorageKey(rid));
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Error reading known players for room:', rid, e);
+  }
+  return [];
 }
 
 export default function App() {
@@ -139,12 +166,7 @@ export default function App() {
       return raw ? JSON.parse(raw) : {};
     } catch (e) { return {}; }
   });
-  const [savedPlayers, setSavedPlayers] = useState(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY_KNOWN_PLAYERS);
-      return raw ? JSON.parse(raw) : [];
-    } catch (e) { return []; }
-  });
+  const [savedPlayers, setSavedPlayers] = useState(() => loadKnownPlayers(initialRoomId));
 
   // Modals
   const [modal, setModal] = useState(null);
@@ -192,13 +214,10 @@ export default function App() {
       setPriorStats(pStats);
       setPriorPartnershipStats(pairStats);
 
-      const rawKnown = localStorage.getItem(STORAGE_KEY_KNOWN_PLAYERS);
-      const savedKnown = rawKnown ? JSON.parse(rawKnown) : [];
-      const knownFromStats = Object.values(pStats).map((p) => p.name);
-      const combinedKnown = Array.from(new Set([...savedKnown, ...knownFromStats].filter(Boolean)));
-      setSavedPlayers(combinedKnown);
+      const roomKnown = loadKnownPlayers(roomId);
+      setSavedPlayers(roomKnown);
     } catch (e) {
-      console.warn('Error loading room stats:', e);
+      console.warn('Error loading room stats & players:', e);
     }
 
     // Connect Firebase Realtime listeners for this roomId
@@ -244,8 +263,11 @@ export default function App() {
       });
 
       unsubPlayers = subscribeToKnownPlayers(roomId, (cloudPlayers) => {
-        if (cloudPlayers && cloudPlayers.length > 0) {
-          setSavedPlayers((prev) => Array.from(new Set([...prev, ...cloudPlayers])));
+        if (cloudPlayers && Array.isArray(cloudPlayers)) {
+          setSavedPlayers(cloudPlayers);
+          try {
+            localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(cloudPlayers));
+          } catch (e) {}
         }
       });
     }
@@ -307,6 +329,37 @@ export default function App() {
     }
   }
 
+  function handleImportFromMainDirectory() {
+    try {
+      const mainRaw = localStorage.getItem(DEFAULT_STORAGE_KEY_KNOWN_PLAYERS);
+      const mainPlayers = mainRaw ? JSON.parse(mainRaw) : [];
+      if (!Array.isArray(mainPlayers) || mainPlayers.length === 0) return;
+      const merged = Array.from(new Set([...savedPlayers, ...mainPlayers]));
+      setSavedPlayers(merged);
+      localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(merged));
+      if (isCloudEnabled()) {
+        saveKnownPlayersToCloud(roomId, merged);
+      }
+    } catch (e) {
+      console.warn('Error importing from main directory:', e);
+    }
+  }
+
+  function handleAddPlayerToDirectory(name) {
+    const trimmed = String(name).trim();
+    if (!trimmed) return;
+    if (!savedPlayers.some((n) => n.trim().toLowerCase() === trimmed.toLowerCase())) {
+      const updated = [...savedPlayers, trimmed];
+      setSavedPlayers(updated);
+      try {
+        localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(updated));
+      } catch (e) {}
+      if (isCloudEnabled()) {
+        saveKnownPlayersToCloud(roomId, updated);
+      }
+    }
+  }
+
   function addPlayer(name) {
     const trimmed = String(name).trim();
     if (!trimmed) return;
@@ -318,7 +371,7 @@ export default function App() {
       const updatedKnown = [...savedPlayers, trimmed];
       setSavedPlayers(updatedKnown);
       try {
-        localStorage.setItem(STORAGE_KEY_KNOWN_PLAYERS, JSON.stringify(updatedKnown));
+        localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(updatedKnown));
       } catch (e) {}
       if (isCloudEnabled()) {
         saveKnownPlayersToCloud(roomId, updatedKnown);
@@ -355,10 +408,10 @@ export default function App() {
     const updated = savedPlayers.filter((n) => n.trim().toLowerCase() !== name.trim().toLowerCase());
     setSavedPlayers(updated);
     try {
-      localStorage.setItem(STORAGE_KEY_KNOWN_PLAYERS, JSON.stringify(updated));
+      localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(updated));
     } catch (e) {}
     if (isCloudEnabled()) {
-      saveKnownPlayersToCloud('neep-pickleball', updated);
+      saveKnownPlayersToCloud(roomId, updated);
     }
   }
 
@@ -633,9 +686,9 @@ export default function App() {
     const updatedKnown = Array.from(new Set([...savedPlayers, newPlayerName.trim()]));
     setSavedPlayers(updatedKnown);
     try {
-      localStorage.setItem(STORAGE_KEY_KNOWN_PLAYERS, JSON.stringify(updatedKnown));
+      localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(updatedKnown));
     } catch (e) {}
-    if (isCloudEnabled()) saveKnownPlayersToCloud(updatedKnown);
+    if (isCloudEnabled()) saveKnownPlayersToCloud(roomId, updatedKnown);
 
     syncTournamentStats(result.bracket, result.teams, result.playersById);
     broadcastTournamentChange({
@@ -661,9 +714,9 @@ export default function App() {
     const updatedKnown = Array.from(new Set([...savedPlayers, newName.trim()]));
     setSavedPlayers(updatedKnown);
     try {
-      localStorage.setItem(STORAGE_KEY_KNOWN_PLAYERS, JSON.stringify(updatedKnown));
+      localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(updatedKnown));
     } catch (e) {}
-    if (isCloudEnabled()) saveKnownPlayersToCloud(updatedKnown);
+    if (isCloudEnabled()) saveKnownPlayersToCloud(roomId, updatedKnown);
 
     syncTournamentStats(bracket, teams, result.playersById);
     broadcastTournamentChange({
@@ -874,6 +927,8 @@ export default function App() {
       setActivePath(null);
     }
 
+    setSavedPlayers(loadKnownPlayers(cleanRoom));
+
     if (pin && pin === (saved?.adminPin || adminPin)) {
       setIsAdmin(true);
     }
@@ -906,6 +961,7 @@ export default function App() {
     setSittingOut([]);
     setBracket(null);
     setActivePath(null);
+    setSavedPlayers(loadKnownPlayers(cleanRoom));
 
     const url = new URL(window.location.href);
     url.searchParams.set('room', cleanRoom);
@@ -1079,6 +1135,8 @@ export default function App() {
             onAddSavedPlayer={handleAddSavedPlayer}
             onAddAllSavedPlayers={handleAddAllSavedPlayers}
             onRemoveSavedPlayer={handleRemoveSavedPlayer}
+            onAddDirectoryPlayer={handleAddPlayerToDirectory}
+            onImportFromMainDirectory={handleImportFromMainDirectory}
             numTeams={numTeams}
             setNumTeams={handleUpdateNumTeams}
             goalScore={goalScore}
