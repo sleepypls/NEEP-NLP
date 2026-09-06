@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound } from 'lucide-react';
+import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2 } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
+import { getDefaultSlotPairs } from '../utils/tournament';
 
 export function SetupView({
   playerPool,
@@ -22,6 +23,8 @@ export function SetupView({
   setCaptainMode,
   selectedCaptainIds = [],
   setSelectedCaptainIds,
+  matchupConfig = { preset: 'adjacent', customSlotPairs: [] },
+  setMatchupConfig,
   roomId,
   setRoomId,
   adminPin,
@@ -460,6 +463,167 @@ export function SetupView({
           placeholder="Custom Dreambreaker limit"
           className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-60"
         />
+      </div>
+
+      {/* Partner Matchup Configuration Card */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
+            <ArrowRightLeft size={16} className="text-[#d7f24c]" /> Partner Matchup Configuration
+          </label>
+          <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/10 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
+            Mirrored Draft Order
+          </span>
+        </div>
+        <p className="text-slate-400 text-xs mb-3">
+          Configure how partners are paired based on draft order. Opponents always mirror the same draft slots (e.g. 1 & 2 vs 1 & 2).
+        </p>
+
+        {/* Preset Selector */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <button
+            type="button"
+            disabled={!isAdmin}
+            onClick={() => {
+              const defaultPairs = getDefaultSlotPairs(baseTeamSize >= 2 ? baseTeamSize : 4, 'adjacent');
+              setMatchupConfig({ preset: 'adjacent', customSlotPairs: defaultPairs });
+            }}
+            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition text-center ${
+              (matchupConfig?.preset || 'adjacent') === 'adjacent'
+                ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
+            }`}
+          >
+            Adjacent Slots
+            <span className="block text-[10px] font-normal opacity-80 mt-0.5">1&2, 3&4, 5&6</span>
+          </button>
+          <button
+            type="button"
+            disabled={!isAdmin}
+            onClick={() => {
+              const defaultPairs = getDefaultSlotPairs(baseTeamSize >= 2 ? baseTeamSize : 4, 'balanced');
+              setMatchupConfig({ preset: 'balanced', customSlotPairs: defaultPairs });
+            }}
+            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition text-center ${
+              matchupConfig?.preset === 'balanced'
+                ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
+            }`}
+          >
+            Balanced / MLP
+            <span className="block text-[10px] font-normal opacity-80 mt-0.5">1&4, 2&3</span>
+          </button>
+          <button
+            type="button"
+            disabled={!isAdmin}
+            onClick={() => {
+              const defaultPairs = (matchupConfig?.customSlotPairs && matchupConfig.customSlotPairs.length > 0)
+                ? matchupConfig.customSlotPairs
+                : getDefaultSlotPairs(baseTeamSize >= 2 ? baseTeamSize : 4, 'adjacent');
+              setMatchupConfig({ preset: 'custom', customSlotPairs: defaultPairs });
+            }}
+            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition text-center ${
+              matchupConfig?.preset === 'custom'
+                ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
+            }`}
+          >
+            Custom Pairs
+            <span className="block text-[10px] font-normal opacity-80 mt-0.5">Game-by-Game</span>
+          </button>
+        </div>
+
+        {/* Custom Game-by-Game Slot Editor */}
+        {matchupConfig?.preset === 'custom' ? (
+          <div className="space-y-2 pt-1 border-t border-slate-800/80">
+            <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+              <span>Regulation Games ({matchupConfig?.customSlotPairs?.length || 0})</span>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const existing = matchupConfig?.customSlotPairs || [];
+                    setMatchupConfig({
+                      preset: 'custom',
+                      customSlotPairs: [...existing, [1, 2]],
+                    });
+                  }}
+                  className="text-[#d7f24c] hover:underline font-bold flex items-center gap-1 text-[11px]"
+                >
+                  <Plus size={12} /> Add Game
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+              {(matchupConfig?.customSlotPairs || []).map((pair, idx) => (
+                <div key={idx} className="flex items-center gap-2 bg-slate-950/60 border border-slate-800 rounded-xl p-2 text-xs">
+                  <span className="font-mono text-slate-500 font-bold w-14 shrink-0">Game {idx + 1}</span>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <select
+                      disabled={!isAdmin}
+                      value={pair[0]}
+                      onChange={(e) => {
+                        const updated = [...(matchupConfig?.customSlotPairs || [])];
+                        updated[idx] = [Number(e.target.value), pair[1]];
+                        setMatchupConfig({ preset: 'custom', customSlotPairs: updated });
+                      }}
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-white font-bold text-xs focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+                    >
+                      {Array.from({ length: Math.max(4, baseTeamSize) }, (_, i) => i + 1).map((s) => (
+                        <option key={s} value={s}>Slot {s} {s === 1 ? '(Capt)' : ''}</option>
+                      ))}
+                    </select>
+                    <span className="text-slate-500 font-bold">&</span>
+                    <select
+                      disabled={!isAdmin}
+                      value={pair[1]}
+                      onChange={(e) => {
+                        const updated = [...(matchupConfig?.customSlotPairs || [])];
+                        updated[idx] = [pair[0], Number(e.target.value)];
+                        setMatchupConfig({ preset: 'custom', customSlotPairs: updated });
+                      }}
+                      className="bg-slate-800 border border-slate-700 rounded-lg px-2 py-1 text-white font-bold text-xs focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+                    >
+                      {Array.from({ length: Math.max(4, baseTeamSize) }, (_, i) => i + 1).map((s) => (
+                        <option key={s} value={s}>Slot {s} {s === 1 ? '(Capt)' : ''}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <span className="text-[11px] text-slate-400 font-mono hidden xs:inline shrink-0">vs identical</span>
+                  {isAdmin && (matchupConfig?.customSlotPairs?.length || 0) > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = (matchupConfig?.customSlotPairs || []).filter((_, i) => i !== idx);
+                        setMatchupConfig({ preset: 'custom', customSlotPairs: updated });
+                      }}
+                      className="text-slate-500 hover:text-red-400 p-1 rounded-lg transition shrink-0"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* Preset Games Preview */
+          <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 text-xs">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+              Scheduled Regulation Matchups Preview:
+            </span>
+            <div className="grid grid-cols-2 gap-1.5 font-mono text-[11px] text-slate-300">
+              {getDefaultSlotPairs(baseTeamSize >= 2 ? baseTeamSize : 4, matchupConfig?.preset || 'adjacent').slice(0, 6).map((pair, idx) => (
+                <div key={idx} className="bg-slate-800/60 border border-slate-700/40 rounded-lg px-2 py-1 flex items-center justify-between">
+                  <span className="text-slate-400">G{idx + 1}:</span>
+                  <span className="text-[#d7f24c] font-bold">Slot {pair[0]} & {pair[1]}</span>
+                  <span className="text-slate-500 text-[10px]">mirrored</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Uneven Teams Toggle */}

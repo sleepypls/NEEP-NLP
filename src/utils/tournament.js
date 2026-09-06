@@ -18,6 +18,57 @@ export function shuffle(arr) {
   return a;
 }
 
+export function getDefaultSlotPairs(teamSize, preset = 'adjacent') {
+  const n = Math.max(2, teamSize || 4);
+  const pairs = [];
+
+  if (preset === 'balanced') {
+    // Balanced / MLP style: 1&n, 2&(n-1), 3&(n-2)...
+    const half = Math.floor(n / 2);
+    for (let i = 0; i < half; i++) {
+      pairs.push([i + 1, n - i]);
+    }
+    // Second rotations (mirrored high-low crosses)
+    for (let i = 0; i < half; i++) {
+      const p1 = (i * 2) + 1;
+      const p2 = ((i * 2) + 2 <= n) ? (i * 2) + 2 : 2;
+      if (pairs.length < 4 || pairs.length < n) {
+        pairs.push([p1, p2]);
+      }
+    }
+    let g = 1;
+    while (pairs.length < Math.max(4, n)) {
+      pairs.push([g, (g % n) + 1]);
+      g = (g % n) + 1;
+    }
+  } else {
+    // Adjacent: 1&2, 3&4, 5&6...
+    for (let i = 1; i <= n - 1; i += 2) {
+      pairs.push([i, i + 1]);
+    }
+    if (n % 2 !== 0) {
+      pairs.push([n - 1, n]);
+    }
+    // Second rotations (e.g. 1&3, 2&4...)
+    for (let i = 1; i <= n - 2; i += 2) {
+      if (pairs.length < Math.max(4, n)) {
+        pairs.push([i, i + 2]);
+      }
+    }
+    for (let i = 2; i <= n; i += 2) {
+      if (pairs.length < Math.max(4, n)) {
+        pairs.push([i, (i + 2 <= n) ? i + 2 : 1]);
+      }
+    }
+    let g = 1;
+    while (pairs.length < Math.max(4, n)) {
+      pairs.push([g, (g % n) + 1]);
+      g = (g % n) + 1;
+    }
+  }
+  return pairs;
+}
+
 export function generatePairs(draftOrder) {
   const pairs = [];
   const n = draftOrder.length;
@@ -61,58 +112,166 @@ export function generateTeamPairsForGames(draftOrder, totalGames) {
   return pairs;
 }
 
-export function generateGames(teamA, teamB, goalScore) {
+export function generateGames(teamA, teamB, goalScore, matchupConfig = { preset: 'adjacent' }) {
   const nA = teamA.draftOrder.length;
   const nB = teamB.draftOrder.length;
+  const commonSize = Math.min(nA, nB);
 
-  if (nA === 4 && nB === 4) {
-    const pairsA = generatePairs(teamA.draftOrder);
-    const pairsB = generatePairs(teamB.draftOrder);
-    const games = [];
-    let id = 0;
-    for (let a = 0; a < 2; a++) {
-      for (let b = 0; b < 2; b++) {
-        games.push({
-          id: id++,
-          pairA: pairsA[a],
-          pairB: pairsB[b],
-          scoreA: 0,
-          scoreB: 0,
-          saved: false,
-          goalScore,
-          isExtra: false,
-          randomized: false,
-        });
-      }
-    }
-    return games;
+  // Determine slot pairs to use
+  let slotPairs = [];
+  if (matchupConfig?.preset === 'custom' && Array.isArray(matchupConfig?.customSlotPairs) && matchupConfig.customSlotPairs.length > 0) {
+    slotPairs = matchupConfig.customSlotPairs;
+  } else {
+    slotPairs = getDefaultSlotPairs(commonSize, matchupConfig?.preset || 'adjacent');
   }
 
+  const baseGamesCount = slotPairs.length;
   const minGamesToCoverA = Math.ceil(nA / 2) * 2;
   const minGamesToCoverB = Math.ceil(nB / 2) * 2;
-  let totalGames = Math.max(minGamesToCoverA, minGamesToCoverB, 4);
+  let totalGames = Math.max(baseGamesCount, minGamesToCoverA, minGamesToCoverB, 4);
   if (totalGames % 2 !== 0) totalGames += 1;
-
-  const baseGamesCount = 4;
-  const teamPairsA = generateTeamPairsForGames(teamA.draftOrder, totalGames);
-  const teamPairsB = generateTeamPairsForGames(teamB.draftOrder, totalGames);
 
   const games = [];
   for (let idx = 0; idx < totalGames; idx++) {
+    let pA, pB;
+    let sPair = null;
+    if (idx < slotPairs.length) {
+      sPair = slotPairs[idx];
+      // Convert 1-indexed slots to 0-indexed indices (safely bounded)
+      const s1A = Math.min(Math.max(1, sPair[0]), nA) - 1;
+      const s2A = Math.min(Math.max(1, sPair[1]), nA) - 1;
+      const s1B = Math.min(Math.max(1, sPair[0]), nB) - 1;
+      const s2B = Math.min(Math.max(1, sPair[1]), nB) - 1;
+
+      pA = [teamA.draftOrder[s1A], teamA.draftOrder[s2A]];
+      pB = [teamB.draftOrder[s1B], teamB.draftOrder[s2B]];
+    } else {
+      // Extra games for uneven rosters: fair candidates
+      const candA = shuffle([...teamA.draftOrder]);
+      const candB = shuffle([...teamB.draftOrder]);
+      pA = [candA[0], candA[1]];
+      pB = [candB[0], candB[1]];
+    }
+
     const isExtra = idx >= baseGamesCount;
     games.push({
       id: idx,
-      pairA: teamPairsA[idx],
-      pairB: teamPairsB[idx],
+      pairA: pA,
+      pairB: pB,
+      slotPair: sPair,
       scoreA: 0,
       scoreB: 0,
       saved: false,
+      inProgress: false,
       goalScore,
       isExtra,
       randomized: isExtra || (nA !== nB),
     });
   }
   return games;
+}
+
+export function randomizePendingMatchups(games, teamA, teamB, mode = 'mirror') {
+  const nA = teamA.draftOrder.length;
+  const nB = teamB.draftOrder.length;
+  const commonSize = Math.min(nA, nB);
+
+  return games.map((game) => {
+    // Only randomize games that are NOT in progress and NOT saved
+    if (game.inProgress || game.saved) return game;
+
+    if (mode === 'mirror' && commonSize >= 2) {
+      // Pick 2 distinct slots between 1 and commonSize
+      const slots = shuffle(Array.from({ length: commonSize }, (_, i) => i + 1));
+      const s1 = Math.min(slots[0], slots[1]);
+      const s2 = Math.max(slots[0], slots[1]);
+      const pA = [teamA.draftOrder[s1 - 1], teamA.draftOrder[s2 - 1]];
+      const pB = [teamB.draftOrder[s1 - 1], teamB.draftOrder[s2 - 1]];
+      return {
+        ...game,
+        pairA: pA,
+        pairB: pB,
+        slotPair: [s1, s2],
+        randomized: true,
+      };
+    } else {
+      // Free pick: pick 2 random distinct players from teamA and 2 from teamB
+      const candA = shuffle([...teamA.draftOrder]);
+      const candB = shuffle([...teamB.draftOrder]);
+      return {
+        ...game,
+        pairA: [candA[0], candA[1]],
+        pairB: [candB[0], candB[1]],
+        slotPair: null,
+        randomized: true,
+      };
+    }
+  });
+}
+
+export function substitutePlayerInTournament({ bracket, teams, playersById, playerPool, teamId, oldPlayerId, newPlayerName }) {
+  const cleanName = String(newPlayerName).trim();
+  if (!cleanName) return null;
+
+  const maxExistingId = Math.max(0, ...playerPool.map((p) => p.id));
+  const newPlayerId = maxExistingId + 1;
+
+  const newPlayersById = { ...playersById, [newPlayerId]: cleanName };
+  const newPlayerPool = [...playerPool, { id: newPlayerId, name: cleanName }];
+
+  const newTeams = teams.map((team) => {
+    if (team.id !== teamId) return team;
+    return {
+      ...team,
+      draftOrder: team.draftOrder.map((id) => (id === oldPlayerId ? newPlayerId : id)),
+      captainId: team.captainId === oldPlayerId ? newPlayerId : team.captainId,
+    };
+  });
+
+  let newBracket = bracket ? JSON.parse(JSON.stringify(bracket)) : null;
+  if (newBracket && newBracket.rounds) {
+    newBracket.rounds.forEach((round) => {
+      round.forEach((match) => {
+        if (match.games) {
+          match.games = match.games.map((g) => {
+            if (g.saved) return g; // preserve completed game stats
+            return {
+              ...g,
+              pairA: g.pairA.map((id) => (id === oldPlayerId ? newPlayerId : id)),
+              pairB: g.pairB.map((id) => (id === oldPlayerId ? newPlayerId : id)),
+            };
+          });
+        }
+        if (match.dreambreaker && !match.dreambreaker.started) {
+          if (Array.isArray(match.dreambreaker.lineupA)) {
+            match.dreambreaker.lineupA = match.dreambreaker.lineupA.map((id) => (id === oldPlayerId ? newPlayerId : id));
+          }
+          if (Array.isArray(match.dreambreaker.lineupB)) {
+            match.dreambreaker.lineupB = match.dreambreaker.lineupB.map((id) => (id === oldPlayerId ? newPlayerId : id));
+          }
+        }
+      });
+    });
+  }
+
+  return {
+    bracket: newBracket,
+    teams: newTeams,
+    playersById: newPlayersById,
+    playerPool: newPlayerPool,
+    newPlayerId,
+  };
+}
+
+export function renamePlayerInTournament({ playersById, playerPool, playerId, newName }) {
+  const cleanName = String(newName).trim();
+  if (!cleanName) return null;
+  const newPlayersById = { ...playersById, [playerId]: cleanName };
+  const newPlayerPool = (playerPool || []).map((p) => (p.id === playerId ? { ...p, name: cleanName } : p));
+  return {
+    playersById: newPlayersById,
+    playerPool: newPlayerPool,
+  };
 }
 
 export function initializeDraftState(playerPool, numTeams, allowUneven = true, selectedCaptainIds = []) {

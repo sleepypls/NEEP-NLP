@@ -10,6 +10,8 @@ import { LeaderboardView } from './components/LeaderboardView';
 import { ConfirmModal } from './components/ConfirmModal';
 import { ShareModal } from './components/ShareModal';
 import { CloudConfigModal } from './components/CloudConfigModal';
+import { EditMatchupModal } from './components/EditMatchupModal';
+import { RosterModal } from './components/RosterModal';
 
 import {
   generateGames,
@@ -17,6 +19,9 @@ import {
   generateBracket,
   advanceWinner,
   computeAllStats,
+  randomizePendingMatchups,
+  substitutePlayerInTournament,
+  renamePlayerInTournament,
 } from './utils/tournament';
 
 import {
@@ -65,6 +70,7 @@ export default function App() {
   const [sittingOut, setSittingOut] = useState([]);
   const [captainMode, setCaptainMode] = useState('random');
   const [selectedCaptainIds, setSelectedCaptainIds] = useState([]);
+  const [matchupConfig, setMatchupConfig] = useState({ preset: 'adjacent', customSlotPairs: [] });
 
   const [bracket, setBracket] = useState(null);
   const [activePath, setActivePath] = useState(null);
@@ -95,6 +101,9 @@ export default function App() {
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
   const [isCloudConfigOpen, setIsCloudConfigOpen] = useState(false);
+  const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
+  const [rosterModalTeamId, setRosterModalTeamId] = useState(null);
+  const [editingMatchupGame, setEditingMatchupGame] = useState(null);
   const [showRotateBanner, setShowRotateBanner] = useState(false);
   const rotateTimeoutRef = useRef(null);
   const hydrated = useRef(false);
@@ -157,6 +166,7 @@ export default function App() {
         setAllowUneven(saved.allowUneven !== undefined ? saved.allowUneven : true);
         setCaptainMode(saved.captainMode || 'random');
         setSelectedCaptainIds(saved.selectedCaptainIds || []);
+        setMatchupConfig(saved.matchupConfig || { preset: 'adjacent', customSlotPairs: [] });
         setTeams(saved.teams || []);
         setPlayersById(saved.playersById || {});
         setRemainingPool(saved.remainingPool || []);
@@ -170,6 +180,7 @@ export default function App() {
         setView('setup');
         setPlayerPool([]);
         setNextPlayerId(1);
+        setMatchupConfig({ preset: 'adjacent', customSlotPairs: [] });
         setTeams([]);
         setPlayersById({});
         setRemainingPool([]);
@@ -202,6 +213,7 @@ export default function App() {
           if (cloudTourn.allowUneven !== undefined) setAllowUneven(cloudTourn.allowUneven);
           if (cloudTourn.captainMode !== undefined) setCaptainMode(cloudTourn.captainMode);
           if (cloudTourn.selectedCaptainIds !== undefined) setSelectedCaptainIds(cloudTourn.selectedCaptainIds);
+          if (cloudTourn.matchupConfig !== undefined) setMatchupConfig(cloudTourn.matchupConfig);
           if (cloudTourn.teams) setTeams(cloudTourn.teams);
           if (cloudTourn.playersById) setPlayersById(cloudTourn.playersById);
           if (cloudTourn.remainingPool) setRemainingPool(cloudTourn.remainingPool);
@@ -244,14 +256,14 @@ export default function App() {
           roomId,
           adminPin,
           view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, allowUneven,
-          captainMode, selectedCaptainIds,
+          captainMode, selectedCaptainIds, matchupConfig,
           teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         })
       );
     } catch (e) {
       // ignore
     }
-  }, [roomId, adminPin, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, allowUneven, captainMode, selectedCaptainIds, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+  }, [roomId, adminPin, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
     const computed = computeAllStats(priorStats, priorPartnershipStats, currentBracket, currentTeams, currentPlayers);
@@ -276,7 +288,7 @@ export default function App() {
         roomId,
         adminPin,
         view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, allowUneven,
-        captainMode, selectedCaptainIds,
+        captainMode, selectedCaptainIds, matchupConfig,
         teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         ...updates,
       });
@@ -401,7 +413,7 @@ export default function App() {
     if (!match.games) {
       const teamA = teams.find((t) => t.id === match.teamAId);
       const teamB = teams.find((t) => t.id === match.teamBId);
-      const games = generateGames(teamA, teamB, goalScore);
+      const games = generateGames(teamA, teamB, goalScore, matchupConfig);
       const nb = JSON.parse(JSON.stringify(bracket));
       nb.rounds[roundIdx][matchIdx].games = games;
       nb.rounds[roundIdx][matchIdx].status = 'in_progress';
@@ -425,7 +437,7 @@ export default function App() {
     const teamA = teams.find((t) => t.id === match.teamAId);
     const teamB = teams.find((t) => t.id === match.teamBId);
     const updatedGames = match.games.map((g) =>
-      g.id === gameId ? { ...g, scoreA: Number(scoreA), scoreB: Number(scoreB), saved: true } : g
+      g.id === gameId ? { ...g, scoreA: Number(scoreA), scoreB: Number(scoreB), saved: true, inProgress: false } : g
     );
     const gamesWonA = updatedGames.filter((g) => g.saved && g.scoreA > g.scoreB).length;
     const gamesWonB = updatedGames.filter((g) => g.saved && g.scoreB > g.scoreA).length;
@@ -485,6 +497,131 @@ export default function App() {
     broadcastTournamentChange({ bracket: nb });
   }
 
+  function handleToggleGameInProgress(gameId) {
+    if (!activePath || !bracket) return;
+    const { round, idx } = activePath;
+    const match = bracket.rounds[round][idx];
+    if (!match.games) return;
+    const updatedGames = match.games.map((g) =>
+      g.id === gameId ? { ...g, inProgress: !g.inProgress } : g
+    );
+    const nb = JSON.parse(JSON.stringify(bracket));
+    nb.rounds[round][idx].games = updatedGames;
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
+  }
+
+  function handleUpdateGameMatchup(gameId, pairA, pairB, slotPair) {
+    if (!activePath || !bracket) return;
+    const { round, idx } = activePath;
+    const match = bracket.rounds[round][idx];
+    if (!match.games) return;
+    const updatedGames = match.games.map((g) =>
+      g.id === gameId
+        ? { ...g, pairA, pairB, slotPair: slotPair || null, inProgress: false }
+        : g
+    );
+    const nb = JSON.parse(JSON.stringify(bracket));
+    nb.rounds[round][idx].games = updatedGames;
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
+  }
+
+  function handleShuffleSingleGame(gameId) {
+    if (!activePath || !bracket) return;
+    const { round, idx } = activePath;
+    const match = bracket.rounds[round][idx];
+    if (!match.games) return;
+    const teamA = teams.find((t) => t.id === match.teamAId);
+    const teamB = teams.find((t) => t.id === match.teamBId);
+    if (!teamA || !teamB) return;
+
+    const gameToShuffle = match.games.find((g) => g.id === gameId);
+    if (!gameToShuffle || gameToShuffle.inProgress || gameToShuffle.saved) return;
+
+    const randomized = randomizePendingMatchups([gameToShuffle], teamA, teamB, 'mirror')[0];
+    const updatedGames = match.games.map((g) => (g.id === gameId ? randomized : g));
+    const nb = JSON.parse(JSON.stringify(bracket));
+    nb.rounds[round][idx].games = updatedGames;
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
+  }
+
+  function handleRandomizeUpcomingGames() {
+    if (!activePath || !bracket) return;
+    const { round, idx } = activePath;
+    const match = bracket.rounds[round][idx];
+    if (!match.games || match.status === 'complete') return;
+    const teamA = teams.find((t) => t.id === match.teamAId);
+    const teamB = teams.find((t) => t.id === match.teamBId);
+    if (!teamA || !teamB) return;
+
+    const updatedGames = randomizePendingMatchups(match.games, teamA, teamB, 'mirror');
+    const nb = JSON.parse(JSON.stringify(bracket));
+    nb.rounds[round][idx].games = updatedGames;
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
+  }
+
+  function handleSubstitutePlayer(teamId, oldPlayerId, newPlayerName) {
+    const result = substitutePlayerInTournament({
+      bracket,
+      teams,
+      playersById,
+      playerPool,
+      teamId,
+      oldPlayerId,
+      newPlayerName,
+    });
+    if (!result) return;
+
+    setBracket(result.bracket);
+    setTeams(result.teams);
+    setPlayersById(result.playersById);
+    setPlayerPool(result.playerPool);
+
+    const updatedKnown = Array.from(new Set([...savedPlayers, newPlayerName.trim()]));
+    setSavedPlayers(updatedKnown);
+    try {
+      localStorage.setItem(STORAGE_KEY_KNOWN_PLAYERS, JSON.stringify(updatedKnown));
+    } catch (e) {}
+    if (isCloudEnabled()) saveKnownPlayersToCloud(updatedKnown);
+
+    syncTournamentStats(result.bracket, result.teams, result.playersById);
+    broadcastTournamentChange({
+      bracket: result.bracket,
+      teams: result.teams,
+      playersById: result.playersById,
+      playerPool: result.playerPool,
+    });
+  }
+
+  function handleRenamePlayer(playerId, newName) {
+    const result = renamePlayerInTournament({
+      playersById,
+      playerPool,
+      playerId,
+      newName,
+    });
+    if (!result) return;
+
+    setPlayersById(result.playersById);
+    setPlayerPool(result.playerPool);
+
+    const updatedKnown = Array.from(new Set([...savedPlayers, newName.trim()]));
+    setSavedPlayers(updatedKnown);
+    try {
+      localStorage.setItem(STORAGE_KEY_KNOWN_PLAYERS, JSON.stringify(updatedKnown));
+    } catch (e) {}
+    if (isCloudEnabled()) saveKnownPlayersToCloud(updatedKnown);
+
+    syncTournamentStats(bracket, teams, result.playersById);
+    broadcastTournamentChange({
+      playersById: result.playersById,
+      playerPool: result.playerPool,
+    });
+  }
+
   function handleReRandomizeExtraGames() {
     if (!activePath || !bracket) return;
     const { round, idx } = activePath;
@@ -492,7 +629,7 @@ export default function App() {
     if (!match.games || match.status === 'complete') return;
     const teamA = teams.find((t) => t.id === match.teamAId);
     const teamB = teams.find((t) => t.id === match.teamBId);
-    const newGames = generateGames(teamA, teamB, goalScore);
+    const newGames = generateGames(teamA, teamB, goalScore, matchupConfig);
     const merged = newGames.map((g, i) => {
       const existing = match.games[i];
       if (existing && existing.saved) return existing;
@@ -790,6 +927,10 @@ export default function App() {
         onOpenRoomModal={() => setIsRoomModalOpen(true)}
         isAdmin={isAdmin}
         onUnlockAdmin={handleUnlockAdmin}
+        onOpenRosterModal={() => {
+          setRosterModalTeamId(null);
+          setIsRosterModalOpen(true);
+        }}
       />
 
       <main className="flex-1">
@@ -814,6 +955,8 @@ export default function App() {
             setCaptainMode={setCaptainMode}
             selectedCaptainIds={selectedCaptainIds}
             setSelectedCaptainIds={setSelectedCaptainIds}
+            matchupConfig={matchupConfig}
+            setMatchupConfig={setMatchupConfig}
             roomId={roomId}
             setRoomId={(newId) => handleSwitchRoom(newId, adminPin)}
             adminPin={adminPin}
@@ -838,7 +981,15 @@ export default function App() {
         )}
 
         {view === 'bracket' && bracket && (
-          <BracketView bracket={bracket} teams={teams} onOpenMatch={openMatch} />
+          <BracketView
+            bracket={bracket}
+            teams={teams}
+            onOpenMatch={openMatch}
+            onOpenRosterModal={() => {
+              setRosterModalTeamId(null);
+              setIsRosterModalOpen(true);
+            }}
+          />
         )}
 
         {view === 'match' && activeMatch && (
@@ -849,10 +1000,17 @@ export default function App() {
             teamB={activeTeamB}
             playersById={playersById}
             onSaveGame={handleSaveGame}
+            onToggleInProgress={handleToggleGameInProgress}
+            onOpenEditMatchup={(game) => setEditingMatchupGame(game)}
+            onShuffleGame={handleShuffleSingleGame}
+            onRandomizeUpcoming={handleRandomizeUpcomingGames}
+            onOpenRoster={(teamId) => {
+              setRosterModalTeamId(teamId);
+              setIsRosterModalOpen(true);
+            }}
             onBack={() => setView('bracket')}
             onGoToDreambreaker={() => setView('dreambreakerSetup')}
             onGoToBracket={() => setView('bracket')}
-            onReRandomizeExtra={handleReRandomizeExtraGames}
             isAdmin={isAdmin}
           />
         )}
@@ -915,6 +1073,28 @@ export default function App() {
       <CloudConfigModal
         isOpen={isCloudConfigOpen}
         onClose={() => setIsCloudConfigOpen(false)}
+      />
+      <EditMatchupModal
+        isOpen={!!editingMatchupGame}
+        onClose={() => setEditingMatchupGame(null)}
+        game={editingMatchupGame}
+        gameIndex={activeMatch?.games ? activeMatch.games.findIndex((g) => g.id === editingMatchupGame?.id) : 0}
+        teamA={activeTeamA}
+        teamB={activeTeamB}
+        playersById={playersById}
+        onSaveMatchup={handleUpdateGameMatchup}
+        isAdmin={isAdmin}
+      />
+      <RosterModal
+        isOpen={isRosterModalOpen}
+        onClose={() => setIsRosterModalOpen(false)}
+        teams={teams}
+        playersById={playersById}
+        savedPlayers={savedPlayers}
+        onSubstitutePlayer={handleSubstitutePlayer}
+        onRenamePlayer={handleRenamePlayer}
+        isAdmin={isAdmin}
+        initialTeamId={rosterModalTeamId}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Users } from 'lucide-react';
 import { isCloudEnabled } from '../services/firebase';
+import { APP_VERSION } from '../version';
 
 export function Header({
   hasTournament,
@@ -15,6 +16,7 @@ export function Header({
   onOpenRoomModal,
   isAdmin,
   onUnlockAdmin,
+  onOpenRosterModal,
 }) {
   const cloudActive = isCloudEnabled();
   const [showPinPrompt, setShowPinPrompt] = useState(false);
@@ -49,7 +51,7 @@ export function Header({
                   NEEP-NLP
                 </span>
                 <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider bg-slate-900 border border-slate-800 px-1 py-0.5 rounded font-semibold hidden xs:inline">
-                  v2.0 Beta
+                  {APP_VERSION}
                 </span>
               </div>
               <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium leading-none mt-0.5 truncate hidden xs:block">Score Tracker</p>
@@ -70,6 +72,14 @@ export function Header({
             >
               <Swords size={13} /> Bracket
             </button>
+            {onOpenRosterModal && (
+              <button
+                onClick={onOpenRosterModal}
+                className="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800"
+              >
+                <Users size={13} /> Rosters & Subs
+              </button>
+            )}
             <button
               onClick={() => setView('leaderboard')}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
@@ -206,6 +216,14 @@ export function Header({
           >
             <Swords size={13} /> Bracket
           </button>
+          {onOpenRosterModal && (
+            <button
+              onClick={onOpenRosterModal}
+              className="flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white"
+            >
+              <Users size={13} /> Rosters
+            </button>
+          )}
           <button
             onClick={() => setView('leaderboard')}
             className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${

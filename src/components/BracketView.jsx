@@ -59,12 +59,24 @@ function MatchCard({ match, teams, onOpen }) {
           <Zap size={12} /> DREAMBREAKER REQUIRED
         </p>
       )}
-      {match.status === 'in_progress' && <p className="text-cyan-400 text-[10px] font-bold mt-1 px-2">IN PROGRESS</p>}
+      {match.status === 'in_progress' && (
+        <div className="flex items-center justify-between px-2 mt-1">
+          <p className="text-cyan-400 text-[10px] font-bold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+            MATCH IN PROGRESS
+          </p>
+          {match.games && match.games.filter((g) => g.inProgress).length > 0 && (
+            <span className="text-cyan-300 text-[10px] font-mono bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">
+              {match.games.filter((g) => g.inProgress).length} active court{match.games.filter((g) => g.inProgress).length === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
+      )}
     </button>
   );
 }
 
-export function BracketView({ bracket, teams, onOpenMatch }) {
+export function BracketView({ bracket, teams, onOpenMatch, onOpenRosterModal }) {
   if (!bracket || !bracket.rounds) return null;
   const totalRounds = bracket.rounds.length;
   const champion = bracket.championId !== null ? teams.find((t) => t.id === bracket.championId) : null;
@@ -79,9 +91,19 @@ export function BracketView({ bracket, teams, onOpenMatch }) {
         </div>
       )}
 
-      <h2 className="text-white text-3xl font-display uppercase tracking-wide font-semibold mb-6 flex items-center gap-2">
-        <Swords size={24} className="text-[#d7f24c]" /> Tournament Bracket
-      </h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-white text-2xl sm:text-3xl font-display uppercase tracking-wide font-semibold flex items-center gap-2">
+          <Swords size={24} className="text-[#d7f24c]" /> Tournament Bracket
+        </h2>
+        {onOpenRosterModal && (
+          <button
+            onClick={onOpenRosterModal}
+            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+          >
+            Manage Rosters & Subs
+          </button>
+        )}
+      </div>
 
       <div className="flex gap-4 overflow-x-auto pb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
         {bracket.rounds.map((round, ri) => (
