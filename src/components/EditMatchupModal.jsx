@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Shuffle, Check, ArrowRightLeft, Users, ShieldAlert } from 'lucide-react';
+import { X, Shuffle, Check, ArrowRightLeft, Users, ShieldAlert, RotateCcw } from 'lucide-react';
+import { getDefaultSlotPairs } from '../utils/tournament';
 
 export function EditMatchupModal({
   isOpen,
@@ -10,6 +11,7 @@ export function EditMatchupModal({
   teamB,
   playersById,
   onSaveMatchup,
+  matchupConfig = { preset: 'adjacent' },
   isAdmin,
 }) {
   const [mode, setMode] = useState('mirror'); // 'mirror' | 'free'
@@ -89,6 +91,17 @@ export function EditMatchupModal({
     teamB?.draftOrder?.[slot2 - 1] ? pName(teamB.draftOrder[slot2 - 1]) : `Slot ${slot2}`,
   ];
 
+  const defaultSlotPairs = getDefaultSlotPairs(maxSlots, matchupConfig?.preset || 'adjacent');
+  const defaultSlotPair = (matchupConfig?.preset === 'custom' && Array.isArray(matchupConfig?.customSlotPairs) && matchupConfig.customSlotPairs[gameIndex])
+    ? matchupConfig.customSlotPairs[gameIndex]
+    : (defaultSlotPairs[gameIndex] || [1, 2]);
+
+  function handleRevertToDefault() {
+    setSlot1(defaultSlotPair[0]);
+    setSlot2(defaultSlotPair[1]);
+    setMode('mirror');
+  }
+
   const isMirrorValid = slot1 !== slot2 && slot1 >= 1 && slot2 >= 1 && slot1 <= maxSlots && slot2 <= maxSlots;
   const isFreeValid = teamAPlayer1 && teamAPlayer2 && teamAPlayer1 !== teamAPlayer2 && teamBPlayer1 && teamBPlayer2 && teamBPlayer1 !== teamBPlayer2;
   const canSave = isAdmin && (mode === 'mirror' ? isMirrorValid : isFreeValid);
@@ -107,12 +120,23 @@ export function EditMatchupModal({
             </div>
             <p className="text-xs text-slate-400 mt-0.5">Customize player pairings for this upcoming game.</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleRevertToDefault}
+              title={`Revert to original Slot ${defaultSlotPair[0]} & ${defaultSlotPair[1]}`}
+              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] hover:text-white transition flex items-center gap-1 text-xs font-semibold border border-slate-700"
+            >
+              <RotateCcw size={13} />
+              <span className="hidden sm:inline text-[11px]">Original</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Mode Selector Tabs */}

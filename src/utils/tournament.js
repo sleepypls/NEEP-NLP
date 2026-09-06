@@ -209,6 +209,65 @@ export function randomizePendingMatchups(games, teamA, teamB, mode = 'mirror') {
   });
 }
 
+export function revertPendingMatchups(games, teamA, teamB, goalScore, matchupConfig = { preset: 'adjacent' }) {
+  const originalGames = generateGames(teamA, teamB, goalScore, matchupConfig);
+  return games.map((game, idx) => {
+    if (game.inProgress || game.saved) return game;
+    const orig = originalGames[idx];
+    if (!orig) return game;
+    return {
+      ...game,
+      pairA: [...orig.pairA],
+      pairB: [...orig.pairB],
+      slotPair: orig.slotPair ? [...orig.slotPair] : null,
+      randomized: orig.randomized,
+    };
+  });
+}
+
+export function revertSingleMatchup(game, gameIdx, teamA, teamB, goalScore, matchupConfig = { preset: 'adjacent' }) {
+  if (game.inProgress || game.saved) return game;
+  const originalGames = generateGames(teamA, teamB, goalScore, matchupConfig);
+  const orig = originalGames[gameIdx];
+  if (!orig) return game;
+  return {
+    ...game,
+    pairA: [...orig.pairA],
+    pairB: [...orig.pairB],
+    slotPair: orig.slotPair ? [...orig.slotPair] : null,
+    randomized: orig.randomized,
+  };
+}
+
+export function hasRandomizedOrEditedPendingGames(games, teamA, teamB, goalScore, matchupConfig = { preset: 'adjacent' }) {
+  if (!games || !teamA || !teamB) return false;
+  const originalGames = generateGames(teamA, teamB, goalScore, matchupConfig);
+  return games.some((game, idx) => {
+    if (game.inProgress || game.saved) return false;
+    const orig = originalGames[idx];
+    if (!orig) return false;
+    return (
+      game.pairA[0] !== orig.pairA[0] ||
+      game.pairA[1] !== orig.pairA[1] ||
+      game.pairB[0] !== orig.pairB[0] ||
+      game.pairB[1] !== orig.pairB[1]
+    );
+  });
+}
+
+export function isSingleGameModified(game, gameIdx, teamA, teamB, goalScore, matchupConfig = { preset: 'adjacent' }) {
+  if (!game || game.inProgress || game.saved || !teamA || !teamB) return false;
+  const originalGames = generateGames(teamA, teamB, goalScore, matchupConfig);
+  const orig = originalGames[gameIdx];
+  if (!orig) return false;
+  return (
+    game.pairA[0] !== orig.pairA[0] ||
+    game.pairA[1] !== orig.pairA[1] ||
+    game.pairB[0] !== orig.pairB[0] ||
+    game.pairB[1] !== orig.pairB[1]
+  );
+}
+
 export function substitutePlayerInTournament({ bracket, teams, playersById, playerPool, teamId, oldPlayerId, newPlayerName }) {
   const cleanName = String(newPlayerName).trim();
   if (!cleanName) return null;

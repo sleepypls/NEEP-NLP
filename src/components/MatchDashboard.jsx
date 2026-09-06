@@ -15,6 +15,7 @@ import {
   Users,
   ShieldAlert,
   Lock,
+  RotateCcw,
 } from 'lucide-react';
 
 function TeamDot({ color, className = '' }) {
@@ -38,6 +39,7 @@ function GameRow({
   onToggleInProgress,
   onOpenEditMatchup,
   onShuffleGame,
+  onRevertGame,
   isAdmin,
 }) {
   const [scoreA, setScoreA] = useState(game.saved ? String(game.scoreA) : (game.scoreA === 0 ? '' : String(game.scoreA)));
@@ -193,6 +195,22 @@ function GameRow({
                 >
                   <Shuffle size={13} />
                 </button>
+
+                {onRevertGame && (
+                  <button
+                    type="button"
+                    disabled={game.inProgress}
+                    onClick={() => onRevertGame(game.id, index)}
+                    title={game.inProgress ? 'Game is in progress on court' : 'Revert to original matchup'}
+                    className={`p-1.5 rounded-xl text-xs font-bold transition border ${
+                      game.inProgress
+                        ? 'bg-slate-800/50 text-slate-600 border-slate-800 cursor-not-allowed'
+                        : 'bg-slate-800 hover:bg-slate-750 text-[#d7f24c] border-[#d7f24c]/30 hover:border-[#d7f24c]/60'
+                    }`}
+                  >
+                    <RotateCcw size={13} />
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -287,6 +305,8 @@ export function MatchDashboard({
   onOpenEditMatchup,
   onShuffleGame,
   onRandomizeUpcoming,
+  onRevertUpcoming,
+  onRevertGame,
   onOpenRoster,
   onBack,
   onGoToDreambreaker,
@@ -311,16 +331,31 @@ export function MatchDashboard({
           <ArrowLeft size={16} /> Back to Bracket
         </button>
 
-        {isAdmin && hasUpcomingGames && (
-          <button
-            onClick={onRandomizeUpcoming}
-            title="Randomize matchups for all upcoming games not in progress"
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold border border-amber-500/30 active:scale-95 transition shrink-0 shadow-sm"
-          >
-            <Shuffle size={13} className="shrink-0" />
-            <span>Randomize Upcoming</span>
-          </button>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+          {isAdmin && hasUpcomingGames && (
+            <button
+              onClick={onRandomizeUpcoming}
+              title="Randomize matchups for all upcoming games not in progress"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold border border-amber-500/30 active:scale-95 transition shadow-sm"
+            >
+              <Shuffle size={13} className="shrink-0" />
+              <span className="hidden xs:inline">Randomize Upcoming</span>
+              <span className="xs:hidden">Shuffle</span>
+            </button>
+          )}
+
+          {isAdmin && onRevertUpcoming && (
+            <button
+              onClick={onRevertUpcoming}
+              title="Revert randomized or customized matchups back to original setup configuration"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] text-xs font-bold border border-[#d7f24c]/30 active:scale-95 transition shadow-sm"
+            >
+              <RotateCcw size={13} className="shrink-0" />
+              <span className="hidden xs:inline">Revert Matchups</span>
+              <span className="xs:hidden">Revert</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Match Header Card */}
@@ -424,6 +459,7 @@ export function MatchDashboard({
           onToggleInProgress={onToggleInProgress}
           onOpenEditMatchup={onOpenEditMatchup}
           onShuffleGame={onShuffleGame}
+          onRevertGame={onRevertGame}
           isAdmin={isAdmin}
         />
       ))}

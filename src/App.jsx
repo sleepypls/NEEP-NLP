@@ -20,6 +20,8 @@ import {
   advanceWinner,
   computeAllStats,
   randomizePendingMatchups,
+  revertPendingMatchups,
+  revertSingleMatchup,
   substitutePlayerInTournament,
   renamePlayerInTournament,
 } from './utils/tournament';
@@ -563,6 +565,44 @@ export default function App() {
     broadcastTournamentChange({ bracket: nb });
   }
 
+  function handleRevertSingleGame(gameId, gameIdx) {
+    if (!activePath || !bracket) return;
+    const { round, idx } = activePath;
+    const match = bracket.rounds[round][idx];
+    if (!match.games) return;
+    const teamA = teams.find((t) => t.id === match.teamAId);
+    const teamB = teams.find((t) => t.id === match.teamBId);
+    if (!teamA || !teamB) return;
+
+    const actualIdx = gameIdx !== undefined ? gameIdx : match.games.findIndex((g) => g.id === gameId);
+    if (actualIdx === -1) return;
+    const gameToRevert = match.games[actualIdx];
+    if (!gameToRevert || gameToRevert.inProgress || gameToRevert.saved) return;
+
+    const reverted = revertSingleMatchup(gameToRevert, actualIdx, teamA, teamB, goalScore, matchupConfig);
+    const updatedGames = match.games.map((g) => (g.id === gameId ? reverted : g));
+    const nb = JSON.parse(JSON.stringify(bracket));
+    nb.rounds[round][idx].games = updatedGames;
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
+  }
+
+  function handleRevertUpcomingGames() {
+    if (!activePath || !bracket) return;
+    const { round, idx } = activePath;
+    const match = bracket.rounds[round][idx];
+    if (!match.games || match.status === 'complete') return;
+    const teamA = teams.find((t) => t.id === match.teamAId);
+    const teamB = teams.find((t) => t.id === match.teamBId);
+    if (!teamA || !teamB) return;
+
+    const updatedGames = revertPendingMatchups(match.games, teamA, teamB, goalScore, matchupConfig);
+    const nb = JSON.parse(JSON.stringify(bracket));
+    nb.rounds[round][idx].games = updatedGames;
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
+  }
+
   function handleSubstitutePlayer(teamId, oldPlayerId, newPlayerName) {
     const result = substitutePlayerInTournament({
       bracket,
@@ -1003,7 +1043,9 @@ export default function App() {
             onToggleInProgress={handleToggleGameInProgress}
             onOpenEditMatchup={(game) => setEditingMatchupGame(game)}
             onShuffleGame={handleShuffleSingleGame}
+            onRevertGame={handleRevertSingleGame}
             onRandomizeUpcoming={handleRandomizeUpcomingGames}
+            onRevertUpcoming={handleRevertUpcomingGames}
             onOpenRoster={(teamId) => {
               setRosterModalTeamId(teamId);
               setIsRosterModalOpen(true);
@@ -1083,6 +1125,7 @@ export default function App() {
         teamB={activeTeamB}
         playersById={playersById}
         onSaveMatchup={handleUpdateGameMatchup}
+        matchupConfig={matchupConfig}
         isAdmin={isAdmin}
       />
       <RosterModal
