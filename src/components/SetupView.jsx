@@ -222,38 +222,71 @@ export function SetupView({
             </form>
 
             {/* List of saved names in this room */}
-            {availableSaved.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {availableSaved.map((name) => (
-                  <span
-                    key={name}
-                    className="group inline-flex items-center gap-1.5 bg-slate-800/70 hover:bg-slate-750 border border-slate-700/60 rounded-full pl-2.5 pr-1 py-0.5 text-slate-300 text-xs transition"
-                  >
-                    <button
-                      onClick={() => onAddSavedPlayer(name)}
-                      className="font-medium hover:text-white flex items-center gap-1"
-                      title={`Add ${name} to tournament`}
-                    >
-                      <span>{name}</span>
-                      <span className="text-emerald-400 font-bold text-sm leading-none">+</span>
-                    </button>
-                    <button
-                      onClick={() => onRemoveSavedPlayer(name)}
-                      className="text-slate-600 hover:text-red-400 p-0.5 rounded-full transition"
-                      title={`Remove ${name} from saved list`}
-                    >
-                      <X size={11} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            ) : savedPlayers.length === 0 ? (
-              <p className="text-[11px] text-slate-500 italic">
-                No saved players in this room directory yet. Names entered in tournaments or saved above will be stored here.
-              </p>
+            {savedPlayers.length > 0 ? (
+              <>
+                <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto pr-1">
+                  {[...savedPlayers]
+                    .sort((a, b) => {
+                      const aIn = playerPool.some((p) => p.name.trim().toLowerCase() === a.trim().toLowerCase());
+                      const bIn = playerPool.some((p) => p.name.trim().toLowerCase() === b.trim().toLowerCase());
+                      if (aIn === bIn) return a.localeCompare(b);
+                      return aIn ? 1 : -1;
+                    })
+                    .map((name) => {
+                      const isInPool = playerPool.some(
+                        (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
+                      );
+                      return (
+                        <span
+                          key={name}
+                          className={`group inline-flex items-center gap-1.5 border rounded-full pl-2.5 pr-1 py-0.5 text-xs transition ${
+                            isInPool
+                              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 shadow-sm'
+                              : 'bg-slate-800/80 hover:bg-slate-750 border-slate-700/70 text-slate-300'
+                          }`}
+                        >
+                          {isInPool ? (
+                            <span
+                              className="font-medium flex items-center gap-1 text-emerald-300 cursor-default"
+                              title={`${name} is currently in the active tournament`}
+                            >
+                              <Check size={11} className="stroke-[3] text-emerald-400" />
+                              <span>{name}</span>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => onAddSavedPlayer(name)}
+                              className="font-medium hover:text-white flex items-center gap-1"
+                              title={`Add ${name} to tournament pool`}
+                            >
+                              <span>{name}</span>
+                              <span className="text-[#d7f24c] font-bold text-sm leading-none">+</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={() => onRemoveSavedPlayer(name)}
+                            className="text-slate-500 hover:text-red-400 p-0.5 rounded-full transition"
+                            title={`Remove ${name} from room directory`}
+                          >
+                            <X size={11} />
+                          </button>
+                        </span>
+                      );
+                    })}
+                </div>
+                {availableSaved.length === 0 ? (
+                  <div className="text-[11px] text-emerald-400/90 font-medium flex items-center gap-1.5 mt-2">
+                    <Check size={12} className="stroke-[3]" /> All {savedPlayers.length} directory players are in the tournament pool
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-2">
+                    <Users size={11} className="text-[#d7f24c]" /> {savedPlayers.length - availableSaved.length} in tournament • {availableSaved.length} available to add
+                  </div>
+                )}
+              </>
             ) : (
               <p className="text-[11px] text-slate-500 italic">
-                All {savedPlayers.length} directory players have been added to the active tournament pool.
+                No saved players in this room directory yet. Players added above or saved here will appear in this directory.
               </p>
             )}
           </div>

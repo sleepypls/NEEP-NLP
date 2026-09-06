@@ -79,17 +79,38 @@ function loadSavedTournament(rid) {
   return null;
 }
 
-function loadKnownPlayers(rid) {
+function loadKnownPlayers(rid, fallbackPool = []) {
+  let list = [];
   try {
     const raw = localStorage.getItem(getKnownPlayersStorageKey(rid));
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      if (Array.isArray(parsed)) list = parsed;
     }
   } catch (e) {
     console.warn('Error reading known players for room:', rid, e);
   }
-  return [];
+
+  // Automatically merge any players already present in the tournament pool
+  if (Array.isArray(fallbackPool) && fallbackPool.length > 0) {
+    const poolNames = fallbackPool.map((p) => (p?.name || '').trim()).filter(Boolean);
+    const existingLower = new Set(list.map((n) => n.trim().toLowerCase()));
+    let changed = false;
+    for (const name of poolNames) {
+      if (!existingLower.has(name.toLowerCase())) {
+        list.push(name);
+        existingLower.add(name.toLowerCase());
+        changed = true;
+      }
+    }
+    if (changed) {
+      try {
+        localStorage.setItem(getKnownPlayersStorageKey(rid), JSON.stringify(list));
+      } catch (e) {}
+    }
+  }
+
+  return list;
 }
 
 export default function App() {
@@ -166,7 +187,7 @@ export default function App() {
       return raw ? JSON.parse(raw) : {};
     } catch (e) { return {}; }
   });
-  const [savedPlayers, setSavedPlayers] = useState(() => loadKnownPlayers(initialRoomId));
+  const [savedPlayers, setSavedPlayers] = useState(() => loadKnownPlayers(initialRoomId, initialSaved?.playerPool));
 
   // Modals
   const [modal, setModal] = useState(null);
@@ -214,7 +235,7 @@ export default function App() {
       setPriorStats(pStats);
       setPriorPartnershipStats(pairStats);
 
-      const roomKnown = loadKnownPlayers(roomId);
+      const roomKnown = loadKnownPlayers(roomId, playerPool);
       setSavedPlayers(roomKnown);
     } catch (e) {
       console.warn('Error loading room stats & players:', e);
@@ -279,6 +300,40 @@ export default function App() {
       if (rotateTimeoutRef.current) clearTimeout(rotateTimeoutRef.current);
     };
   }, [roomId, isAdmin]);
+
+  // Automatically ensure any newly added tournament players are saved to the active room directory
+  const prevPoolRef = useRef(playerPool);
+  useEffect(() => {
+    const prevNames = new Set(
+      (prevPoolRef.current || [])
+        .map((p) => (p?.name || '').trim().toLowerCase())
+        .filter(Boolean)
+    );
+    prevPoolRef.current = playerPool;
+
+    const newlyAdded = (playerPool || [])
+      .map((p) => (p?.name || '').trim())
+      .filter(Boolean)
+      .filter((name) => !prevNames.has(name.toLowerCase()));
+
+    if (newlyAdded.length > 0) {
+      setSavedPlayers((currentSaved) => {
+        const currentLower = new Set(currentSaved.map((n) => n.trim().toLowerCase()));
+        const toAdd = newlyAdded.filter((name) => !currentLower.has(name.toLowerCase()));
+        if (toAdd.length === 0) return currentSaved;
+
+        const uniqueToAdd = Array.from(new Set(toAdd));
+        const updated = [...currentSaved, ...uniqueToAdd];
+        try {
+          localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(updated));
+        } catch (e) {}
+        if (isCloudEnabled()) {
+          saveKnownPlayersToCloud(roomId, updated);
+        }
+        return updated;
+      });
+    }
+  }, [playerPool, roomId]);
 
   // 3. LocalStorage persistence on change
   useEffect(() => {
@@ -927,7 +982,7 @@ export default function App() {
       setActivePath(null);
     }
 
-    setSavedPlayers(loadKnownPlayers(cleanRoom));
+    setSavedPlayers(loadKnownPlayers(cleanRoom, saved?.playerPool));
 
     if (pin && pin === (saved?.adminPin || adminPin)) {
       setIsAdmin(true);
