@@ -1,0 +1,313 @@
+import React, { useState } from 'react';
+import { X, Users, Pencil, Trash2, Check, Search, UserPlus, ShieldAlert, ArrowDownToLine, AlertCircle } from 'lucide-react';
+
+export function DirectoryModal({
+  isOpen,
+  onClose,
+  roomId,
+  savedPlayers = [],
+  playerPool = [],
+  onAddDirectoryPlayer,
+  onRenameDirectoryPlayer,
+  onRemoveSavedPlayer,
+  onImportFromMainDirectory,
+  isAdmin,
+}) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [newPlayerName, setNewPlayerName] = useState('');
+  const [editingName, setEditingName] = useState(null);
+  const [editValue, setEditValue] = useState('');
+  const [pendingDeleteName, setPendingDeleteName] = useState(null);
+
+  if (!isOpen) return null;
+
+  const poolNamesLower = new Set(
+    (playerPool || []).map((p) => String(p?.name || '').trim().toLowerCase()).filter(Boolean)
+  );
+
+  const filteredPlayers = (savedPlayers || []).filter((name) =>
+    name.toLowerCase().includes(searchQuery.trim().toLowerCase())
+  );
+
+  function handleAddSubmit(e) {
+    e.preventDefault();
+    const trimmed = newPlayerName.trim();
+    if (!trimmed) return;
+    if (onAddDirectoryPlayer) {
+      onAddDirectoryPlayer(trimmed);
+      setNewPlayerName('');
+    }
+  }
+
+  function handleStartRename(name) {
+    if (!isAdmin) return;
+    setEditingName(name);
+    setEditValue(name);
+    setPendingDeleteName(null);
+  }
+
+  function handleSaveRename(oldName) {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed.toLowerCase() !== oldName.toLowerCase() && onRenameDirectoryPlayer) {
+      onRenameDirectoryPlayer(oldName, trimmed);
+    }
+    setEditingName(null);
+    setEditValue('');
+  }
+
+  function handleConfirmDelete(name) {
+    if (onRemoveSavedPlayer) {
+      onRemoveSavedPlayer(name);
+    }
+    setPendingDeleteName(null);
+  }
+
+  const isDefaultRoom = !roomId || roomId === 'neep-main' || roomId === 'neep-pickleball';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+      <div className="bg-slate-900 border border-slate-750 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        {/* Modal Header */}
+        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/90">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-[#d7f24c]/10 border border-[#d7f24c]/30 flex items-center justify-center text-[#d7f24c] shrink-0">
+              <Users size={20} />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-white text-lg font-bold font-display leading-tight truncate">
+                  Manage Player Directory
+                </h3>
+                <span className="text-[10px] font-mono font-bold bg-slate-850 text-[#d7f24c] border border-slate-700 px-2 py-0.5 rounded-md shrink-0">
+                  {roomId || 'Main'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 truncate">
+                Saved player roster for this room ({savedPlayers.length} total)
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition shrink-0 ml-2"
+            title="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Quick Add Form & Search */}
+        <div className="p-4 border-b border-slate-800/80 bg-slate-925 space-y-2.5 shrink-0">
+          {isAdmin ? (
+            <form onSubmit={handleAddSubmit} className="flex gap-2">
+              <input
+                type="text"
+                value={newPlayerName}
+                onChange={(e) => setNewPlayerName(e.target.value)}
+                placeholder="Add player name to directory..."
+                className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+              />
+              <button
+                type="submit"
+                disabled={!newPlayerName.trim()}
+                className="px-3.5 py-2 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 font-bold text-xs flex items-center gap-1.5 disabled:opacity-40 transition active:scale-95 shrink-0 shadow-md shadow-[#d7f24c]/10"
+              >
+                <UserPlus size={14} /> Add
+              </button>
+            </form>
+          ) : (
+            <div className="flex items-center gap-2 text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
+              <ShieldAlert size={14} className="shrink-0" />
+              <span>Viewing directory in Spectator mode. Admin PIN required to modify names.</span>
+            </div>
+          )}
+
+          {/* Search bar */}
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search directory..."
+              className="w-full bg-slate-950/60 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-slate-700"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Directory Player List */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-slate-800/40 min-h-[220px]">
+          {filteredPlayers.length === 0 ? (
+            <div className="text-center py-10">
+              <Users size={32} className="mx-auto text-slate-600 mb-2 opacity-60" />
+              <p className="text-sm font-medium text-slate-400">
+                {searchQuery ? 'No matching players found' : 'No players in this directory yet'}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {searchQuery
+                  ? 'Try searching with a different term'
+                  : 'Add player names above or run tournaments in this room'}
+              </p>
+            </div>
+          ) : (
+            filteredPlayers.map((name) => {
+              const isInTournament = poolNamesLower.has(name.trim().toLowerCase());
+              const isEditing = editingName === name;
+              const isDeleting = pendingDeleteName === name;
+
+              if (isEditing) {
+                return (
+                  <form
+                    key={name}
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleSaveRename(name);
+                    }}
+                    className="pt-2 flex items-center gap-2"
+                  >
+                    <input
+                      autoFocus
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setEditingName(null);
+                      }}
+                      className="flex-1 bg-slate-950 border border-[#d7f24c] rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!editValue.trim()}
+                      className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30 transition"
+                      title="Save name"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingName(null)}
+                      className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+                      title="Cancel"
+                    >
+                      <X size={16} />
+                    </button>
+                  </form>
+                );
+              }
+
+              if (isDeleting) {
+                return (
+                  <div
+                    key={name}
+                    className="pt-2 flex items-center justify-between gap-2 bg-red-950/20 border border-red-500/30 rounded-2xl p-2.5 animate-in fade-in duration-100"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <AlertCircle size={15} className="text-red-400 shrink-0" />
+                      <span className="text-xs text-red-200 truncate">
+                        Remove <strong className="text-white">{name}</strong> from directory?
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmDelete(name)}
+                        className="px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition shadow-sm"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteName(null)}
+                        className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-medium transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <div
+                  key={name}
+                  className="pt-2 flex items-center justify-between gap-3 group hover:bg-slate-850/40 rounded-xl px-2 py-1.5 transition"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 text-xs font-bold shrink-0">
+                      {name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-slate-200 truncate">{name}</span>
+                    {isInTournament ? (
+                      <span className="text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-md px-1.5 py-0.5 shrink-0 flex items-center gap-1">
+                        <Check size={10} className="stroke-[3]" /> Active
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-medium bg-slate-800 text-slate-400 rounded-md px-1.5 py-0.5 shrink-0">
+                        Available
+                      </span>
+                    )}
+                  </div>
+
+                  {isAdmin && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleStartRename(name)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#d7f24c] hover:bg-slate-800 transition"
+                        title={`Rename ${name}`}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteName(name)}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
+                        title={`Remove ${name} from directory`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Modal Footer */}
+        <div className="p-4 border-t border-slate-800 bg-slate-900/95 flex items-center justify-between gap-3 shrink-0">
+          {!isDefaultRoom && onImportFromMainDirectory ? (
+            <button
+              type="button"
+              onClick={onImportFromMainDirectory}
+              className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 py-1 px-2 rounded-lg hover:bg-cyan-950/30 transition"
+              title="Import all names from the Main room directory into this room"
+            >
+              <ArrowDownToLine size={13} /> Import from Main
+            </button>
+          ) : (
+            <div className="text-[11px] text-slate-500">
+              {savedPlayers.length} player{savedPlayers.length !== 1 ? 's' : ''} in directory
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs border border-slate-700 transition active:scale-95 shadow-md"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
