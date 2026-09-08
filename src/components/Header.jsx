@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Users } from 'lucide-react';
+import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Users, LogOut } from 'lucide-react';
 import { isCloudEnabled } from '../services/firebase';
 import { APP_VERSION } from '../version';
 
@@ -17,6 +17,7 @@ export function Header({
   isAdmin,
   onUnlockAdmin,
   onOpenRosterModal,
+  onExitToLanding,
 }) {
   const cloudActive = isCloudEnabled();
   const [showPinPrompt, setShowPinPrompt] = useState(false);
@@ -166,6 +167,18 @@ export function Header({
               className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-500 hover:text-red-400 border border-slate-800 transition active:scale-95 shrink-0"
             >
               <Trash2 size={15} />
+            </button>
+          )}
+
+          {/* Leave Room / Return to Landing Page */}
+          {onExitToLanding && (
+            <button
+              onClick={onExitToLanding}
+              title="Exit Room & Return to Landing Page"
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-900 hover:bg-slate-850 text-slate-400 hover:text-white border border-slate-800 transition active:scale-95 shrink-0 flex items-center gap-1"
+            >
+              <LogOut size={14} />
+              <span className="hidden xl:inline text-[11px] font-semibold">Exit</span>
             </button>
           )}
         </div>

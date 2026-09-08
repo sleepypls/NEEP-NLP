@@ -33,3 +33,24 @@ export function sanitizeRoomId(raw) {
     .replace(/[^A-Z0-9_-]/g, '')
     .slice(0, 20);
 }
+
+/**
+ * Returns localStorage key for tournament state of a given room
+ */
+export function getTournStorageKey(rid) {
+  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-tournament-state-v1' : `neep_tourn_${rid}_v1`;
+}
+
+/**
+ * Checks if a room has saved tournament data in localStorage
+ */
+export function checkLocalRoomExists(roomId) {
+  if (!roomId) return false;
+  try {
+    const key = getTournStorageKey(roomId);
+    const data = localStorage.getItem(key);
+    return Boolean(data);
+  } catch (e) {
+    return false;
+  }
+}

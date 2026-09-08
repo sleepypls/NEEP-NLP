@@ -1,7 +1,7 @@
 {
   "name": "neep-nlp",
   "private": true,
-  "version": "2.5.0-beta",
+  "version": "2.6.0-beta",
   "type": "module",
   "scripts": {
     "dev": "vite",

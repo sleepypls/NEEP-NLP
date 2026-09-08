@@ -84,6 +84,22 @@ export function isCloudEnabled() {
   return getDb() !== null;
 }
 
+/**
+ * Checks whether an active tournament document exists in Firestore for the given roomId/clubId
+ */
+export async function checkRoomExistsInCloud(clubId = DEFAULT_CLUB_ID) {
+  const db = getDb();
+  if (!db) return false;
+  try {
+    const tournamentDocRef = doc(db, 'clubs', clubId, 'tournaments', 'active');
+    const snap = await getDoc(tournamentDocRef);
+    return snap.exists();
+  } catch (err) {
+    console.warn('[Firebase] Room existence check error:', err);
+    return false;
+  }
+}
+
 // ---------------- Realtime Listeners ----------------
 
 export function subscribeToActiveTournament(clubId = DEFAULT_CLUB_ID, onUpdate, onError) {

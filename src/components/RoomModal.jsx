@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Lock, KeyRound, Copy, Check, PlusCircle, ArrowRight, ShieldCheck, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { X, Lock, KeyRound, Copy, Check, PlusCircle, ArrowRight, ShieldCheck, Eye, EyeOff, Sparkles, LogOut } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
 
 export function RoomModal({
@@ -10,6 +10,7 @@ export function RoomModal({
   isAdmin,
   onSwitchRoom,
   onCreatePrivateRoom,
+  onExitToLanding,
 }) {
   const [joinInput, setJoinInput] = useState('');
   const [joinPin, setJoinPin] = useState('');
@@ -180,6 +181,22 @@ export function RoomModal({
             <ArrowRight size={15} />
           </button>
         </form>
+
+        {onExitToLanding && (
+          <div className="mt-4 pt-3 border-t border-slate-800">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onExitToLanding();
+              }}
+              className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-750 flex items-center justify-center gap-2 transition active:scale-95"
+            >
+              <LogOut size={14} />
+              <span>Leave Room & Return to Home</span>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

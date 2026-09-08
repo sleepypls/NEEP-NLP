@@ -12,6 +12,8 @@ import { ShareModal } from './components/ShareModal';
 import { CloudConfigModal } from './components/CloudConfigModal';
 import { EditMatchupModal } from './components/EditMatchupModal';
 import { RosterModal } from './components/RosterModal';
+import { LandingView } from './components/LandingView';
+import { RoomCreatedModal } from './components/RoomCreatedModal';
 
 import {
   generateGames,
@@ -34,6 +36,7 @@ import {
   saveTournamentToCloud,
   saveStatsToCloud,
   saveKnownPlayersToCloud,
+  checkRoomExistsInCloud,
 } from './services/firebase';
 import { RoomModal } from './components/RoomModal';
 import {
@@ -42,6 +45,7 @@ import {
   generateRoomId,
   generatePin,
   sanitizeRoomId,
+  checkLocalRoomExists,
 } from './utils/room';
 
 function getTournStorageKey(rid) {
@@ -63,13 +67,12 @@ function getInitialRoomId() {
     const params = new URLSearchParams(window.location.search);
     const urlRoom = params.get('room');
     if (urlRoom) return sanitizeRoomId(urlRoom);
-    const savedRoom = localStorage.getItem('neep_current_room');
-    if (savedRoom) return sanitizeRoomId(savedRoom);
   } catch (e) {}
-  return DEFAULT_ROOM_ID;
+  return null;
 }
 
 function loadSavedTournament(rid) {
+  if (!rid) return null;
   try {
     const raw = localStorage.getItem(getTournStorageKey(rid));
     if (raw) return JSON.parse(raw);
@@ -80,6 +83,7 @@ function loadSavedTournament(rid) {
 }
 
 function loadKnownPlayers(rid, fallbackPool = []) {
+  if (!rid) return [];
   let list = [];
   try {
     const raw = localStorage.getItem(getKnownPlayersStorageKey(rid));
@@ -115,7 +119,7 @@ function loadKnownPlayers(rid, fallbackPool = []) {
 
 export default function App() {
   const initialRoomId = getInitialRoomId();
-  const initialSaved = loadSavedTournament(initialRoomId);
+  const initialSaved = initialRoomId ? loadSavedTournament(initialRoomId) : null;
 
   const [roomId, setRoomId] = useState(initialRoomId);
   const [adminPin, setAdminPin] = useState(() => initialSaved?.adminPin || DEFAULT_ADMIN_PIN);
@@ -134,6 +138,7 @@ export default function App() {
   });
 
   const [view, setView] = useState(() => {
+    if (!initialRoomId) return 'landing';
     try {
       const params = new URLSearchParams(window.location.search);
       const mode = params.get('mode');
@@ -164,30 +169,45 @@ export default function App() {
   const [activePath, setActivePath] = useState(() => initialSaved?.activePath || null);
 
   const [globalStats, setGlobalStats] = useState(() => {
+    if (!initialRoomId) return {};
     try {
       const raw = localStorage.getItem(getStatsStorageKey(initialRoomId));
       return raw ? JSON.parse(raw) : {};
     } catch (e) { return {}; }
   });
   const [partnershipStats, setPartnershipStats] = useState(() => {
+    if (!initialRoomId) return {};
     try {
       const raw = localStorage.getItem(getPairsStorageKey(initialRoomId));
       return raw ? JSON.parse(raw) : {};
     } catch (e) { return {}; }
   });
   const [priorStats, setPriorStats] = useState(() => {
+    if (!initialRoomId) return {};
     try {
       const raw = localStorage.getItem(getStatsStorageKey(initialRoomId));
       return raw ? JSON.parse(raw) : {};
     } catch (e) { return {}; }
   });
   const [priorPartnershipStats, setPriorPartnershipStats] = useState(() => {
+    if (!initialRoomId) return {};
     try {
       const raw = localStorage.getItem(getPairsStorageKey(initialRoomId));
       return raw ? JSON.parse(raw) : {};
     } catch (e) { return {}; }
   });
-  const [savedPlayers, setSavedPlayers] = useState(() => loadKnownPlayers(initialRoomId, initialSaved?.playerPool));
+  const [savedPlayers, setSavedPlayers] = useState(() => initialRoomId ? loadKnownPlayers(initialRoomId, initialSaved?.playerPool) : []);
+
+  const [newlyCreatedRoomInfo, setNewlyCreatedRoomInfo] = useState(null);
+
+  const recentRoomId = (() => {
+    try {
+      const saved = localStorage.getItem('neep_current_room');
+      return saved ? sanitizeRoomId(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  })();
 
   // Modals
   const [modal, setModal] = useState(null);
@@ -203,6 +223,16 @@ export default function App() {
   // 1. Keep active room and mode in URL bar so refresh preserves it
   useEffect(() => {
     try {
+      if (view === 'landing' || !roomId) {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('room')) {
+          url.searchParams.delete('room');
+          url.searchParams.delete('pin');
+          url.searchParams.delete('mode');
+          window.history.replaceState({}, '', url.toString());
+        }
+        return;
+      }
       const url = new URL(window.location.href);
       let changed = false;
       if (url.searchParams.get('room') !== roomId) {
@@ -217,10 +247,12 @@ export default function App() {
         window.history.replaceState({}, '', url.toString());
       }
     } catch (e) {}
-  }, [roomId, isAdmin]);
+  }, [roomId, isAdmin, view]);
 
   // 2. Load Stats & Setup Cloud Listeners for Active Room
   useEffect(() => {
+    if (!roomId || view === 'landing') return;
+
     try {
       localStorage.setItem('neep_current_room', roomId);
       const statsKey = getStatsStorageKey(roomId);
@@ -299,11 +331,13 @@ export default function App() {
       unsubPlayers();
       if (rotateTimeoutRef.current) clearTimeout(rotateTimeoutRef.current);
     };
-  }, [roomId, isAdmin]);
+  }, [roomId, isAdmin, view]);
 
   // Automatically ensure any newly added tournament players are saved to the active room directory
   const prevPoolRef = useRef(playerPool);
   useEffect(() => {
+    if (!roomId || view === 'landing') return;
+
     const prevNames = new Set(
       (prevPoolRef.current || [])
         .map((p) => (p?.name || '').trim().toLowerCase())
@@ -333,10 +367,12 @@ export default function App() {
         return updated;
       });
     }
-  }, [playerPool, roomId]);
+  }, [playerPool, roomId, view]);
 
   // 3. LocalStorage persistence on change
   useEffect(() => {
+    if (!roomId || view === 'landing') return;
+
     try {
       localStorage.setItem(
         getTournStorageKey(roomId),
@@ -1025,12 +1061,17 @@ export default function App() {
 
     setSavedPlayers(loadKnownPlayers(cleanRoom, saved?.playerPool));
 
-    if (pin && pin === (saved?.adminPin || adminPin)) {
+    const expectedAdminPin = saved?.adminPin || DEFAULT_ADMIN_PIN;
+    if (pin && pin === expectedAdminPin) {
       setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
     }
   }
 
-  function handleCreatePrivateRoom(newRoomId, newPin) {
+  function handleCreatePrivateRoom(customNewRoomId, customNewPin) {
+    const newRoomId = customNewRoomId || generateRoomId('NLP');
+    const newPin = customNewPin || generatePin();
     const cleanRoom = sanitizeRoomId(newRoomId);
     setRoomId(cleanRoom);
     setAdminPin(newPin);
@@ -1088,6 +1129,56 @@ export default function App() {
         bracket: null,
         activePath: null,
       });
+    }
+
+    setNewlyCreatedRoomInfo({ roomId: cleanRoom, adminPin: newPin });
+  }
+
+  async function handleJoinExistingRoom(targetRoomId, pin) {
+    const cleanRoom = sanitizeRoomId(targetRoomId);
+    if (!cleanRoom) {
+      return { error: 'Please enter a valid Room ID.' };
+    }
+
+    const existsLocally = checkLocalRoomExists(cleanRoom);
+    let existsInCloud = false;
+
+    if (isCloudEnabled()) {
+      try {
+        existsInCloud = await checkRoomExistsInCloud(cleanRoom);
+      } catch (e) {
+        console.warn('Error checking cloud room existence:', e);
+      }
+    }
+
+    if (isCloudEnabled() && !existsLocally && !existsInCloud) {
+      return { error: `Room "${cleanRoom}" was not found. Please verify the code or generate a new room.` };
+    }
+
+    if (!isCloudEnabled() && !existsLocally) {
+      return { error: `Room "${cleanRoom}" was not found in local storage.` };
+    }
+
+    handleSwitchRoom(cleanRoom, pin);
+    return { success: true };
+  }
+
+  function handleExitToLanding() {
+    setView('landing');
+    setRoomId(null);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('room');
+      url.searchParams.delete('pin');
+      url.searchParams.delete('mode');
+      window.history.replaceState({}, '', url.toString());
+    } catch (e) {}
+  }
+
+  function handleResumeRecentRoom(recRoomId) {
+    const clean = sanitizeRoomId(recRoomId);
+    if (clean) {
+      handleSwitchRoom(clean);
     }
   }
 
@@ -1200,6 +1291,25 @@ export default function App() {
   const activeTeamA = activeMatch ? teams.find((t) => t.id === activeMatch.teamAId) : null;
   const activeTeamB = activeMatch ? teams.find((t) => t.id === activeMatch.teamBId) : null;
 
+  if (view === 'landing' || !roomId) {
+    return (
+      <>
+        <LandingView
+          onCreatePrivateRoom={() => handleCreatePrivateRoom()}
+          onJoinRoom={handleJoinExistingRoom}
+          recentRoomId={recentRoomId}
+          onResumeRecentRoom={handleResumeRecentRoom}
+          onOpenCloudConfig={() => setIsCloudConfigOpen(true)}
+          isCloudActive={isCloudEnabled()}
+        />
+        <CloudConfigModal
+          isOpen={isCloudConfigOpen}
+          onClose={() => setIsCloudConfigOpen(false)}
+        />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Header
@@ -1219,6 +1329,7 @@ export default function App() {
           setRosterModalTeamId(null);
           setIsRosterModalOpen(true);
         }}
+        onExitToLanding={handleExitToLanding}
       />
 
       <main className="flex-1">
@@ -1362,6 +1473,13 @@ export default function App() {
         isAdmin={isAdmin}
         onSwitchRoom={handleSwitchRoom}
         onCreatePrivateRoom={handleCreatePrivateRoom}
+        onExitToLanding={handleExitToLanding}
+      />
+      <RoomCreatedModal
+        isOpen={Boolean(newlyCreatedRoomInfo)}
+        onClose={() => setNewlyCreatedRoomInfo(null)}
+        roomId={newlyCreatedRoomInfo?.roomId || ''}
+        adminPin={newlyCreatedRoomInfo?.adminPin || ''}
       />
       <CloudConfigModal
         isOpen={isCloudConfigOpen}
