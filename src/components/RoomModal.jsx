@@ -133,9 +133,6 @@ export function RoomModal({
           >
             <Sparkles size={16} /> Create New Private Room
           </button>
-          <p className="text-slate-400 text-xs mt-2 text-center">
-            Generates a unique Room code & PIN for an isolated tournament.
-          </p>
         </div>
 
         {/* Saved Rooms Quick Switcher */}

@@ -456,9 +456,6 @@ export function SetupView({
           <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
             <Lock size={15} className="text-amber-400" /> Private Session & PIN
           </label>
-          <span className="text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full">
-            Isolated Tournament
-          </span>
         </div>
         <p className="text-slate-400 text-xs mb-3">
           Share your Room ID and Spectator link with players. Only users with this Admin PIN can record scores.
