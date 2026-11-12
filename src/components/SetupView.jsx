@@ -331,25 +331,6 @@ export function SetupView({
                     <UserPlus size={13} /> + Add All ({availableSaved.length})
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => csvFileInputRef.current?.click()}
-                  title="Upload a CSV of player names into this room directory & tournament"
-                  className="text-xs font-bold text-[#d7f24c] hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
-                >
-                  <Upload size={12} className="text-[#d7f24c]" /> Upload CSV
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const sampleCsv = generateSampleDirectoryCSV();
-                    triggerCsvDownload('sample-player-directory.csv', sampleCsv);
-                  }}
-                  title="Download a sample CSV template for the room directory"
-                  className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
-                >
-                  <Download size={12} className="text-slate-400" /> Sample CSV
-                </button>
                 {savedPlayers.length > 0 && (
                   <button
                     type="button"

@@ -154,21 +154,10 @@ export function DirectoryModal({
                 <button
                   type="button"
                   onClick={() => csvInputRef.current?.click()}
-                  title="Upload players from CSV into tournament & directory"
-                  className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition active:scale-95 shrink-0"
+                  title="Import players from CSV into tournament & directory"
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition active:scale-95 shrink-0"
                 >
-                  <Upload size={13} /> Upload CSV
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const sampleCsv = generateSampleDirectoryCSV();
-                    triggerCsvDownload('sample-player-directory.csv', sampleCsv);
-                  }}
-                  title="Download a sample CSV template for importing players"
-                  className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition active:scale-95 shrink-0"
-                >
-                  <Download size={13} className="text-slate-400" /> Sample CSV
+                  <Upload size={14} /> CSV
                 </button>
               </form>
               {csvNotice && (
