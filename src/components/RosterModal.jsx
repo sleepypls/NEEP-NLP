@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, UserCheck, UserPlus, Pencil, Check, Crown, AlertCircle, Sparkles, Users } from 'lucide-react';
+import { X, UserCheck, UserPlus, Pencil, Check, Crown, AlertCircle, Sparkles, Users, ChevronUp, ChevronDown } from 'lucide-react';
 
 export function RosterModal({
   isOpen,
@@ -9,6 +9,7 @@ export function RosterModal({
   savedPlayers = [],
   onSubstitutePlayer,
   onRenamePlayer,
+  onReorderDraftPosition,
   isAdmin,
   initialTeamId = null,
 }) {
@@ -70,7 +71,7 @@ export function RosterModal({
             </div>
             <div>
               <h3 className="text-lg font-bold text-white font-display">Team Rosters & Subs</h3>
-              <p className="text-xs text-slate-400">View team lineups, substitute players, or fix names.</p>
+              <p className="text-xs text-slate-400">Reorder draft slots, substitute players, or fix names.</p>
             </div>
           </div>
           <button
@@ -186,6 +187,42 @@ export function RosterModal({
 
                         {isAdmin && !isEditingThis && (
                           <div className="flex items-center gap-1 shrink-0">
+                            {onReorderDraftPosition && activeTeam.draftOrder.length > 1 && (
+                              <div className="flex items-center gap-1 mr-0.5">
+                                <select
+                                  value={slotIdx}
+                                  onChange={(e) => onReorderDraftPosition(activeTeam.id, slotIdx, Number(e.target.value))}
+                                  title="Change draft slot position"
+                                  className="bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl px-2 py-1 text-slate-300 font-mono font-bold text-[11px] focus:outline-none focus:ring-1 focus:ring-[#d7f24c] cursor-pointer"
+                                >
+                                  {activeTeam.draftOrder.map((_, idx) => (
+                                    <option key={idx} value={idx}>
+                                      Slot {idx + 1}
+                                    </option>
+                                  ))}
+                                </select>
+                                <div className="flex flex-col">
+                                  <button
+                                    type="button"
+                                    disabled={slotIdx === 0}
+                                    onClick={() => onReorderDraftPosition(activeTeam.id, slotIdx, slotIdx - 1)}
+                                    title="Move up one draft slot"
+                                    className="p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-[#d7f24c] disabled:opacity-25 disabled:pointer-events-none transition"
+                                  >
+                                    <ChevronUp size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={slotIdx === activeTeam.draftOrder.length - 1}
+                                    onClick={() => onReorderDraftPosition(activeTeam.id, slotIdx, slotIdx + 1)}
+                                    title="Move down one draft slot"
+                                    className="p-0.5 rounded hover:bg-slate-800 text-slate-400 hover:text-[#d7f24c] disabled:opacity-25 disabled:pointer-events-none transition"
+                                  >
+                                    <ChevronDown size={12} />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                             <button
                               onClick={() => startRename(playerId, playerName)}
                               title="Rename player"

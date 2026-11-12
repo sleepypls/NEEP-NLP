@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings, Upload } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
-import { getDefaultSlotPairs } from '../utils/tournament';
+import { getDefaultSlotPairs, parsePlayersFromCSV } from '../utils/tournament';
+import { APP_VERSION } from '../version';
 import { DirectoryModal } from './DirectoryModal';
 
 export function SetupView({
   playerPool,
   addPlayer,
+  onAddMultiplePlayers,
   removePlayer,
   savedPlayers = [],
   onAddSavedPlayer,
@@ -39,6 +41,35 @@ export function SetupView({
   const [nameInput, setNameInput] = useState('');
   const [directoryNameInput, setDirectoryNameInput] = useState('');
   const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
+  const [csvFeedback, setCsvFeedback] = useState(null);
+  const csvFileInputRef = useRef(null);
+
+  function handleCsvFileUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result || '';
+      const names = parsePlayersFromCSV(text);
+      if (names.length === 0) {
+        setCsvFeedback({ type: 'error', message: 'No valid player names found in CSV file.' });
+      } else if (onAddMultiplePlayers) {
+        const addedCount = onAddMultiplePlayers(names, true);
+        setCsvFeedback({
+          type: 'success',
+          message: addedCount > 0
+            ? `Imported ${addedCount} player${addedCount === 1 ? '' : 's'} from ${file.name}`
+            : `All ${names.length} player${names.length === 1 ? '' : 's'} from ${file.name} are already in the tournament pool`,
+        });
+      } else {
+        names.forEach((n) => addPlayer(n));
+        setCsvFeedback({ type: 'success', message: `Imported ${names.length} players from ${file.name}` });
+      }
+      setTimeout(() => setCsvFeedback(null), 4000);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
 
   function toggleCaptain(id) {
     if (!isAdmin) return;
@@ -87,9 +118,12 @@ export function SetupView({
           <img src="/logo.png" alt="NEEP-NLP Score Tracker Logo" className="w-full h-full object-contain" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="font-display font-black tracking-wider text-white text-xl">NEEP-NLP</span>
             <span className="text-[10px] font-mono text-[#d7f24c] bg-[#d7f24c]/10 border border-[#d7f24c]/30 px-2 py-0.5 rounded-full font-bold">SCORE TRACKER</span>
+            <span className="text-[10px] font-mono text-slate-400 bg-slate-950/80 border border-slate-800 px-2 py-0.5 rounded-full font-semibold">
+              {APP_VERSION}
+            </span>
           </div>
           <p className="text-slate-400 text-xs mt-0.5">Tournament Score Tracker & Live Scoring</p>
         </div>
@@ -111,9 +145,48 @@ export function SetupView({
 
       {/* Player Pool Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
-        <label className="text-slate-300 text-sm font-semibold mb-2 block">
-          Player Pool ({playerPool.length})
-        </label>
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <label className="text-slate-300 text-sm font-semibold">
+            Player Pool ({playerPool.length})
+          </label>
+          {isAdmin && (
+            <div>
+              <input
+                ref={csvFileInputRef}
+                type="file"
+                accept=".csv,.txt,text/csv,text/plain"
+                onChange={handleCsvFileUpload}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => csvFileInputRef.current?.click()}
+                title="Upload a CSV or text list of player names into this tournament"
+                className="text-xs font-bold text-[#d7f24c] hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+              >
+                <Upload size={12} className="text-[#d7f24c]" /> Upload CSV
+              </button>
+            </div>
+          )}
+        </div>
+        {csvFeedback && (
+          <div
+            className={`mb-3 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between border ${
+              csvFeedback.type === 'error'
+                ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+            }`}
+          >
+            <span>{csvFeedback.message}</span>
+            <button
+              type="button"
+              onClick={() => setCsvFeedback(null)}
+              className="text-slate-400 hover:text-white ml-2"
+            >
+              <X size={13} />
+            </button>
+          </div>
+        )}
         {isAdmin && (
           <div className="flex gap-2 mb-3">
             <input
@@ -808,6 +881,7 @@ export function SetupView({
         savedPlayers={savedPlayers}
         playerPool={playerPool}
         onAddDirectoryPlayer={onAddDirectoryPlayer}
+        onAddMultiplePlayers={onAddMultiplePlayers}
         onRenameDirectoryPlayer={onRenameDirectoryPlayer}
         onRemoveSavedPlayer={onRemoveSavedPlayer}
         onImportFromMainDirectory={onImportFromMainDirectory}

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { X, Users, Pencil, Trash2, Check, Search, UserPlus, ShieldAlert, ArrowDownToLine, AlertCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Users, Pencil, Trash2, Check, Search, UserPlus, ShieldAlert, ArrowDownToLine, AlertCircle, Upload } from 'lucide-react';
+import { parsePlayersFromCSV } from '../utils/tournament';
 
 export function DirectoryModal({
   isOpen,
@@ -8,6 +9,7 @@ export function DirectoryModal({
   savedPlayers = [],
   playerPool = [],
   onAddDirectoryPlayer,
+  onAddMultiplePlayers,
   onRenameDirectoryPlayer,
   onRemoveSavedPlayer,
   onImportFromMainDirectory,
@@ -18,6 +20,31 @@ export function DirectoryModal({
   const [editingName, setEditingName] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState(null);
+  const [csvNotice, setCsvNotice] = useState(null);
+  const csvInputRef = useRef(null);
+
+  function handleDirectoryCsvUpload(e, addToTournament = false) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const names = parsePlayersFromCSV(evt.target?.result || '');
+      if (names.length === 0) {
+        setCsvNotice({ type: 'error', text: 'No player names found in CSV.' });
+      } else if (onAddMultiplePlayers) {
+        const count = onAddMultiplePlayers(names, addToTournament);
+        setCsvNotice({
+          type: 'success',
+          text: addToTournament
+            ? `Imported ${count} player${count === 1 ? '' : 's'} into tournament & directory`
+            : `Saved ${count} new player${count === 1 ? '' : 's'} to room directory`,
+        });
+      }
+      setTimeout(() => setCsvNotice(null), 4000);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
 
   if (!isOpen) return null;
 
@@ -99,22 +126,53 @@ export function DirectoryModal({
         {/* Quick Add Form & Search */}
         <div className="p-4 border-b border-slate-800/80 bg-slate-925 space-y-2.5 shrink-0">
           {isAdmin ? (
-            <form onSubmit={handleAddSubmit} className="flex gap-2">
-              <input
-                type="text"
-                value={newPlayerName}
-                onChange={(e) => setNewPlayerName(e.target.value)}
-                placeholder="Add player name to directory..."
-                className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
-              />
-              <button
-                type="submit"
-                disabled={!newPlayerName.trim()}
-                className="px-3.5 py-2 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 font-bold text-xs flex items-center gap-1.5 disabled:opacity-40 transition active:scale-95 shrink-0 shadow-md shadow-[#d7f24c]/10"
-              >
-                <UserPlus size={14} /> Add
-              </button>
-            </form>
+            <>
+              <form onSubmit={handleAddSubmit} className="flex gap-2">
+                <input
+                  type="text"
+                  value={newPlayerName}
+                  onChange={(e) => setNewPlayerName(e.target.value)}
+                  placeholder="Add player name to directory..."
+                  className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+                />
+                <button
+                  type="submit"
+                  disabled={!newPlayerName.trim()}
+                  className="px-3.5 py-2 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 font-bold text-xs flex items-center gap-1.5 disabled:opacity-40 transition active:scale-95 shrink-0 shadow-md shadow-[#d7f24c]/10"
+                >
+                  <UserPlus size={14} /> Add
+                </button>
+                <input
+                  ref={csvInputRef}
+                  type="file"
+                  accept=".csv,.txt,text/csv,text/plain"
+                  onChange={(e) => handleDirectoryCsvUpload(e, true)}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => csvInputRef.current?.click()}
+                  title="Import players from CSV into tournament & directory"
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition active:scale-95 shrink-0"
+                >
+                  <Upload size={14} /> CSV
+                </button>
+              </form>
+              {csvNotice && (
+                <div
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center justify-between border ${
+                    csvNotice.type === 'error'
+                      ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                      : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  }`}
+                >
+                  <span>{csvNotice.text}</span>
+                  <button type="button" onClick={() => setCsvNotice(null)} className="text-slate-400 hover:text-white ml-2">
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <div className="flex items-center gap-2 text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2">
               <ShieldAlert size={14} className="shrink-0" />

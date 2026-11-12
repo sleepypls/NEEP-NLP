@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <strong>Version: 2.0 Beta</strong>
+  <strong>Version: v0.27 Beta</strong>
 </p>
 
 A modern, real-time tournament score tracker with team snake drafting, dynamic court rotations, and live multiplayer scoring.

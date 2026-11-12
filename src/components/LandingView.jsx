@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, ArrowRight, ShieldCheck, KeyRound, Lock, History, Cloud, AlertCircle, Loader2 } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, KeyRound, Lock, History, Cloud, AlertCircle, Loader2, Eye, Trash2 } from 'lucide-react';
 import { APP_VERSION } from '../version';
 import { sanitizeRoomId } from '../utils/room';
 
@@ -7,7 +7,9 @@ export function LandingView({
   onCreatePrivateRoom,
   onJoinRoom,
   recentRoomId,
+  savedRooms = [],
   onResumeRecentRoom,
+  onRemoveSavedRoom,
   onOpenCloudConfig,
   isCloudActive,
 }) {
@@ -98,26 +100,74 @@ export function LandingView({
             </p>
           </div>
 
-          {/* Quick Resume Recent Room Shortcut (if exists) */}
-          {recentRoomId && (
-            <div className="mb-8 max-w-xl mx-auto">
-              <div className="bg-slate-900/90 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl transition">
-                <div className="flex items-center gap-3 text-center sm:text-left">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0">
-                    <History size={20} />
+          {/* Saved / Recent Rooms List */}
+          {(savedRooms.length > 0 || recentRoomId) && (
+            <div className="mb-8 max-w-2xl mx-auto">
+              <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <History size={16} className="text-[#d7f24c]" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Saved Tournament Rooms ({savedRooms.length || 1})
+                    </span>
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-400 font-medium">Previous session detected</div>
-                    <div className="text-base font-black text-white font-mono tracking-wide">{recentRoomId}</div>
-                  </div>
+                  <span className="text-[11px] text-slate-500">Auto-saved on this device</span>
                 </div>
-                <button
-                  onClick={() => onResumeRecentRoom(recentRoomId)}
-                  className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-black bg-slate-800 hover:bg-slate-750 text-white border border-slate-700 hover:border-slate-600 transition flex items-center justify-center gap-2 active:scale-95"
-                >
-                  <span>Resume Tournament</span>
-                  <ArrowRight size={14} />
-                </button>
+
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {(savedRooms.length > 0
+                    ? savedRooms
+                    : [{ roomId: recentRoomId, adminPin: null, isAdmin: false }]
+                  ).map((entry) => (
+                    <div
+                      key={entry.roomId}
+                      className="bg-slate-950/70 border border-slate-800/90 hover:border-slate-700 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 font-mono font-black text-white text-sm tracking-wider shrink-0">
+                          {entry.roomId}
+                        </div>
+                        <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+                          {entry.isAdmin ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
+                              <ShieldCheck size={11} /> Scorekeeper Admin
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                              <Eye size={11} /> Spectator
+                            </span>
+                          )}
+                          {entry.isAdmin && entry.adminPin && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold bg-amber-500/10 text-amber-300 border border-amber-500/25 px-2 py-0.5 rounded-full">
+                              <KeyRound size={10} /> PIN: {entry.adminPin}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => onResumeRecentRoom(entry.roomId, entry.adminPin)}
+                          className="flex-1 sm:flex-initial px-3.5 py-2 rounded-xl text-xs font-black bg-[#d7f24c] hover:bg-[#c8e33a] text-slate-950 transition flex items-center justify-center gap-1.5 active:scale-95 shadow-md shadow-[#d7f24c]/10"
+                        >
+                          <span>Resume {entry.isAdmin ? 'as Admin' : 'Room'}</span>
+                          <ArrowRight size={13} />
+                        </button>
+                        {onRemoveSavedRoom && (
+                          <button
+                            type="button"
+                            onClick={() => onRemoveSavedRoom(entry.roomId)}
+                            title={`Remove ${entry.roomId} from saved rooms`}
+                            className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-500 hover:text-red-400 border border-slate-800 transition"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -265,7 +315,7 @@ export function LandingView({
 
       {/* Minimal Footer */}
       <footer className="border-t border-slate-900 py-4 px-4 text-center text-xs text-slate-400">
-        NEEP-NLP Score Tracker · Isolated Private Sessions & Real-time Cloud Sync
+        NEEP-NLP Score Tracker ({APP_VERSION}) · Isolated Private Sessions & Real-time Cloud Sync
       </footer>
     </div>
   );

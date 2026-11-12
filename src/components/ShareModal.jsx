@@ -1,16 +1,47 @@
-import React, { useState } from 'react';
-import { X, Copy, Check, Share2, Eye, ShieldCheck, Lock, KeyRound } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, Copy, Check, Eye, ShieldCheck, Lock, KeyRound, Download } from 'lucide-react';
+import { generateQrMatrix, renderQrCardPngDataUrl } from '../utils/qrcode';
+
+function QrSvg({ url, size = 144 }) {
+  const matrix = useMemo(() => generateQrMatrix(url), [url]);
+  const count = matrix.length;
+  const quiet = 3;
+  const total = count + quiet * 2;
+
+  return (
+    <svg
+      viewBox={`0 0 ${total} ${total}`}
+      width={size}
+      height={size}
+      className="rounded-2xl bg-white p-1.5 shadow-inner mx-auto block"
+      shapeRendering="crispEdges"
+    >
+      <rect width={total} height={total} fill="#ffffff" />
+      {matrix.map((row, r) =>
+        row.map((dark, c) =>
+          dark ? (
+            <rect key={`${r}-${c}`} x={c + quiet} y={r + quiet} width={1} height={1} fill="#020617" />
+          ) : null
+        )
+      )}
+    </svg>
+  );
+}
 
 export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
   const [copiedSpectator, setCopiedSpectator] = useState(false);
   const [copiedAdmin, setCopiedAdmin] = useState(false);
+  const [qrMode, setQrMode] = useState(() => (isAdmin ? 'admin' : 'spectator'));
+  const [downloadedQr, setDownloadedQr] = useState(false);
 
   if (!isOpen) return null;
 
   const baseUrl = window.location.origin + window.location.pathname;
   const currentRoom = roomId || 'neep-main';
-  const spectatorUrl = `${baseUrl}?room=${currentRoom}&mode=spectator`;
-  const adminUrl = `${baseUrl}?room=${currentRoom}&mode=admin&pin=${adminPin || '1234'}`;
+  const spectatorUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}&mode=spectator`;
+  const adminUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}&mode=admin&pin=${encodeURIComponent(adminPin || '1234')}`;
+  const effectiveMode = isAdmin ? qrMode : 'spectator';
+  const activeQrUrl = effectiveMode === 'admin' ? adminUrl : spectatorUrl;
 
   function copyToClipboard(text, isSpectator) {
     navigator.clipboard.writeText(text).then(() => {
@@ -24,17 +55,38 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
     });
   }
 
+  function handleDownloadQr() {
+    try {
+      const dataUrl = renderQrCardPngDataUrl({
+        url: activeQrUrl,
+        roomId: currentRoom,
+        adminPin: effectiveMode === 'admin' ? (adminPin || '1234') : null,
+        mode: effectiveMode,
+      });
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${currentRoom}-${effectiveMode}-qr-pass.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setDownloadedQr(true);
+      setTimeout(() => setDownloadedQr(false), 2500);
+    } catch (e) {
+      console.warn('Failed to download QR card:', e);
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm px-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm px-4 py-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-11 flex-shrink-0 flex items-center justify-center filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
               <img src="/logo.png" alt="NEEP-NLP Score Tracker" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h3 className="text-white text-lg font-bold leading-tight">Share Tournament</h3>
-              <p className="text-xs text-slate-400">NEEP-NLP Live Sync</p>
+              <h3 className="text-white text-lg font-bold leading-tight">Share & QR Pass</h3>
+              <p className="text-xs text-slate-400">NEEP-NLP Live Sync & Room Recovery</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition">
@@ -64,13 +116,62 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
           )}
         </div>
 
-        <p className="text-slate-400 text-sm mb-5 leading-relaxed">
-          Share live links with other players. Anyone on mobile or desktop will see scores and bracket updates in real time!
-        </p>
+        {/* QR Code Section with Download Option */}
+        <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 mb-4 text-center">
+          {isAdmin && (
+            <div className="flex items-center justify-between gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 mb-3">
+              <button
+                type="button"
+                onClick={() => setQrMode('admin')}
+                className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  effectiveMode === 'admin'
+                    ? 'bg-[#d7f24c] text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <ShieldCheck size={13} />
+                Admin Pass QR
+              </button>
+              <button
+                type="button"
+                onClick={() => setQrMode('spectator')}
+                className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  effectiveMode === 'spectator'
+                    ? 'bg-cyan-400 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Eye size={13} />
+                Spectator QR
+              </button>
+            </div>
+          )}
+
+          <QrSvg url={activeQrUrl} size={144} />
+
+          <p className="text-[11px] text-slate-400 mt-2.5 mb-3">
+            {effectiveMode === 'admin'
+              ? 'Scan or save this QR Pass to return to this room with Admin PIN access.'
+              : 'Players & fans can scan to watch live match scores and brackets.'}
+          </p>
+
+          <button
+            type="button"
+            onClick={handleDownloadQr}
+            className="w-full py-2.5 px-3 rounded-xl font-bold text-xs bg-slate-800 hover:bg-slate-750 text-[#d7f24c] border border-slate-700 flex items-center justify-center gap-1.5 active:scale-95 transition"
+          >
+            {downloadedQr ? <Check size={14} className="text-emerald-400" /> : <Download size={14} />}
+            <span>
+              {downloadedQr
+                ? 'QR Pass Saved!'
+                : `Save ${effectiveMode === 'admin' ? 'Admin' : 'Spectator'} QR Code (.PNG)`}
+            </span>
+          </button>
+        </div>
 
         {/* Spectator Link */}
-        <div className="bg-slate-850 border border-slate-750 rounded-2xl p-4 mb-4">
-          <div className="flex items-center justify-between mb-2">
+        <div className="bg-slate-850 border border-slate-750 rounded-2xl p-3.5 mb-3">
+          <div className="flex items-center justify-between mb-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
               <Eye size={14} className="text-cyan-400" /> Spectator Link (Read-Only)
             </span>
@@ -78,9 +179,6 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
               For Players & Fans
             </span>
           </div>
-          <p className="text-slate-400 text-xs mb-3">
-            Players can watch live match scores, court rotations, and all-time leaderboards without accidental score changes.
-          </p>
           <div className="flex gap-2">
             <input
               readOnly
@@ -99,8 +197,8 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
 
         {/* Scorekeeper / Admin Link */}
         {isAdmin && (
-          <div className="bg-slate-850 border border-slate-750 rounded-2xl p-4 mb-2">
-            <div className="flex items-center justify-between mb-2">
+          <div className="bg-slate-850 border border-slate-750 rounded-2xl p-3.5">
+            <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                 <ShieldCheck size={14} className="text-[#d7f24c]" /> Scorekeeper Admin Link
               </span>
@@ -108,9 +206,6 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
                 Full Access
               </span>
             </div>
-            <p className="text-slate-400 text-xs mb-3">
-              Only share with co-organizers who are managing the draft, scoring games, and running Dreambreakers.
-            </p>
             <div className="flex gap-2">
               <input
                 readOnly

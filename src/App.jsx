@@ -26,6 +26,7 @@ import {
   revertSingleMatchup,
   substitutePlayerInTournament,
   renamePlayerInTournament,
+  reorderTeamDraftPosition,
 } from './utils/tournament';
 
 import {
@@ -46,6 +47,9 @@ import {
   generatePin,
   sanitizeRoomId,
   checkLocalRoomExists,
+  loadSavedRoomsHistory,
+  upsertSavedRoomHistory,
+  removeSavedRoomHistory,
 } from './utils/room';
 
 function getTournStorageKey(rid) {
@@ -199,8 +203,10 @@ export default function App() {
   const [savedPlayers, setSavedPlayers] = useState(() => initialRoomId ? loadKnownPlayers(initialRoomId, initialSaved?.playerPool) : []);
 
   const [newlyCreatedRoomInfo, setNewlyCreatedRoomInfo] = useState(null);
+  const [savedRoomsHistory, setSavedRoomsHistory] = useState(() => loadSavedRoomsHistory());
 
   const recentRoomId = (() => {
+    if (savedRoomsHistory.length > 0) return savedRoomsHistory[0].roomId;
     try {
       const saved = localStorage.getItem('neep_current_room');
       return saved ? sanitizeRoomId(saved) : null;
@@ -255,6 +261,7 @@ export default function App() {
 
     try {
       localStorage.setItem('neep_current_room', roomId);
+      setSavedRoomsHistory(upsertSavedRoomHistory(roomId, isAdmin ? adminPin : null, isAdmin));
       const statsKey = getStatsStorageKey(roomId);
       const pairsKey = getPairsStorageKey(roomId);
 
@@ -481,6 +488,57 @@ export default function App() {
 
   function handleAddSavedPlayer(name) {
     addPlayer(name);
+  }
+
+  function handleAddMultiplePlayers(namesArray, addToPool = true) {
+    if (!Array.isArray(namesArray) || namesArray.length === 0) return 0;
+    const cleanNames = namesArray
+      .map((n) => String(n || '').trim())
+      .filter(Boolean);
+    if (cleanNames.length === 0) return 0;
+
+    // 1. Update directory (savedPlayers)
+    const existingSavedLower = new Set(savedPlayers.map((n) => n.trim().toLowerCase()));
+    const newForDirectory = [];
+    for (const name of cleanNames) {
+      const lower = name.toLowerCase();
+      if (!existingSavedLower.has(lower)) {
+        existingSavedLower.add(lower);
+        newForDirectory.push(name);
+      }
+    }
+    if (newForDirectory.length > 0) {
+      const updatedSaved = [...savedPlayers, ...newForDirectory];
+      setSavedPlayers(updatedSaved);
+      try {
+        localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(updatedSaved));
+      } catch (e) {}
+      if (isCloudEnabled()) {
+        saveKnownPlayersToCloud(roomId, updatedSaved);
+      }
+    }
+
+    // 2. Optionally add to active tournament playerPool
+    if (!addToPool) return newForDirectory.length;
+
+    const existingPoolLower = new Set(playerPool.map((p) => p.name.trim().toLowerCase()));
+    const toAddPool = [];
+    for (const name of cleanNames) {
+      const lower = name.toLowerCase();
+      if (!existingPoolLower.has(lower)) {
+        existingPoolLower.add(lower);
+        toAddPool.push(name);
+      }
+    }
+    if (toAddPool.length === 0) return 0;
+
+    let nextId = nextPlayerId;
+    const newPoolItems = toAddPool.map((name) => ({ id: nextId++, name }));
+    const updatedPool = [...playerPool, ...newPoolItems];
+    setPlayerPool(updatedPool);
+    setNextPlayerId(nextId);
+    broadcastTournamentChange({ playerPool: updatedPool, nextPlayerId: nextId });
+    return toAddPool.length;
   }
 
   function handleAddAllSavedPlayers() {
@@ -857,6 +915,26 @@ export default function App() {
     });
   }
 
+  function handleReorderDraftPosition(teamId, fromIndex, toIndex) {
+    const result = reorderTeamDraftPosition({
+      bracket,
+      teams,
+      teamId,
+      fromIndex,
+      toIndex,
+    });
+    if (!result) return;
+
+    setTeams(result.teams);
+    if (result.bracket) {
+      setBracket(result.bracket);
+    }
+    broadcastTournamentChange({
+      teams: result.teams,
+      bracket: result.bracket,
+    });
+  }
+
   function handleReRandomizeExtraGames() {
     if (!activePath || !bracket) return;
     const { round, idx } = activePath;
@@ -1062,10 +1140,15 @@ export default function App() {
     setSavedPlayers(loadKnownPlayers(cleanRoom, saved?.playerPool));
 
     const expectedAdminPin = saved?.adminPin || DEFAULT_ADMIN_PIN;
-    if (pin && pin === expectedAdminPin) {
+    const historyEntry = loadSavedRoomsHistory().find((r) => r.roomId === cleanRoom);
+    const effectivePin = pin || (historyEntry?.isAdmin && historyEntry?.adminPin ? historyEntry.adminPin : '');
+
+    if (effectivePin && effectivePin === expectedAdminPin) {
       setIsAdmin(true);
+      setSavedRoomsHistory(upsertSavedRoomHistory(cleanRoom, effectivePin, true));
     } else {
       setIsAdmin(false);
+      setSavedRoomsHistory(upsertSavedRoomHistory(cleanRoom, null, false));
     }
   }
 
@@ -1078,6 +1161,7 @@ export default function App() {
     setIsAdmin(true);
     try {
       localStorage.setItem('neep_current_room', cleanRoom);
+      setSavedRoomsHistory(upsertSavedRoomHistory(cleanRoom, newPin, true));
     } catch (e) {}
 
     setView('setup');
@@ -1175,16 +1259,23 @@ export default function App() {
     } catch (e) {}
   }
 
-  function handleResumeRecentRoom(recRoomId) {
+  function handleResumeRecentRoom(recRoomId, savedPin) {
     const clean = sanitizeRoomId(recRoomId);
     if (clean) {
-      handleSwitchRoom(clean);
+      const historyEntry = savedRoomsHistory.find((r) => r.roomId === clean);
+      const pinToUse = savedPin || (historyEntry?.isAdmin ? historyEntry?.adminPin : '');
+      handleSwitchRoom(clean, pinToUse);
     }
+  }
+
+  function handleRemoveSavedRoom(targetRoomId) {
+    setSavedRoomsHistory(removeSavedRoomHistory(targetRoomId));
   }
 
   function handleUnlockAdmin(pin) {
     if (pin === adminPin) {
       setIsAdmin(true);
+      setSavedRoomsHistory(upsertSavedRoomHistory(roomId, pin, true));
       return true;
     }
     return false;
@@ -1298,7 +1389,9 @@ export default function App() {
           onCreatePrivateRoom={() => handleCreatePrivateRoom()}
           onJoinRoom={handleJoinExistingRoom}
           recentRoomId={recentRoomId}
+          savedRooms={savedRoomsHistory}
           onResumeRecentRoom={handleResumeRecentRoom}
+          onRemoveSavedRoom={handleRemoveSavedRoom}
           onOpenCloudConfig={() => setIsCloudConfigOpen(true)}
           isCloudActive={isCloudEnabled()}
         />
@@ -1337,6 +1430,7 @@ export default function App() {
           <SetupView
             playerPool={playerPool}
             addPlayer={addPlayer}
+            onAddMultiplePlayers={handleAddMultiplePlayers}
             removePlayer={removePlayer}
             savedPlayers={savedPlayers}
             onAddSavedPlayer={handleAddSavedPlayer}
@@ -1377,6 +1471,7 @@ export default function App() {
             playersById={playersById}
             sittingOut={sittingOut}
             onDraftPlayer={draftPlayer}
+            onReorderDraftPosition={handleReorderDraftPosition}
             onGenerateBracket={handleGenerateBracket}
             isAdmin={isAdmin}
           />
@@ -1471,6 +1566,8 @@ export default function App() {
         currentRoomId={roomId}
         adminPin={adminPin}
         isAdmin={isAdmin}
+        savedRooms={savedRoomsHistory}
+        onRemoveSavedRoom={handleRemoveSavedRoom}
         onSwitchRoom={handleSwitchRoom}
         onCreatePrivateRoom={handleCreatePrivateRoom}
         onExitToLanding={handleExitToLanding}
@@ -1505,6 +1602,7 @@ export default function App() {
         savedPlayers={savedPlayers}
         onSubstitutePlayer={handleSubstitutePlayer}
         onRenamePlayer={handleRenamePlayer}
+        onReorderDraftPosition={handleReorderDraftPosition}
         isAdmin={isAdmin}
         initialTeamId={rosterModalTeamId}
       />

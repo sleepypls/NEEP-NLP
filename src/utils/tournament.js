@@ -20,52 +20,80 @@ export function shuffle(arr) {
 
 export function getDefaultSlotPairs(teamSize, preset = 'adjacent') {
   const n = Math.max(2, teamSize || 4);
+  const targetGames = Math.max(4, Math.ceil(n / 2) * 2);
   const pairs = [];
+  const playCounts = new Array(n + 1).fill(0);
+  const pairHistory = new Map();
+
+  function addPair(s1, s2) {
+    const a = Math.min(Math.max(1, s1), n);
+    let b = Math.min(Math.max(1, s2), n);
+    if (a === b) {
+      b = (a % n) + 1;
+    }
+    const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+    pairs.push([a, b]);
+    playCounts[a] += 1;
+    playCounts[b] += 1;
+    pairHistory.set(key, (pairHistory.get(key) || 0) + 1);
+  }
+
+  function pickFairCrossPair(preferredOffset = 2) {
+    let bestS1 = 1;
+    let bestS2 = 2;
+    let bestScore = Infinity;
+
+    for (let i = 1; i <= n; i++) {
+      for (let j = i + 1; j <= n; j++) {
+        const key = `${i}-${j}`;
+        const used = pairHistory.get(key) || 0;
+        const countSum = playCounts[i] + playCounts[j];
+        const maxCount = Math.max(playCounts[i], playCounts[j]);
+        const isPreferred = (j - i === preferredOffset) ? -0.5 : 0;
+        // Prioritize: 1) lowest max playCount (so nobody stays at 1 game while others play 3),
+        // 2) lowest sum of playCounts, 3) unused partnership, 4) preferred cross offset
+        const score = maxCount * 1000 + countSum * 100 + used * 50 + isPreferred;
+        if (score < bestScore) {
+          bestScore = score;
+          bestS1 = i;
+          bestS2 = j;
+        }
+      }
+    }
+    addPair(bestS1, bestS2);
+  }
 
   if (preset === 'balanced') {
-    // Balanced / MLP style: 1&n, 2&(n-1), 3&(n-2)...
+    // Pass 1: Balanced / MLP style high-low (1&n, 2&(n-1), 3&(n-2)...)
     const half = Math.floor(n / 2);
     for (let i = 0; i < half; i++) {
-      pairs.push([i + 1, n - i]);
+      addPair(i + 1, n - i);
     }
-    // Second rotations (mirrored high-low crosses)
-    for (let i = 0; i < half; i++) {
-      const p1 = (i * 2) + 1;
-      const p2 = ((i * 2) + 2 <= n) ? (i * 2) + 2 : 2;
-      if (pairs.length < 4 || pairs.length < n) {
-        pairs.push([p1, p2]);
-      }
+    // If odd team size, pair the middle slot with the least-played / balanced partner
+    if (n % 2 !== 0) {
+      const mid = Math.ceil(n / 2);
+      const partner = mid > 1 ? 1 : 2;
+      addPair(mid, partner);
     }
-    let g = 1;
-    while (pairs.length < Math.max(4, n)) {
-      pairs.push([g, (g % n) + 1]);
-      g = (g % n) + 1;
+    // Pass 2+: Fill remaining games ensuring every slot plays at least twice with fresh partners
+    while (pairs.length < targetGames) {
+      pickFairCrossPair(1);
     }
   } else {
-    // Adjacent: 1&2, 3&4, 5&6...
+    // Pass 1: Adjacent slots (1&2, 3&4, 5&6...)
     for (let i = 1; i <= n - 1; i += 2) {
-      pairs.push([i, i + 1]);
+      addPair(i, i + 1);
     }
+    // If odd team size, cover the last slot N immediately
     if (n % 2 !== 0) {
-      pairs.push([n - 1, n]);
+      addPair(n - 1, n);
     }
-    // Second rotations (e.g. 1&3, 2&4...)
-    for (let i = 1; i <= n - 2; i += 2) {
-      if (pairs.length < Math.max(4, n)) {
-        pairs.push([i, i + 2]);
-      }
-    }
-    for (let i = 2; i <= n; i += 2) {
-      if (pairs.length < Math.max(4, n)) {
-        pairs.push([i, (i + 2 <= n) ? i + 2 : 1]);
-      }
-    }
-    let g = 1;
-    while (pairs.length < Math.max(4, n)) {
-      pairs.push([g, (g % n) + 1]);
-      g = (g % n) + 1;
+    // Pass 2+: Second rotation (e.g. 1&3, 2&4 for 4-player teams, or fair cross-pairs for 5+ players)
+    while (pairs.length < targetGames) {
+      pickFairCrossPair(2);
     }
   }
+
   return pairs;
 }
 
@@ -118,8 +146,9 @@ export function generateGames(teamA, teamB, goalScore, matchupConfig = { preset:
   const commonSize = Math.min(nA, nB);
 
   // Determine slot pairs to use
+  const isCustom = matchupConfig?.preset === 'custom' && Array.isArray(matchupConfig?.customSlotPairs) && matchupConfig.customSlotPairs.length > 0;
   let slotPairs = [];
-  if (matchupConfig?.preset === 'custom' && Array.isArray(matchupConfig?.customSlotPairs) && matchupConfig.customSlotPairs.length > 0) {
+  if (isCustom) {
     slotPairs = matchupConfig.customSlotPairs;
   } else {
     slotPairs = getDefaultSlotPairs(commonSize, matchupConfig?.preset || 'adjacent');
@@ -128,8 +157,49 @@ export function generateGames(teamA, teamB, goalScore, matchupConfig = { preset:
   const baseGamesCount = slotPairs.length;
   const minGamesToCoverA = Math.ceil(nA / 2) * 2;
   const minGamesToCoverB = Math.ceil(nB / 2) * 2;
-  let totalGames = Math.max(baseGamesCount, minGamesToCoverA, minGamesToCoverB, 4);
-  if (totalGames % 2 !== 0) totalGames += 1;
+  let totalGames = isCustom
+    ? baseGamesCount
+    : Math.max(baseGamesCount, minGamesToCoverA, minGamesToCoverB, 4);
+  if (!isCustom && totalGames % 2 !== 0) totalGames += 1;
+
+  // Track play counts and partnership history so extra games prioritize under-played players
+  const playCountsA = {};
+  const playCountsB = {};
+  teamA.draftOrder.forEach((id) => { playCountsA[id] = 0; });
+  teamB.draftOrder.forEach((id) => { playCountsB[id] = 0; });
+  const pairHistoryA = new Map();
+  const pairHistoryB = new Map();
+
+  function recordPair(pair, counts, history) {
+    if (!pair || pair.length < 2) return;
+    const [p1, p2] = pair;
+    counts[p1] = (counts[p1] || 0) + 1;
+    counts[p2] = (counts[p2] || 0) + 1;
+    const key = p1 < p2 ? `${p1}-${p2}` : `${p2}-${p1}`;
+    history.set(key, (history.get(key) || 0) + 1);
+  }
+
+  function pickBalancedPair(draftOrder, counts, history) {
+    if (draftOrder.length < 2) return [...draftOrder];
+    const candidates = shuffle([...draftOrder]).sort((a, b) => (counts[a] || 0) - (counts[b] || 0));
+    const p1 = candidates[0];
+    let bestP2 = candidates[1];
+    let bestScore = Infinity;
+    for (let i = 1; i < candidates.length; i++) {
+      const p2 = candidates[i];
+      const key = p1 < p2 ? `${p1}-${p2}` : `${p2}-${p1}`;
+      const timesTogether = history.get(key) || 0;
+      const score = (counts[p2] || 0) * 100 + timesTogether * 10;
+      if (score < bestScore) {
+        bestScore = score;
+        bestP2 = p2;
+      }
+    }
+    // Preserve draft order sorting inside the pair for clean display
+    const idx1 = draftOrder.indexOf(p1);
+    const idx2 = draftOrder.indexOf(bestP2);
+    return idx1 <= idx2 ? [p1, bestP2] : [bestP2, p1];
+  }
 
   const games = [];
   for (let idx = 0; idx < totalGames; idx++) {
@@ -138,20 +208,24 @@ export function generateGames(teamA, teamB, goalScore, matchupConfig = { preset:
     if (idx < slotPairs.length) {
       sPair = slotPairs[idx];
       // Convert 1-indexed slots to 0-indexed indices (safely bounded)
-      const s1A = Math.min(Math.max(1, sPair[0]), nA) - 1;
-      const s2A = Math.min(Math.max(1, sPair[1]), nA) - 1;
-      const s1B = Math.min(Math.max(1, sPair[0]), nB) - 1;
-      const s2B = Math.min(Math.max(1, sPair[1]), nB) - 1;
+      let s1A = Math.min(Math.max(1, sPair[0]), nA) - 1;
+      let s2A = Math.min(Math.max(1, sPair[1]), nA) - 1;
+      if (s1A === s2A && nA >= 2) s2A = (s1A + 1) % nA;
+
+      let s1B = Math.min(Math.max(1, sPair[0]), nB) - 1;
+      let s2B = Math.min(Math.max(1, sPair[1]), nB) - 1;
+      if (s1B === s2B && nB >= 2) s2B = (s1B + 1) % nB;
 
       pA = [teamA.draftOrder[s1A], teamA.draftOrder[s2A]];
       pB = [teamB.draftOrder[s1B], teamB.draftOrder[s2B]];
     } else {
-      // Extra games for uneven rosters: fair candidates
-      const candA = shuffle([...teamA.draftOrder]);
-      const candB = shuffle([...teamB.draftOrder]);
-      pA = [candA[0], candA[1]];
-      pB = [candB[0], candB[1]];
+      // Extra games for uneven rosters: prioritize players with the fewest games played!
+      pA = pickBalancedPair(teamA.draftOrder, playCountsA, pairHistoryA);
+      pB = pickBalancedPair(teamB.draftOrder, playCountsB, pairHistoryB);
     }
+
+    recordPair(pA, playCountsA, pairHistoryA);
+    recordPair(pB, playCountsB, pairHistoryB);
 
     const isExtra = idx >= baseGamesCount;
     games.push({
@@ -331,6 +405,151 @@ export function renamePlayerInTournament({ playersById, playerPool, playerId, ne
     playersById: newPlayersById,
     playerPool: newPlayerPool,
   };
+}
+
+export function reorderTeamDraftPosition({ bracket, teams, teamId, fromIndex, toIndex }) {
+  const targetTeam = teams.find((t) => t.id === teamId);
+  if (!targetTeam) return null;
+  const n = targetTeam.draftOrder.length;
+  if (fromIndex < 0 || fromIndex >= n || toIndex < 0 || toIndex >= n || fromIndex === toIndex) return null;
+
+  const newDraftOrder = [...targetTeam.draftOrder];
+  const [moved] = newDraftOrder.splice(fromIndex, 1);
+  newDraftOrder.splice(toIndex, 0, moved);
+
+  const newTeams = teams.map((team) => {
+    if (team.id !== teamId) return team;
+    return {
+      ...team,
+      draftOrder: newDraftOrder,
+    };
+  });
+
+  let newBracket = bracket ? JSON.parse(JSON.stringify(bracket)) : null;
+  if (newBracket && newBracket.rounds) {
+    newBracket.rounds.forEach((round) => {
+      round.forEach((match) => {
+        const isTeamA = match.teamAId === teamId;
+        const isTeamB = match.teamBId === teamId;
+        if (!isTeamA && !isTeamB) return;
+
+        if (match.games) {
+          match.games = match.games.map((g) => {
+            if (g.saved || g.inProgress || !g.slotPair || g.slotPair.length < 2) return g;
+            const s1 = Math.min(Math.max(1, g.slotPair[0]), n) - 1;
+            let s2 = Math.min(Math.max(1, g.slotPair[1]), n) - 1;
+            if (s1 === s2 && n >= 2) s2 = (s1 + 1) % n;
+            const updatedPair = [newDraftOrder[s1], newDraftOrder[s2]];
+            return {
+              ...g,
+              pairA: isTeamA ? updatedPair : g.pairA,
+              pairB: isTeamB ? updatedPair : g.pairB,
+            };
+          });
+        }
+
+        if (match.dreambreaker && !match.dreambreaker.started) {
+          if (isTeamA && !match.dreambreaker.lockedA) {
+            match.dreambreaker.lineupA = [...newDraftOrder];
+          }
+          if (isTeamB && !match.dreambreaker.lockedB) {
+            match.dreambreaker.lineupB = [...newDraftOrder];
+          }
+        }
+      });
+    });
+  }
+
+  return {
+    teams: newTeams,
+    bracket: newBracket,
+  };
+}
+
+export function parsePlayersFromCSV(csvText) {
+  if (!csvText) return [];
+  const lines = String(csvText)
+    .replace(/^\uFEFF/, '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return [];
+
+  function splitCSVRow(row) {
+    const result = [];
+    let current = '';
+    let inQuotes = false;
+    for (let i = 0; i < row.length; i++) {
+      const ch = row[i];
+      if (ch === '"') {
+        if (inQuotes && row[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if ((ch === ',' || ch === ';' || ch === '\t') && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  }
+
+  const rows = lines.map(splitCSVRow);
+  const firstRow = rows[0].map((c) => c.toLowerCase());
+  const headerKeywords = ['name', 'player', 'player name', 'full name', 'fullname', 'first name', 'firstname', 'participant', 'member'];
+  const lastKeywords = ['last name', 'lastname', 'surname'];
+
+  const nameColIdx = firstRow.findIndex((c) => headerKeywords.includes(c));
+  const lastColIdx = firstRow.findIndex((c) => lastKeywords.includes(c));
+  const hasHeader = nameColIdx !== -1 || firstRow.some((c) => ['id', 'email', 'phone', 'dupr', 'rating', 'skill', 'team', 'captain'].includes(c));
+
+  const names = [];
+  const startRow = hasHeader ? 1 : 0;
+
+  for (let r = startRow; r < rows.length; r++) {
+    const cols = rows[r];
+    if (!cols || cols.length === 0) continue;
+
+    if (hasHeader && nameColIdx !== -1) {
+      let fullName = cols[nameColIdx] || '';
+      if (lastColIdx !== -1 && cols[lastColIdx]) {
+        fullName = `${fullName} ${cols[lastColIdx]}`.trim();
+      }
+      if (fullName) names.push(fullName);
+    } else if (cols.length === 1) {
+      if (cols[0]) names.push(cols[0]);
+    } else {
+      // Multi-column without explicit header: if single row of comma-separated names, add all; otherwise take first non-numeric cell
+      if (rows.length === 1 && !hasHeader) {
+        cols.forEach((c) => {
+          if (c && isNaN(Number(c))) names.push(c);
+        });
+      } else {
+        const candidate = cols.find((c) => c && isNaN(Number(c)));
+        if (candidate) names.push(candidate);
+      }
+    }
+  }
+
+  // Deduplicate case-insensitively while preserving order
+  const seen = new Set();
+  const unique = [];
+  for (const raw of names) {
+    const clean = raw.replace(/^["']+|["']+$/g, '').trim();
+    if (!clean) continue;
+    const lower = clean.toLowerCase();
+    if (!seen.has(lower)) {
+      seen.add(lower);
+      unique.push(clean);
+    }
+  }
+  return unique;
 }
 
 export function initializeDraftState(playerPool, numTeams, allowUneven = true, selectedCaptainIds = []) {

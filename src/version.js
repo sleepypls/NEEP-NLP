@@ -1,2 +1,2 @@
-export const APP_VERSION = 'v2.6 Beta';
-export const APP_VERSION_RAW = '2.6.0-beta';
+export const APP_VERSION = 'v0.27 Beta';
+export const APP_VERSION_RAW = '0.27.0-beta';

@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserCheck, Swords, ShieldAlert, Crown } from 'lucide-react';
+import { UserCheck, Swords, ShieldAlert, Crown, ChevronUp, ChevronDown } from 'lucide-react';
 
 export function DraftView({
   teams,
@@ -9,6 +9,7 @@ export function DraftView({
   playersById,
   sittingOut,
   onDraftPlayer,
+  onReorderDraftPosition,
   onGenerateBracket,
   isAdmin,
 }) {
@@ -89,17 +90,44 @@ export function DraftView({
               </span>
             </div>
             <ol className="space-y-1.5 text-sm">
-              {team.draftOrder.map((pid, i) => (
-                <li key={pid} className="flex items-center gap-2 bg-slate-800/80 rounded-lg px-2.5 py-1.5 text-slate-200">
-                  <span className="font-mono text-xs text-slate-500 w-4">{i + 1}.</span>
-                  <span className="font-medium truncate">{playersById[pid]}</span>
-                  {i === 0 && (
-                    <span className="ml-auto text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded flex items-center gap-1">
-                      <Crown size={11} className="fill-current" /> Captain
-                    </span>
-                  )}
-                </li>
-              ))}
+              {team.draftOrder.map((pid, i) => {
+                const isCaptain = team.captainId === pid;
+                const canMoveUp = i > 0;
+                const canMoveDown = i < team.draftOrder.length - 1;
+                return (
+                  <li key={pid} className="flex items-center gap-1.5 bg-slate-800/80 rounded-lg px-2.5 py-1.5 text-slate-200">
+                    <span className="font-mono text-xs text-slate-500 w-4 shrink-0">{i + 1}.</span>
+                    <span className="font-medium truncate flex-1">{playersById[pid]}</span>
+                    {isCaptain && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                        <Crown size={11} className="fill-current" /> Captain
+                      </span>
+                    )}
+                    {isAdmin && onReorderDraftPosition && team.draftOrder.length > 1 && (
+                      <div className="flex items-center gap-0.5 shrink-0 ml-1">
+                        <button
+                          type="button"
+                          disabled={!canMoveUp}
+                          onClick={() => onReorderDraftPosition(team.id, i, i - 1)}
+                          title={`Move ${playersById[pid]} up to Slot ${i}`}
+                          className="p-0.5 rounded hover:bg-slate-700 text-slate-400 hover:text-[#d7f24c] disabled:opacity-25 disabled:pointer-events-none transition"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!canMoveDown}
+                          onClick={() => onReorderDraftPosition(team.id, i, i + 1)}
+                          title={`Move ${playersById[pid]} down to Slot ${i + 2}`}
+                          className="p-0.5 rounded hover:bg-slate-700 text-slate-400 hover:text-[#d7f24c] disabled:opacity-25 disabled:pointer-events-none transition"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ol>
           </div>
         ))}
