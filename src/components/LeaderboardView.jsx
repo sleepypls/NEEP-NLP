@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
-import { Trophy, User, Users } from 'lucide-react';
+import { Trophy, User, Users, Download } from 'lucide-react';
+import { generateLeaderboardCSV, generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
 
-export function LeaderboardView({ globalStats = {}, partnershipStats = {} }) {
+export function LeaderboardView({
+  globalStats = {},
+  partnershipStats = {},
+  bracket = null,
+  teams = [],
+  playersById = {},
+  roomId = '',
+}) {
   const [tab, setTab] = useState('players');
 
   const playerRows = Object.values(globalStats || {}).sort((a, b) => {
@@ -14,14 +22,60 @@ export function LeaderboardView({ globalStats = {}, partnershipStats = {} }) {
     return (b.pointDiff - a.pointDiff) || (b.wins - a.wins) || (b.gamesPlayed - a.gamesPlayed);
   });
 
+  function handleExportLeaderboardCsv() {
+    const csv = generateLeaderboardCSV({ globalStats, partnershipStats, roomId });
+    triggerCsvDownload(`${roomId || 'room'}-leaderboard-stats.csv`, csv);
+  }
+
+  function handleExportMatchScoresCsv() {
+    const csv = generateMatchScoresCSV({ bracket, teams, playersById, roomId });
+    triggerCsvDownload(`${roomId || 'room'}-match-scores.csv`, csv);
+  }
+
+  const hasStats = playerRows.length > 0 || pairRows.length > 0;
+  const hasMatchGames = Boolean(
+    bracket?.rounds?.some((r) => r.some((m) => Array.isArray(m.games) && m.games.length > 0))
+  );
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 pb-24 animate-in fade-in duration-200">
-      <h2 className="text-white text-3xl font-display uppercase tracking-wide font-semibold mb-1 flex items-center gap-2">
-        <Trophy size={24} className="text-amber-400" /> All-Time Leaderboard
-      </h2>
-      <p className="text-slate-500 text-sm mb-5 text-balance">
-        Persisted across every tournament played on this device.
-      </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+        <div>
+          <h2 className="text-white text-3xl font-display uppercase tracking-wide font-semibold flex items-center gap-2">
+            <Trophy size={24} className="text-amber-400" /> Room Leaderboard
+          </h2>
+          <p className="text-slate-500 text-sm text-balance">
+            Isolated stats & partnership records for room <span className="font-mono text-slate-300 font-bold">{roomId}</span>.
+          </p>
+        </div>
+
+        {(hasStats || hasMatchGames) && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {hasStats && (
+              <button
+                type="button"
+                onClick={handleExportLeaderboardCsv}
+                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[#d7f24c] text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                title="Export individual & partnership leaderboard stats as CSV"
+              >
+                <Download size={14} />
+                <span>Export Leaderboard CSV</span>
+              </button>
+            )}
+            {hasMatchGames && (
+              <button
+                type="button"
+                onClick={handleExportMatchScoresCsv}
+                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                title="Export all regulation & Dreambreaker game scores as CSV"
+              >
+                <Download size={14} className="text-[#d7f24c]" />
+                <span>Export Match Scores CSV</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Segmented Tab Switcher */}
       <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-6 max-w-xs shadow-lg">

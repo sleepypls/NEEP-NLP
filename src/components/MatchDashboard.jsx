@@ -16,7 +16,9 @@ import {
   ShieldAlert,
   Lock,
   RotateCcw,
+  Download,
 } from 'lucide-react';
+import { generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
 
 function TeamDot({ color, className = '' }) {
   return (
@@ -300,6 +302,9 @@ export function MatchDashboard({
   teamA,
   teamB,
   playersById,
+  bracket = null,
+  teams = [],
+  roomId = '',
   onSaveGame,
   onToggleInProgress,
   onOpenEditMatchup,
@@ -319,6 +324,11 @@ export function MatchDashboard({
   const isTie = match.status === 'tied';
   const isDone = match.status === 'complete';
   const hasUpcomingGames = match.games.some((g) => !g.inProgress && !g.saved);
+
+  function handleExportScoresCsv() {
+    const csv = generateMatchScoresCSV({ bracket, teams, playersById, roomId });
+    triggerCsvDownload(`${roomId || 'room'}-match-scores.csv`, csv);
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 pb-24 animate-in fade-in duration-200">
@@ -353,6 +363,19 @@ export function MatchDashboard({
               <RotateCcw size={13} className="shrink-0" />
               <span className="hidden xs:inline">Revert Matchups</span>
               <span className="xs:hidden">Revert</span>
+            </button>
+          )}
+
+          {bracket && (
+            <button
+              type="button"
+              onClick={handleExportScoresCsv}
+              title="Export all tournament match & game scores as CSV"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white text-xs font-bold border border-slate-700 active:scale-95 transition shadow-sm"
+            >
+              <Download size={13} className="text-[#d7f24c] shrink-0" />
+              <span className="hidden sm:inline">Export Scores CSV</span>
+              <span className="sm:hidden">CSV</span>
             </button>
           )}
         </div>

@@ -54,8 +54,6 @@ export function RoomModal({
     onClose();
   }
 
-  const isDefaultRoom = currentRoomId === 'neep-main' || currentRoomId === 'neep-pickleball';
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm px-4">
       <div className="bg-slate-900 border border-slate-750 rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
@@ -82,12 +80,8 @@ export function RoomModal({
         <div className="bg-slate-850 border border-slate-750 rounded-2xl p-4 mb-5">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Current Room</span>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-              isDefaultRoom
-                ? 'bg-slate-800 text-slate-400 border-slate-700'
-                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-            }`}>
-              {isDefaultRoom ? 'Public Room' : 'Private Session'}
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+              Private Session
             </span>
           </div>
 

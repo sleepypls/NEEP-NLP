@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { X, Users, Pencil, Trash2, Check, Search, UserPlus, ShieldAlert, ArrowDownToLine, AlertCircle, Upload } from 'lucide-react';
-import { parsePlayersFromCSV } from '../utils/tournament';
+import { X, Users, Pencil, Trash2, Check, Search, UserPlus, ShieldAlert, AlertCircle, Upload, Download } from 'lucide-react';
+import { parsePlayersFromCSV, generateDirectoryCSV, generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
 
 export function DirectoryModal({
   isOpen,
@@ -12,7 +12,6 @@ export function DirectoryModal({
   onAddMultiplePlayers,
   onRenameDirectoryPlayer,
   onRemoveSavedPlayer,
-  onImportFromMainDirectory,
   isAdmin,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -89,7 +88,10 @@ export function DirectoryModal({
     setPendingDeleteName(null);
   }
 
-  const isDefaultRoom = !roomId || roomId === 'neep-main' || roomId === 'neep-pickleball';
+  function handleExportDirectoryCsv() {
+    const csv = generateDirectoryCSV(savedPlayers, playerPool);
+    triggerCsvDownload(`${roomId || 'room'}-directory.csv`, csv);
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
@@ -103,14 +105,14 @@ export function DirectoryModal({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="text-white text-lg font-bold font-display leading-tight truncate">
-                  Manage Player Directory
+                  Room Player Directory
                 </h3>
                 <span className="text-[10px] font-mono font-bold bg-slate-850 text-[#d7f24c] border border-slate-700 px-2 py-0.5 rounded-md shrink-0">
-                  {roomId || 'Main'}
+                  {roomId}
                 </span>
               </div>
               <p className="text-xs text-slate-400 truncate">
-                Saved player roster for this room ({savedPlayers.length} total)
+                Isolated player roster for this room ({savedPlayers.length} total)
               </p>
             </div>
           </div>
@@ -152,10 +154,21 @@ export function DirectoryModal({
                 <button
                   type="button"
                   onClick={() => csvInputRef.current?.click()}
-                  title="Import players from CSV into tournament & directory"
-                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition active:scale-95 shrink-0"
+                  title="Upload players from CSV into tournament & directory"
+                  className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition active:scale-95 shrink-0"
                 >
-                  <Upload size={14} /> CSV
+                  <Upload size={13} /> Upload CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sampleCsv = generateSampleDirectoryCSV();
+                    triggerCsvDownload('sample-player-directory.csv', sampleCsv);
+                  }}
+                  title="Download a sample CSV template for importing players"
+                  className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white font-bold text-xs border border-slate-700 flex items-center gap-1.5 transition active:scale-95 shrink-0"
+                >
+                  <Download size={13} className="text-slate-400" /> Sample CSV
                 </button>
               </form>
               {csvNotice && (
@@ -341,26 +354,36 @@ export function DirectoryModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900/95 flex items-center justify-between gap-3 shrink-0">
-          {!isDefaultRoom && onImportFromMainDirectory ? (
+        <div className="p-4 border-t border-slate-800 bg-slate-900/95 flex items-center justify-between gap-2 flex-wrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={onImportFromMainDirectory}
-              className="text-xs font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1.5 py-1 px-2 rounded-lg hover:bg-cyan-950/30 transition"
-              title="Import all names from the Main room directory into this room"
+              onClick={() => {
+                const sampleCsv = generateSampleDirectoryCSV();
+                triggerCsvDownload('sample-player-directory.csv', sampleCsv);
+              }}
+              className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 flex items-center gap-1.5 py-2 px-3 rounded-xl transition active:scale-95"
+              title="Download a sample CSV template for importing players"
             >
-              <ArrowDownToLine size={13} /> Import from Main
+              <Download size={13} className="text-slate-400" /> Sample CSV
             </button>
-          ) : (
-            <div className="text-[11px] text-slate-500">
-              {savedPlayers.length} player{savedPlayers.length !== 1 ? 's' : ''} in directory
-            </div>
-          )}
+
+            {savedPlayers.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExportDirectoryCsv}
+                className="text-xs font-bold text-[#d7f24c] hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 flex items-center gap-1.5 py-2 px-3 rounded-xl transition active:scale-95"
+                title="Export this room's player directory as a CSV file"
+              >
+                <Download size={13} /> Export Directory CSV
+              </button>
+            )}
+          </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs border border-slate-700 transition active:scale-95 shadow-md"
+            className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs border border-slate-700 transition active:scale-95 shadow-md ml-auto"
           >
             Done
           </button>

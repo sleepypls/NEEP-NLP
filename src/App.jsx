@@ -27,6 +27,7 @@ import {
   substitutePlayerInTournament,
   renamePlayerInTournament,
   reorderTeamDraftPosition,
+  getActiveDreambreakerPlayers,
 } from './utils/tournament';
 
 import {
@@ -34,9 +35,11 @@ import {
   subscribeToActiveTournament,
   subscribeToStats,
   subscribeToKnownPlayers,
+  subscribeToSavedConfigs,
   saveTournamentToCloud,
   saveStatsToCloud,
   saveKnownPlayersToCloud,
+  saveConfigsToCloud,
   checkRoomExistsInCloud,
   wipeAllDatabaseData,
 } from './services/firebase';
@@ -63,6 +66,86 @@ function getPairsStorageKey(rid) {
 }
 function getKnownPlayersStorageKey(rid) {
   return `neep_players_${rid}_v1`;
+}
+function getConfigStorageKey(rid) {
+  return `neep_config_${rid}_v1`;
+}
+const GLOBAL_DEFAULT_CONFIG_KEY = 'neep_default_config_v1';
+const GLOBAL_PRESETS_KEY = 'neep_config_presets_v1';
+
+const SYSTEM_DEFAULT_CONFIG = {
+  numTeams: 4,
+  goalScore: 11,
+  dreambreakerScore: 21,
+  dreambreakerFormat: 'singles',
+  allowUneven: true,
+  captainMode: 'random',
+  matchupConfig: { preset: 'adjacent', customSlotPairs: [] },
+};
+
+function sanitizeConfigObject(cfg = {}) {
+  return {
+    numTeams: Number(cfg.numTeams) >= 2 && Number(cfg.numTeams) <= 8 ? Number(cfg.numTeams) : 4,
+    goalScore: Number(cfg.goalScore) >= 1 ? Number(cfg.goalScore) : 11,
+    dreambreakerScore: Number(cfg.dreambreakerScore) >= 1 ? Number(cfg.dreambreakerScore) : 21,
+    dreambreakerFormat: cfg.dreambreakerFormat === 'doubles' ? 'doubles' : 'singles',
+    allowUneven: cfg.allowUneven !== undefined ? Boolean(cfg.allowUneven) : true,
+    captainMode: cfg.captainMode === 'manual' ? 'manual' : 'random',
+    matchupConfig:
+      cfg.matchupConfig && typeof cfg.matchupConfig === 'object'
+        ? {
+            preset: ['adjacent', 'balanced', 'custom'].includes(cfg.matchupConfig.preset)
+              ? cfg.matchupConfig.preset
+              : 'adjacent',
+            customSlotPairs: Array.isArray(cfg.matchupConfig.customSlotPairs)
+              ? cfg.matchupConfig.customSlotPairs
+              : [],
+          }
+        : { preset: 'adjacent', customSlotPairs: [] },
+  };
+}
+
+function loadSavedConfigs(rid) {
+  let defaultConfig = null;
+  let presets = [];
+  try {
+    const globalDefRaw = localStorage.getItem(GLOBAL_DEFAULT_CONFIG_KEY);
+    if (globalDefRaw) defaultConfig = sanitizeConfigObject(JSON.parse(globalDefRaw));
+  } catch (e) {}
+
+  try {
+    const globalPresetsRaw = localStorage.getItem(GLOBAL_PRESETS_KEY);
+    if (globalPresetsRaw) {
+      const parsed = JSON.parse(globalPresetsRaw);
+      if (Array.isArray(parsed)) presets = parsed;
+    }
+  } catch (e) {}
+
+  if (rid) {
+    try {
+      const roomRaw = localStorage.getItem(getConfigStorageKey(rid));
+      if (roomRaw) {
+        const parsedRoom = JSON.parse(roomRaw);
+        if (parsedRoom?.defaultConfig) {
+          defaultConfig = sanitizeConfigObject(parsedRoom.defaultConfig);
+        }
+        if (Array.isArray(parsedRoom?.presets) && parsedRoom.presets.length > 0) {
+          const byId = new Map(presets.map((p) => [p.id || p.name, p]));
+          parsedRoom.presets.forEach((p) => {
+            if (p && p.name) byId.set(p.id || p.name, p);
+          });
+          presets = Array.from(byId.values());
+        }
+      }
+    } catch (e) {}
+  }
+
+  return { defaultConfig, presets };
+}
+
+function getEffectiveDefaultConfig(rid) {
+  const { defaultConfig } = loadSavedConfigs(rid);
+  return defaultConfig || SYSTEM_DEFAULT_CONFIG;
 }
 
 function getInitialRoomId() {
@@ -123,8 +206,12 @@ function loadKnownPlayers(rid, fallbackPool = []) {
 export default function App() {
   const initialRoomId = getInitialRoomId();
   const initialSaved = initialRoomId ? loadSavedTournament(initialRoomId) : null;
+  const initialConfigs = loadSavedConfigs(initialRoomId);
+  const initialDefaultCfg = initialConfigs.defaultConfig || SYSTEM_DEFAULT_CONFIG;
 
   const [roomId, setRoomId] = useState(initialRoomId);
+  const [savedDefaultConfig, setSavedDefaultConfig] = useState(() => initialConfigs.defaultConfig);
+  const [configPresets, setConfigPresets] = useState(() => initialConfigs.presets || []);
   const [adminPin, setAdminPin] = useState(() => initialSaved?.adminPin || DEFAULT_ADMIN_PIN);
   const [isAdmin, setIsAdmin] = useState(() => {
     try {
@@ -153,13 +240,14 @@ export default function App() {
   });
   const [playerPool, setPlayerPool] = useState(() => initialSaved?.playerPool || []);
   const [nextPlayerId, setNextPlayerId] = useState(() => initialSaved?.nextPlayerId || (initialSaved?.playerPool?.length ? Math.max(...initialSaved.playerPool.map((p) => p.id)) + 1 : 1));
-  const [numTeams, setNumTeams] = useState(() => initialSaved?.numTeams || 4);
-  const [goalScore, setGoalScore] = useState(() => initialSaved?.goalScore || 11);
-  const [dreambreakerScore, setDreambreakerScore] = useState(() => initialSaved?.dreambreakerScore || 21);
-  const [allowUneven, setAllowUneven] = useState(() => (initialSaved?.allowUneven !== undefined ? initialSaved.allowUneven : true));
-  const [captainMode, setCaptainMode] = useState(() => initialSaved?.captainMode || 'random');
+  const [numTeams, setNumTeams] = useState(() => initialSaved?.numTeams || initialDefaultCfg.numTeams || 4);
+  const [goalScore, setGoalScore] = useState(() => initialSaved?.goalScore || initialDefaultCfg.goalScore || 11);
+  const [dreambreakerScore, setDreambreakerScore] = useState(() => initialSaved?.dreambreakerScore || initialDefaultCfg.dreambreakerScore || 21);
+  const [dreambreakerFormat, setDreambreakerFormat] = useState(() => initialSaved?.dreambreakerFormat || initialDefaultCfg.dreambreakerFormat || 'singles');
+  const [allowUneven, setAllowUneven] = useState(() => (initialSaved?.allowUneven !== undefined ? initialSaved.allowUneven : initialDefaultCfg.allowUneven));
+  const [captainMode, setCaptainMode] = useState(() => initialSaved?.captainMode || initialDefaultCfg.captainMode || 'random');
   const [selectedCaptainIds, setSelectedCaptainIds] = useState(() => initialSaved?.selectedCaptainIds || []);
-  const [matchupConfig, setMatchupConfig] = useState(() => initialSaved?.matchupConfig || { preset: 'adjacent', customSlotPairs: [] });
+  const [matchupConfig, setMatchupConfig] = useState(() => initialSaved?.matchupConfig || initialDefaultCfg.matchupConfig || { preset: 'adjacent', customSlotPairs: [] });
 
   const [teams, setTeams] = useState(() => initialSaved?.teams || []);
   const [playersById, setPlayersById] = useState(() => initialSaved?.playersById || {});
@@ -303,6 +391,10 @@ export default function App() {
 
       const roomKnown = loadKnownPlayers(roomId, playerPool);
       setSavedPlayers(roomKnown);
+
+      const loadedCfgs = loadSavedConfigs(roomId);
+      setSavedDefaultConfig(loadedCfgs.defaultConfig);
+      setConfigPresets(loadedCfgs.presets || []);
     } catch (e) {
       console.warn('Error loading room stats & players:', e);
     }
@@ -311,6 +403,7 @@ export default function App() {
     let unsubTourn = () => {};
     let unsubStats = () => {};
     let unsubPlayers = () => {};
+    let unsubConfigs = () => {};
 
     if (isCloudEnabled()) {
       unsubTourn = subscribeToActiveTournament(roomId, (cloudTourn) => {
@@ -320,6 +413,7 @@ export default function App() {
           if (cloudTourn.numTeams) setNumTeams(cloudTourn.numTeams);
           if (cloudTourn.goalScore) setGoalScore(cloudTourn.goalScore);
           if (cloudTourn.dreambreakerScore) setDreambreakerScore(cloudTourn.dreambreakerScore);
+          if (cloudTourn.dreambreakerFormat) setDreambreakerFormat(cloudTourn.dreambreakerFormat);
           if (cloudTourn.allowUneven !== undefined) setAllowUneven(cloudTourn.allowUneven);
           if (cloudTourn.captainMode !== undefined) setCaptainMode(cloudTourn.captainMode);
           if (cloudTourn.selectedCaptainIds !== undefined) setSelectedCaptainIds(cloudTourn.selectedCaptainIds);
@@ -357,12 +451,42 @@ export default function App() {
           } catch (e) {}
         }
       });
+
+      unsubConfigs = subscribeToSavedConfigs(roomId, ({ defaultConfig: cloudDef, presets: cloudPresets }) => {
+        if (cloudDef) {
+          const cleanDef = sanitizeConfigObject(cloudDef);
+          setSavedDefaultConfig(cleanDef);
+          try {
+            localStorage.setItem(GLOBAL_DEFAULT_CONFIG_KEY, JSON.stringify(cleanDef));
+          } catch (e) {}
+        }
+        if (Array.isArray(cloudPresets)) {
+          setConfigPresets((prev) => {
+            const byId = new Map(prev.map((p) => [p.id || p.name, p]));
+            cloudPresets.forEach((p) => {
+              if (p && p.name) {
+                byId.set(p.id || p.name, { ...sanitizeConfigObject(p), id: p.id || p.name, name: p.name, updatedAt: p.updatedAt });
+              }
+            });
+            const merged = Array.from(byId.values());
+            try {
+              localStorage.setItem(GLOBAL_PRESETS_KEY, JSON.stringify(merged));
+              localStorage.setItem(
+                getConfigStorageKey(roomId),
+                JSON.stringify({ defaultConfig: cloudDef ? sanitizeConfigObject(cloudDef) : savedDefaultConfig, presets: merged })
+              );
+            } catch (e) {}
+            return merged;
+          });
+        }
+      });
     }
 
     return () => {
       unsubTourn();
       unsubStats();
       unsubPlayers();
+      unsubConfigs();
       if (rotateTimeoutRef.current) clearTimeout(rotateTimeoutRef.current);
     };
   }, [roomId, isAdmin, view]);
@@ -413,7 +537,7 @@ export default function App() {
         JSON.stringify({
           roomId,
           adminPin,
-          view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, allowUneven,
+          view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
           captainMode, selectedCaptainIds, matchupConfig,
           teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         })
@@ -421,7 +545,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
-  }, [roomId, adminPin, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+  }, [roomId, adminPin, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
 
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
@@ -446,7 +570,7 @@ export default function App() {
       saveTournamentToCloud(roomId, {
         roomId,
         adminPin,
-        view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, allowUneven,
+        view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
         captainMode, selectedCaptainIds, matchupConfig,
         teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         ...updates,
@@ -728,6 +852,7 @@ export default function App() {
             scoreA: 0,
             scoreB: 0,
             goalScore: dreambreakerScore,
+            format: dreambreakerFormat || 'singles',
             rotationIndex: 0,
             lastRotationTrigger: 0,
             playerStats: {},
@@ -966,15 +1091,35 @@ export default function App() {
   }
 
   function handleUpdateDreambreakerScore(newScore) {
-    if (!activePath || !bracket) return;
-    const { round, idx } = activePath;
-    const nb = JSON.parse(JSON.stringify(bracket));
-    if (nb.rounds[round][idx].dreambreaker) {
-      nb.rounds[round][idx].dreambreaker.goalScore = newScore;
-      setBracket(nb);
-      broadcastTournamentChange({ bracket: nb });
+    if (activePath && bracket) {
+      const { round, idx } = activePath;
+      const nb = JSON.parse(JSON.stringify(bracket));
+      if (nb.rounds[round][idx].dreambreaker) {
+        nb.rounds[round][idx].dreambreaker.goalScore = newScore;
+        setBracket(nb);
+        setDreambreakerScore(newScore);
+        broadcastTournamentChange({ bracket: nb, dreambreakerScore: newScore });
+        return;
+      }
     }
     setDreambreakerScore(newScore);
+    broadcastTournamentChange({ dreambreakerScore: newScore });
+  }
+
+  function handleUpdateDreambreakerFormat(newFormat) {
+    const cleanFormat = newFormat === 'doubles' ? 'doubles' : 'singles';
+    setDreambreakerFormat(cleanFormat);
+    if (activePath && bracket) {
+      const { round, idx } = activePath;
+      const nb = JSON.parse(JSON.stringify(bracket));
+      if (nb.rounds[round][idx].dreambreaker) {
+        nb.rounds[round][idx].dreambreaker.format = cleanFormat;
+        setBracket(nb);
+        broadcastTournamentChange({ bracket: nb, dreambreakerFormat: cleanFormat });
+        return;
+      }
+    }
+    broadcastTournamentChange({ dreambreakerFormat: cleanFormat });
   }
 
   function moveLineup(team, index, dir) {
@@ -1014,13 +1159,10 @@ export default function App() {
   function scoreDreambreakerPoint(scoringTeam) {
     const { round, idx } = activePath;
     const match = bracket.rounds[round][idx];
-    const teamA = teams.find((t) => t.id === match.teamAId);
-    const teamB = teams.find((t) => t.id === match.teamBId);
     const db = match.dreambreaker;
-    const lenA = db.lineupA.length;
-    const lenB = db.lineupB.length;
-    const activeAId = db.lineupA[db.rotationIndex % lenA];
-    const activeBId = db.lineupB[db.rotationIndex % lenB];
+    const activeFormat = db.format || dreambreakerFormat || 'singles';
+    const activeAIds = getActiveDreambreakerPlayers(db.lineupA, db.rotationIndex, activeFormat);
+    const activeBIds = getActiveDreambreakerPlayers(db.lineupB, db.rotationIndex, activeFormat);
     const newScoreA = db.scoreA + (scoringTeam === 'A' ? 1 : 0);
     const newScoreB = db.scoreB + (scoringTeam === 'B' ? 1 : 0);
     const combined = newScoreA + newScoreB;
@@ -1031,12 +1173,18 @@ export default function App() {
     const m = nb.rounds[round][idx];
     const ps = m.dreambreaker.playerStats;
     function bump(id, field) {
+      if (id === undefined || id === null) return;
       const key = String(id);
       if (!ps[key]) ps[key] = { pointsWon: 0, pointsLost: 0 };
       ps[key][field] += 1;
     }
-    if (scoringTeam === 'A') { bump(activeAId, 'pointsWon'); bump(activeBId, 'pointsLost'); }
-    else { bump(activeBId, 'pointsWon'); bump(activeAId, 'pointsLost'); }
+    if (scoringTeam === 'A') {
+      activeAIds.forEach((id) => bump(id, 'pointsWon'));
+      activeBIds.forEach((id) => bump(id, 'pointsLost'));
+    } else {
+      activeBIds.forEach((id) => bump(id, 'pointsWon'));
+      activeAIds.forEach((id) => bump(id, 'pointsLost'));
+    }
 
     m.dreambreaker.scoreA = newScoreA;
     m.dreambreaker.scoreB = newScoreB;
@@ -1067,10 +1215,6 @@ export default function App() {
     setGoalScore(val);
     broadcastTournamentChange({ goalScore: val });
   }
-  function handleUpdateDreambreakerScore(val) {
-    setDreambreakerScore(val);
-    broadcastTournamentChange({ dreambreakerScore: val });
-  }
   function handleUpdateAllowUneven(val) {
     setAllowUneven(val);
     broadcastTournamentChange({ allowUneven: val });
@@ -1086,6 +1230,99 @@ export default function App() {
   function handleUpdateMatchupConfig(val) {
     setMatchupConfig(val);
     broadcastTournamentChange({ matchupConfig: val });
+  }
+
+  function persistSavedConfigs(nextDefault, nextPresets) {
+    try {
+      if (nextDefault) {
+        localStorage.setItem(GLOBAL_DEFAULT_CONFIG_KEY, JSON.stringify(nextDefault));
+      } else {
+        localStorage.removeItem(GLOBAL_DEFAULT_CONFIG_KEY);
+      }
+      localStorage.setItem(GLOBAL_PRESETS_KEY, JSON.stringify(nextPresets));
+      if (roomId) {
+        localStorage.setItem(
+          getConfigStorageKey(roomId),
+          JSON.stringify({ defaultConfig: nextDefault, presets: nextPresets })
+        );
+      }
+    } catch (e) {}
+    if (roomId && isCloudEnabled()) {
+      saveConfigsToCloud(roomId, { defaultConfig: nextDefault, presets: nextPresets });
+    }
+  }
+
+  function getCurrentConfigSnapshot() {
+    return sanitizeConfigObject({
+      numTeams,
+      goalScore,
+      dreambreakerScore,
+      dreambreakerFormat,
+      allowUneven,
+      captainMode,
+      matchupConfig,
+    });
+  }
+
+  function handleSaveDefaultConfig() {
+    const snap = getCurrentConfigSnapshot();
+    setSavedDefaultConfig(snap);
+    persistSavedConfigs(snap, configPresets);
+  }
+
+  function handleSaveConfigPreset(name) {
+    const cleanName = String(name || '').trim();
+    if (!cleanName) return false;
+    const snap = getCurrentConfigSnapshot();
+    const id = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const newPreset = {
+      id,
+      name: cleanName,
+      updatedAt: new Date().toISOString(),
+      ...snap,
+    };
+    const existingIdx = configPresets.findIndex(
+      (p) => (p.id && p.id === id) || p.name.trim().toLowerCase() === cleanName.toLowerCase()
+    );
+    let nextPresets;
+    if (existingIdx >= 0) {
+      nextPresets = [...configPresets];
+      nextPresets[existingIdx] = newPreset;
+    } else {
+      nextPresets = [newPreset, ...configPresets];
+    }
+    setConfigPresets(nextPresets);
+    persistSavedConfigs(savedDefaultConfig, nextPresets);
+    return true;
+  }
+
+  function handleDeleteConfigPreset(presetIdOrName) {
+    const nextPresets = configPresets.filter(
+      (p) => p.id !== presetIdOrName && p.name !== presetIdOrName
+    );
+    setConfigPresets(nextPresets);
+    persistSavedConfigs(savedDefaultConfig, nextPresets);
+  }
+
+  function handleApplyConfig(cfg) {
+    if (!cfg) return;
+    const clean = sanitizeConfigObject(cfg);
+    setNumTeams(clean.numTeams);
+    setGoalScore(clean.goalScore);
+    setDreambreakerScore(clean.dreambreakerScore);
+    setDreambreakerFormat(clean.dreambreakerFormat);
+    setAllowUneven(clean.allowUneven);
+    setCaptainMode(clean.captainMode);
+    setMatchupConfig(clean.matchupConfig);
+    broadcastTournamentChange({
+      numTeams: clean.numTeams,
+      goalScore: clean.goalScore,
+      dreambreakerScore: clean.dreambreakerScore,
+      dreambreakerFormat: clean.dreambreakerFormat,
+      allowUneven: clean.allowUneven,
+      captainMode: clean.captainMode,
+      matchupConfig: clean.matchupConfig,
+    });
   }
 
   function handleSwitchRoom(newRoomId, pin) {
@@ -1114,6 +1351,7 @@ export default function App() {
       setNumTeams(saved.numTeams || 4);
       setGoalScore(saved.goalScore || 11);
       setDreambreakerScore(saved.dreambreakerScore || 21);
+      setDreambreakerFormat(saved.dreambreakerFormat || 'singles');
       setAllowUneven(saved.allowUneven !== undefined ? saved.allowUneven : true);
       setCaptainMode(saved.captainMode || 'random');
       setSelectedCaptainIds(saved.selectedCaptainIds || []);
@@ -1128,16 +1366,18 @@ export default function App() {
       setActivePath(saved.activePath || null);
       if (saved.adminPin) setAdminPin(saved.adminPin);
     } else {
+      const defCfg = getEffectiveDefaultConfig(cleanRoom);
       setView('setup');
       setPlayerPool([]);
       setNextPlayerId(1);
-      setNumTeams(4);
-      setGoalScore(11);
-      setDreambreakerScore(21);
-      setAllowUneven(true);
-      setCaptainMode('random');
+      setNumTeams(defCfg.numTeams);
+      setGoalScore(defCfg.goalScore);
+      setDreambreakerScore(defCfg.dreambreakerScore);
+      setDreambreakerFormat(defCfg.dreambreakerFormat);
+      setAllowUneven(defCfg.allowUneven);
+      setCaptainMode(defCfg.captainMode);
       setSelectedCaptainIds([]);
-      setMatchupConfig({ preset: 'adjacent', customSlotPairs: [] });
+      setMatchupConfig(defCfg.matchupConfig);
       setTeams([]);
       setPlayersById({});
       setRemainingPool([]);
@@ -1175,16 +1415,18 @@ export default function App() {
       setSavedRoomsHistory(upsertSavedRoomHistory(cleanRoom, newPin, true));
     } catch (e) {}
 
+    const defCfg = getEffectiveDefaultConfig(cleanRoom);
     setView('setup');
     setPlayerPool([]);
     setNextPlayerId(1);
-    setNumTeams(4);
-    setGoalScore(11);
-    setDreambreakerScore(21);
-    setAllowUneven(true);
-    setCaptainMode('random');
+    setNumTeams(defCfg.numTeams);
+    setGoalScore(defCfg.goalScore);
+    setDreambreakerScore(defCfg.dreambreakerScore);
+    setDreambreakerFormat(defCfg.dreambreakerFormat);
+    setAllowUneven(defCfg.allowUneven);
+    setCaptainMode(defCfg.captainMode);
     setSelectedCaptainIds([]);
-    setMatchupConfig({ preset: 'adjacent', customSlotPairs: [] });
+    setMatchupConfig(defCfg.matchupConfig);
     setTeams([]);
     setPlayersById({});
     setRemainingPool([]);
@@ -1208,13 +1450,14 @@ export default function App() {
         view: 'setup',
         playerPool: [],
         nextPlayerId: 1,
-        numTeams: 4,
-        goalScore: 11,
-        dreambreakerScore: 21,
-        allowUneven: true,
-        captainMode: 'random',
+        numTeams: defCfg.numTeams,
+        goalScore: defCfg.goalScore,
+        dreambreakerScore: defCfg.dreambreakerScore,
+        dreambreakerFormat: defCfg.dreambreakerFormat,
+        allowUneven: defCfg.allowUneven,
+        captainMode: defCfg.captainMode,
         selectedCaptainIds: [],
-        matchupConfig: { preset: 'adjacent', customSlotPairs: [] },
+        matchupConfig: defCfg.matchupConfig,
         teams: [],
         playersById: {},
         remainingPool: [],
@@ -1329,14 +1572,19 @@ export default function App() {
       },
       confirmLabel: 'Clear All',
       onConfirm: () => {
+        const defCfg = getEffectiveDefaultConfig(roomId);
         setPriorStats(globalStats);
         setPriorPartnershipStats(partnershipStats);
         setPlayerPool([]);
         setNextPlayerId(1);
-        setNumTeams(4);
-        setGoalScore(11);
-        setDreambreakerScore(21);
-        setAllowUneven(true);
+        setNumTeams(defCfg.numTeams);
+        setGoalScore(defCfg.goalScore);
+        setDreambreakerScore(defCfg.dreambreakerScore);
+        setDreambreakerFormat(defCfg.dreambreakerFormat);
+        setAllowUneven(defCfg.allowUneven);
+        setCaptainMode(defCfg.captainMode);
+        setSelectedCaptainIds([]);
+        setMatchupConfig(defCfg.matchupConfig);
         setTeams([]);
         setPlayersById({});
         setRemainingPool([]);
@@ -1352,6 +1600,14 @@ export default function App() {
         broadcastTournamentChange({
           playerPool: [],
           nextPlayerId: 1,
+          numTeams: defCfg.numTeams,
+          goalScore: defCfg.goalScore,
+          dreambreakerScore: defCfg.dreambreakerScore,
+          dreambreakerFormat: defCfg.dreambreakerFormat,
+          allowUneven: defCfg.allowUneven,
+          captainMode: defCfg.captainMode,
+          selectedCaptainIds: [],
+          matchupConfig: defCfg.matchupConfig,
           teams: [],
           playersById: {},
           remainingPool: [],
@@ -1480,6 +1736,8 @@ export default function App() {
             setGoalScore={handleUpdateGoalScore}
             dreambreakerScore={dreambreakerScore}
             setDreambreakerScore={handleUpdateDreambreakerScore}
+            dreambreakerFormat={dreambreakerFormat}
+            setDreambreakerFormat={handleUpdateDreambreakerFormat}
             allowUneven={allowUneven}
             setAllowUneven={handleUpdateAllowUneven}
             captainMode={captainMode}
@@ -1488,6 +1746,12 @@ export default function App() {
             setSelectedCaptainIds={handleUpdateSelectedCaptainIds}
             matchupConfig={matchupConfig}
             setMatchupConfig={handleUpdateMatchupConfig}
+            savedDefaultConfig={savedDefaultConfig}
+            configPresets={configPresets}
+            onSaveDefaultConfig={handleSaveDefaultConfig}
+            onSaveConfigPreset={handleSaveConfigPreset}
+            onDeleteConfigPreset={handleDeleteConfigPreset}
+            onApplyConfig={handleApplyConfig}
             roomId={roomId}
             setRoomId={(newId) => handleSwitchRoom(newId, adminPin)}
             adminPin={adminPin}
@@ -1561,7 +1825,9 @@ export default function App() {
             teamB={activeTeamB}
             playersById={playersById}
             dreambreakerScore={dreambreakerScore}
+            dreambreakerFormat={dreambreakerFormat}
             onUpdateScoreLimit={handleUpdateDreambreakerScore}
+            onUpdateFormat={handleUpdateDreambreakerFormat}
             onMove={moveLineup}
             onLock={lockLineup}
             onStart={startDreambreaker}
@@ -1577,6 +1843,7 @@ export default function App() {
             teamB={activeTeamB}
             playersById={playersById}
             dreambreakerScore={dreambreakerScore}
+            dreambreakerFormat={dreambreakerFormat}
             showRotateBanner={showRotateBanner}
             onScore={scoreDreambreakerPoint}
             onBack={() => setView('bracket')}

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Trophy, Swords, Zap } from 'lucide-react';
-import { roundName } from '../utils/tournament';
+import { Trophy, Swords, Zap, Download } from 'lucide-react';
+import { roundName, generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
 
 function TeamDot({ color, className = '' }) {
   return <span className={`inline-block w-3 h-3 rounded-full flex-shrink-0 ${className}`} style={{ backgroundColor: color?.accent || '#64748b' }} />;
@@ -76,10 +76,16 @@ function MatchCard({ match, teams, onOpen }) {
   );
 }
 
-export function BracketView({ bracket, teams, onOpenMatch, onOpenRosterModal }) {
+export function BracketView({ bracket, teams, playersById = {}, roomId = '', onOpenMatch, onOpenRosterModal }) {
   if (!bracket || !bracket.rounds) return null;
   const totalRounds = bracket.rounds.length;
   const champion = bracket.championId !== null ? teams.find((t) => t.id === bracket.championId) : null;
+  const hasAnyGames = bracket.rounds.some((r) => r.some((m) => Array.isArray(m.games) && m.games.length > 0));
+
+  function handleExportScoresCsv() {
+    const csv = generateMatchScoresCSV({ bracket, teams, playersById, roomId });
+    triggerCsvDownload(`${roomId || 'room'}-match-scores.csv`, csv);
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 pb-24 animate-in fade-in duration-200">
@@ -91,18 +97,30 @@ export function BracketView({ bracket, teams, onOpenMatch, onOpenRosterModal }) 
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between gap-2 mb-6 flex-wrap">
         <h2 className="text-white text-2xl sm:text-3xl font-display uppercase tracking-wide font-semibold flex items-center gap-2">
           <Swords size={24} className="text-[#d7f24c]" /> Tournament Bracket
         </h2>
-        {onOpenRosterModal && (
-          <button
-            onClick={onOpenRosterModal}
-            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
-          >
-            Manage Rosters & Subs
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasAnyGames && (
+            <button
+              type="button"
+              onClick={handleExportScoresCsv}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[#d7f24c] hover:text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+              title="Export all match & game scores as CSV"
+            >
+              <Download size={13} /> Export Scores CSV
+            </button>
+          )}
+          {onOpenRosterModal && (
+            <button
+              onClick={onOpenRosterModal}
+              className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            >
+              Manage Rosters & Subs
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-4 overflow-x-auto pb-6 -mx-4 px-4 sm:mx-0 sm:px-0">

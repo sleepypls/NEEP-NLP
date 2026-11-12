@@ -168,6 +168,32 @@ export function subscribeToKnownPlayers(clubId = DEFAULT_CLUB_ID, onUpdate) {
   );
 }
 
+export function subscribeToSavedConfigs(clubId = DEFAULT_CLUB_ID, onUpdate) {
+  const db = getDb();
+  if (!db) return () => {};
+
+  const configDocRef = doc(db, 'clubs', clubId, 'data', 'config');
+  return onSnapshot(
+    configDocRef,
+    (snap) => {
+      if (snap.exists()) {
+        const raw = snap.data();
+        const decodedDefault = raw.defaultConfig ? decodeStateFromFirestore(raw.defaultConfig) : null;
+        const decodedPresets = Array.isArray(raw.presets)
+          ? raw.presets.map((p) => decodeStateFromFirestore(p))
+          : [];
+        onUpdate({
+          defaultConfig: decodedDefault,
+          presets: decodedPresets,
+        });
+      }
+    },
+    (err) => {
+      console.warn('[Firebase] Saved configs listener error:', err);
+    }
+  );
+}
+
 // ---------------- Document Sanitizer & Codec ----------------
 
 export function sanitizeForFirestore(val) {
@@ -282,6 +308,29 @@ export async function saveKnownPlayersToCloud(clubId = DEFAULT_CLUB_ID, roster) 
     return true;
   } catch (err) {
     console.error('[Firebase] Error saving players to cloud:', err);
+    return false;
+  }
+}
+
+export async function saveConfigsToCloud(clubId = DEFAULT_CLUB_ID, { defaultConfig, presets }) {
+  const db = getDb();
+  if (!db) return false;
+
+  try {
+    const configDocRef = doc(db, 'clubs', clubId, 'data', 'config');
+    const encodedDefault = defaultConfig ? encodeStateForFirestore(defaultConfig) : null;
+    const encodedPresets = Array.isArray(presets)
+      ? presets.map((p) => encodeStateForFirestore(p))
+      : [];
+    const sanitized = sanitizeForFirestore({
+      defaultConfig: encodedDefault,
+      presets: encodedPresets,
+      updatedAt: new Date().toISOString(),
+    });
+    await setDoc(configDocRef, sanitized, { merge: true });
+    return true;
+  } catch (err) {
+    console.error('[Firebase] Error saving tournament configs to cloud:', err);
     return false;
   }
 }

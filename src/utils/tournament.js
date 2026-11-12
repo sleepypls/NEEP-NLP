@@ -106,6 +106,23 @@ export function generatePairs(draftOrder) {
   return pairs;
 }
 
+/**
+ * Returns the active player(s) on court for a Dreambreaker rotation index.
+ * - 'singles': [lineup[rotationIndex % n]]
+ * - 'doubles': [lineup[(rotationIndex * 2) % n], lineup[(rotationIndex * 2 + 1) % n]]
+ */
+export function getActiveDreambreakerPlayers(lineup = [], rotationIndex = 0, format = 'singles') {
+  const n = lineup.length;
+  if (n === 0) return [];
+  if (format === 'doubles' && n >= 2) {
+    const idx1 = (rotationIndex * 2) % n;
+    let idx2 = (rotationIndex * 2 + 1) % n;
+    if (idx1 === idx2) idx2 = (idx1 + 1) % n;
+    return [lineup[idx1], lineup[idx2]];
+  }
+  return [lineup[rotationIndex % n]];
+}
+
 export function generateTeamPairsForGames(draftOrder, totalGames) {
   const n = draftOrder.length;
   if (n < 2) return [];
@@ -586,6 +603,21 @@ export function generateDirectoryCSV(savedPlayers = [], playerPool = []) {
   return [header.join(','), ...rows].join('\r\n');
 }
 
+export function generateSampleDirectoryCSV() {
+  const header = ['Player Name'];
+  const sampleNames = [
+    'Alex Rivera',
+    'Jordan Taylor',
+    'Casey Morgan',
+    'Sam Chen',
+    'Taylor Brooks',
+    'Morgan Lee',
+    'Riley Patel',
+    'Cameron Diaz',
+  ];
+  return [header.join(','), ...sampleNames].join('\r\n');
+}
+
 export function generateMatchScoresCSV({ bracket, teams = [], playersById = {}, roomId = '' }) {
   const header = [
     'Room ID',
@@ -663,6 +695,7 @@ export function generateMatchScoresCSV({ bracket, teams = [], playersById = {}, 
             : db.winnerId === match.teamBId
             ? teamBName
             : 'In Progress';
+        const dbTypeLabel = db.format === 'doubles' ? 'Dreambreaker (Doubles)' : 'Dreambreaker (Singles)';
 
         rows.push(
           [
@@ -673,7 +706,7 @@ export function generateMatchScoresCSV({ bracket, teams = [], playersById = {}, 
             teamAName,
             teamBName,
             'TB',
-            'Dreambreaker',
+            dbTypeLabel,
             (db.lineupA || []).map(pName).join(' / '),
             (db.lineupB || []).map(pName).join(' / '),
             db.scoreA,

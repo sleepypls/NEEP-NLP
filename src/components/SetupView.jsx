@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings, Upload, Download } from 'lucide-react';
+import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings, Upload, Download, Bookmark, Save, RotateCcw } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
-import { getDefaultSlotPairs, parsePlayersFromCSV, generateDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
+import { getDefaultSlotPairs, parsePlayersFromCSV, generateDirectoryCSV, generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
 import { APP_VERSION } from '../version';
 import { DirectoryModal } from './DirectoryModal';
 
@@ -22,6 +22,8 @@ export function SetupView({
   setGoalScore,
   dreambreakerScore,
   setDreambreakerScore,
+  dreambreakerFormat = 'singles',
+  setDreambreakerFormat,
   allowUneven,
   setAllowUneven,
   captainMode = 'random',
@@ -30,6 +32,12 @@ export function SetupView({
   setSelectedCaptainIds,
   matchupConfig = { preset: 'adjacent', customSlotPairs: [] },
   setMatchupConfig,
+  savedDefaultConfig = null,
+  configPresets = [],
+  onSaveDefaultConfig,
+  onSaveConfigPreset,
+  onDeleteConfigPreset,
+  onApplyConfig,
   roomId,
   setRoomId,
   adminPin,
@@ -41,7 +49,63 @@ export function SetupView({
   const [directoryNameInput, setDirectoryNameInput] = useState('');
   const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
   const [csvFeedback, setCsvFeedback] = useState(null);
+  const [presetNameInput, setPresetNameInput] = useState('');
+  const [configFeedback, setConfigFeedback] = useState(null);
   const csvFileInputRef = useRef(null);
+  const configFileInputRef = useRef(null);
+
+  function showConfigToast(message, type = 'success') {
+    setConfigFeedback({ message, type });
+    setTimeout(() => setConfigFeedback(null), 3500);
+  }
+
+  function handleExportConfigJson() {
+    const payload = {
+      name: presetNameInput.trim() || `${roomId || 'tournament'}-config`,
+      exportedAt: new Date().toISOString(),
+      numTeams,
+      goalScore,
+      dreambreakerScore,
+      dreambreakerFormat,
+      allowUneven,
+      captainMode,
+      matchupConfig,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(roomId || 'neep-nlp').toLowerCase()}-tournament-config.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showConfigToast('Exported tournament configuration JSON');
+  }
+
+  function handleImportConfigJson(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const parsed = JSON.parse(evt.target?.result || '{}');
+        if (parsed && (parsed.numTeams || parsed.goalScore || parsed.matchupConfig)) {
+          if (onApplyConfig) onApplyConfig(parsed);
+          if (parsed.name && onSaveConfigPreset) {
+            onSaveConfigPreset(parsed.name);
+          }
+          showConfigToast(`Applied configuration from ${file.name}`);
+        } else {
+          showConfigToast('Invalid configuration JSON file.', 'error');
+        }
+      } catch (err) {
+        showConfigToast('Could not parse configuration JSON file.', 'error');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  }
 
   function handleCsvFileUpload(e) {
     const file = e.target.files?.[0];
@@ -144,12 +208,12 @@ export function SetupView({
 
       {/* Player Pool Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
-        <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <label className="text-slate-300 text-sm font-semibold">
             Player Pool ({playerPool.length})
           </label>
           {isAdmin && (
-            <div>
+            <div className="flex items-center gap-1.5">
               <input
                 ref={csvFileInputRef}
                 type="file"
@@ -164,6 +228,17 @@ export function SetupView({
                 className="text-xs font-bold text-[#d7f24c] hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
               >
                 <Upload size={12} className="text-[#d7f24c]" /> Upload CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const sampleCsv = generateSampleDirectoryCSV();
+                  triggerCsvDownload('sample-player-directory.csv', sampleCsv);
+                }}
+                title="Download a sample CSV template to fill in player names"
+                className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+              >
+                <Download size={12} className="text-slate-400" /> Sample CSV
               </button>
             </div>
           )}
@@ -256,6 +331,25 @@ export function SetupView({
                     <UserPlus size={13} /> + Add All ({availableSaved.length})
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => csvFileInputRef.current?.click()}
+                  title="Upload a CSV of player names into this room directory & tournament"
+                  className="text-xs font-bold text-[#d7f24c] hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                >
+                  <Upload size={12} className="text-[#d7f24c]" /> Upload CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sampleCsv = generateSampleDirectoryCSV();
+                    triggerCsvDownload('sample-player-directory.csv', sampleCsv);
+                  }}
+                  title="Download a sample CSV template for the room directory"
+                  className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                >
+                  <Download size={12} className="text-slate-400" /> Sample CSV
+                </button>
                 {savedPlayers.length > 0 && (
                   <button
                     type="button"
@@ -615,13 +709,46 @@ export function SetupView({
         />
       </div>
 
-      {/* Dreambreaker Score Limit */}
+      {/* Dreambreaker Score Limit & Format */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
         <label className="text-slate-300 text-sm font-semibold mb-1 flex items-center justify-between">
-          <span className="flex items-center gap-1.5"><Zap size={14} className="text-amber-400" /> Dreambreaker Score Limit</span>
+          <span className="flex items-center gap-1.5"><Zap size={14} className="text-amber-400" /> Dreambreaker Format &amp; Score Limit</span>
           <span className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">Tiebreaker</span>
         </label>
-        <p className="text-slate-500 text-xs mb-3">Singles rotation target when regulation match ties.</p>
+        <p className="text-slate-500 text-xs mb-3">
+          {dreambreakerFormat === 'doubles'
+            ? 'Doubles (2v2) rotation every 4 points when regulation match ties.'
+            : 'Singles (1v1) rotation every 4 points when regulation match ties.'}
+        </p>
+
+        {/* Singles vs Doubles Format Toggle */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <button
+            type="button"
+            disabled={!isAdmin}
+            onClick={() => setDreambreakerFormat && setDreambreakerFormat('singles')}
+            className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+              dreambreakerFormat !== 'doubles'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
+            }`}
+          >
+            Singles (1v1)
+          </button>
+          <button
+            type="button"
+            disabled={!isAdmin}
+            onClick={() => setDreambreakerFormat && setDreambreakerFormat('doubles')}
+            className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+              dreambreakerFormat === 'doubles'
+                ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
+            }`}
+          >
+            Doubles (2v2)
+          </button>
+        </div>
+
         <div className="flex gap-2 mb-2">
           {[11, 15, 21].map((preset) => (
             <button
@@ -839,6 +966,181 @@ export function SetupView({
           </div>
         </label>
       </div>
+
+      {/* Saved Tournament Configuration Settings Card */}
+      {isAdmin && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+          <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
+            <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
+              <Bookmark size={15} className="text-[#d7f24c]" /> Saved Tournament Configurations
+            </label>
+            <div className="flex items-center gap-1.5">
+              <input
+                ref={configFileInputRef}
+                type="file"
+                accept=".json,application/json"
+                onChange={handleImportConfigJson}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => configFileInputRef.current?.click()}
+                title="Import tournament configuration from a JSON file"
+                className="text-[11px] font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl px-2.5 py-1 flex items-center gap-1 transition active:scale-95"
+              >
+                <Upload size={11} className="text-[#d7f24c]" /> Import
+              </button>
+              <button
+                type="button"
+                onClick={handleExportConfigJson}
+                title="Export current tournament configuration as a JSON file"
+                className="text-[11px] font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl px-2.5 py-1 flex items-center gap-1 transition active:scale-95"
+              >
+                <Download size={11} className="text-[#d7f24c]" /> Export
+              </button>
+            </div>
+          </div>
+          <p className="text-slate-400 text-xs mb-3">
+            Save your current rules (teams, score limits, Dreambreaker format, partner matchups, and uneven settings) as your default configuration or as named presets.
+          </p>
+
+          {configFeedback && (
+            <div
+              className={`mb-3 px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between border ${
+                configFeedback.type === 'error'
+                  ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                  : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              }`}
+            >
+              <span className="flex items-center gap-1.5">
+                <Check size={13} /> {configFeedback.message}
+              </span>
+              <button
+                type="button"
+                onClick={() => setConfigFeedback(null)}
+                className="text-slate-400 hover:text-white ml-2"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
+          {/* Default Settings Actions */}
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                if (onSaveDefaultConfig) {
+                  onSaveDefaultConfig();
+                  showConfigToast('Saved current settings as default tournament configuration');
+                }
+              }}
+              className="flex-1 py-2 px-3 rounded-xl bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 text-[#d7f24c] border border-[#d7f24c]/30 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+            >
+              <Save size={13} /> Save Current as Default
+            </button>
+            {savedDefaultConfig && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onApplyConfig) {
+                    onApplyConfig(savedDefaultConfig);
+                    showConfigToast('Loaded saved default configuration');
+                  }
+                }}
+                className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+              >
+                <RotateCcw size={13} /> Load Saved Default
+              </button>
+            )}
+          </div>
+
+          {/* Save Named Preset Form */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = presetNameInput.trim();
+              if (!trimmed || !onSaveConfigPreset) return;
+              onSaveConfigPreset(trimmed);
+              setPresetNameInput('');
+              showConfigToast(`Saved preset "${trimmed}"`);
+            }}
+            className="flex items-center gap-1.5 mb-3"
+          >
+            <input
+              type="text"
+              value={presetNameInput}
+              onChange={(e) => setPresetNameInput(e.target.value)}
+              placeholder="Preset name (e.g. Friday MLP Doubles DB)..."
+              className="flex-1 bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+            />
+            <button
+              type="submit"
+              disabled={!presetNameInput.trim()}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] font-bold text-xs border border-slate-700 disabled:opacity-40 transition shrink-0 flex items-center gap-1"
+            >
+              <Plus size={12} /> Save Preset
+            </button>
+          </form>
+
+          {/* Saved Presets List */}
+          {configPresets.length > 0 ? (
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {configPresets.map((preset) => {
+                const key = preset.id || preset.name;
+                const formatLabel = preset.dreambreakerFormat === 'doubles' ? 'Doubles DB' : 'Singles DB';
+                const matchupLabel =
+                  preset.matchupConfig?.preset === 'balanced'
+                    ? 'Balanced (1&4, 2&3)'
+                    : preset.matchupConfig?.preset === 'custom'
+                    ? `Custom (${preset.matchupConfig?.customSlotPairs?.length || 0}G)`
+                    : 'Adjacent (1&2, 3&4)';
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800/90 rounded-xl px-3 py-2 text-xs"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-white truncate">{preset.name}</p>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        {preset.numTeams} Teams &bull; {preset.goalScore} pts &bull; {preset.dreambreakerScore} pt {formatLabel} &bull; {matchupLabel}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onApplyConfig) {
+                            onApplyConfig(preset);
+                            showConfigToast(`Applied preset "${preset.name}"`);
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 font-bold text-[11px] transition active:scale-95"
+                      >
+                        Apply
+                      </button>
+                      {onDeleteConfigPreset && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteConfigPreset(key)}
+                          title="Delete preset"
+                          className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-slate-800 transition"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-[11px] text-slate-500 italic">
+              No named presets saved yet. Name and save a preset above to switch between tournament formats anytime.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Dynamic Sizing Summary Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl text-sm text-slate-400">
