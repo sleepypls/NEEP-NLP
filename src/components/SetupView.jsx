@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings, Upload } from 'lucide-react';
+import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings, Upload, Download } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
-import { getDefaultSlotPairs, parsePlayersFromCSV } from '../utils/tournament';
+import { getDefaultSlotPairs, parsePlayersFromCSV, generateDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
 import { APP_VERSION } from '../version';
 import { DirectoryModal } from './DirectoryModal';
 
@@ -16,7 +16,6 @@ export function SetupView({
   onRemoveSavedPlayer,
   onAddDirectoryPlayer,
   onRenameDirectoryPlayer,
-  onImportFromMainDirectory,
   numTeams,
   setNumTeams,
   goalScore,
@@ -242,10 +241,10 @@ export function SetupView({
               <div className="flex items-center gap-1.5 min-w-0">
                 <Users size={13} className="text-[#d7f24c] shrink-0" />
                 <span className="text-slate-300 text-xs font-bold uppercase tracking-wider truncate">
-                  Directory ({savedPlayers.length})
+                  Room Directory ({savedPlayers.length})
                 </span>
                 <span className="text-[10px] font-mono font-bold bg-slate-850 text-[#d7f24c] border border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[120px]">
-                  {roomId || 'Main'}
+                  {roomId}
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
@@ -257,20 +256,24 @@ export function SetupView({
                     <UserPlus size={13} /> + Add All ({availableSaved.length})
                   </button>
                 )}
-                {onImportFromMainDirectory && roomId && roomId !== 'neep-main' && savedPlayers.length === 0 && (
+                {savedPlayers.length > 0 && (
                   <button
-                    onClick={onImportFromMainDirectory}
-                    title="Copy player names from the main room directory into this room"
-                    className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 active:scale-95 transition"
+                    type="button"
+                    onClick={() => {
+                      const csv = generateDirectoryCSV(savedPlayers, playerPool);
+                      triggerCsvDownload(`${roomId || 'room'}-directory.csv`, csv);
+                    }}
+                    title="Export this room's player directory as CSV"
+                    className="text-xs font-bold text-slate-300 hover:text-[#d7f24c] bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
                   >
-                    <Plus size={12} /> Import from Main
+                    <Download size={12} className="text-[#d7f24c]" /> Export CSV
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setIsDirectoryModalOpen(true)}
                   className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
-                  title="Manage room directory players (rename, delete, search)"
+                  title="Manage room directory players (rename, delete, search, export)"
                 >
                   <Settings size={12} className="text-[#d7f24c]" /> Manage Players
                 </button>
@@ -884,7 +887,6 @@ export function SetupView({
         onAddMultiplePlayers={onAddMultiplePlayers}
         onRenameDirectoryPlayer={onRenameDirectoryPlayer}
         onRemoveSavedPlayer={onRemoveSavedPlayer}
-        onImportFromMainDirectory={onImportFromMainDirectory}
         isAdmin={isAdmin}
       />
     </div>

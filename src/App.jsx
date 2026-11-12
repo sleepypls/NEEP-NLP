@@ -38,10 +38,10 @@ import {
   saveStatsToCloud,
   saveKnownPlayersToCloud,
   checkRoomExistsInCloud,
+  wipeAllDatabaseData,
 } from './services/firebase';
 import { RoomModal } from './components/RoomModal';
 import {
-  DEFAULT_ROOM_ID,
   DEFAULT_ADMIN_PIN,
   generateRoomId,
   generatePin,
@@ -53,18 +53,17 @@ import {
 } from './utils/room';
 
 function getTournStorageKey(rid) {
-  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-tournament-state-v1' : `neep_tourn_${rid}_v1`;
+  return `neep_tourn_${rid}_v1`;
 }
 function getStatsStorageKey(rid) {
-  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-global-stats-v1' : `neep_stats_${rid}_v1`;
+  return `neep_stats_${rid}_v1`;
 }
 function getPairsStorageKey(rid) {
-  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-partnerships-v1' : `neep_pairs_${rid}_v1`;
+  return `neep_pairs_${rid}_v1`;
 }
 function getKnownPlayersStorageKey(rid) {
-  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-known-players-v1' : `neep_players_${rid}_v1`;
+  return `neep_players_${rid}_v1`;
 }
-const DEFAULT_STORAGE_KEY_KNOWN_PLAYERS = 'neep-pickleball-known-players-v1';
 
 function getInitialRoomId() {
   try {
@@ -226,7 +225,35 @@ export default function App() {
   const [showRotateBanner, setShowRotateBanner] = useState(false);
   const rotateTimeoutRef = useRef(null);
 
-  // 1. Keep active room and mode in URL bar so refresh preserves it
+  // One-time database reset migration for v0.27 Beta to clear legacy tournaments & names
+  useEffect(() => {
+    const RESET_FLAG_KEY = 'neep_db_reset_v027_done';
+    try {
+      if (!localStorage.getItem(RESET_FLAG_KEY)) {
+        localStorage.setItem(RESET_FLAG_KEY, 'true');
+        wipeAllDatabaseData(roomId ? [roomId] : []).then(() => {
+          localStorage.setItem(RESET_FLAG_KEY, 'true');
+          setSavedPlayers([]);
+          setPlayerPool([]);
+          setTeams([]);
+          setPlayersById({});
+          setRemainingPool([]);
+          setPickSequence([]);
+          setPickPointer(0);
+          setSittingOut([]);
+          setBracket(null);
+          setActivePath(null);
+          setGlobalStats({});
+          setPartnershipStats({});
+          setPriorStats({});
+          setPriorPartnershipStats({});
+          setSavedRoomsHistory([]);
+          setRoomId(null);
+          setView('landing');
+        });
+      }
+    } catch (e) {}
+  }, []);
   useEffect(() => {
     try {
       if (view === 'landing' || !roomId) {
@@ -424,22 +451,6 @@ export default function App() {
         teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         ...updates,
       });
-    }
-  }
-
-  function handleImportFromMainDirectory() {
-    try {
-      const mainRaw = localStorage.getItem(DEFAULT_STORAGE_KEY_KNOWN_PLAYERS);
-      const mainPlayers = mainRaw ? JSON.parse(mainRaw) : [];
-      if (!Array.isArray(mainPlayers) || mainPlayers.length === 0) return;
-      const merged = Array.from(new Set([...savedPlayers, ...mainPlayers]));
-      setSavedPlayers(merged);
-      localStorage.setItem(getKnownPlayersStorageKey(roomId), JSON.stringify(merged));
-      if (isCloudEnabled()) {
-        saveKnownPlayersToCloud(roomId, merged);
-      }
-    } catch (e) {
-      console.warn('Error importing from main directory:', e);
     }
   }
 
@@ -1358,9 +1369,33 @@ export default function App() {
 
   function requestWipeStats() {
     setModal({
-      title: 'Wipe All Stats?',
-      message: 'This permanently deletes the all-time leaderboard and all partnership records. This cannot be undone.',
-      confirmLabel: 'Wipe Stats',
+      title: 'Wipe Stats or Full Database?',
+      message: 'Choose whether to wipe only the leaderboard stats for this room, or completely clear all tournaments, rooms, and player names from the database.',
+      secondaryConfirm: {
+        label: 'Wipe All Tournaments & Names',
+        onAction: async () => {
+          await wipeAllDatabaseData(roomId ? [roomId] : []);
+          setGlobalStats({});
+          setPartnershipStats({});
+          setPriorStats({});
+          setPriorPartnershipStats({});
+          setSavedPlayers([]);
+          setPlayerPool([]);
+          setTeams([]);
+          setPlayersById({});
+          setRemainingPool([]);
+          setPickSequence([]);
+          setPickPointer(0);
+          setSittingOut([]);
+          setBracket(null);
+          setActivePath(null);
+          setSavedRoomsHistory([]);
+          setRoomId(null);
+          setView('landing');
+          setModal(null);
+        },
+      },
+      confirmLabel: 'Wipe Leaderboard Only',
       onConfirm: () => {
         try {
           localStorage.setItem(getStatsStorageKey(roomId), JSON.stringify({}));
@@ -1398,6 +1433,7 @@ export default function App() {
         <CloudConfigModal
           isOpen={isCloudConfigOpen}
           onClose={() => setIsCloudConfigOpen(false)}
+          currentRoomId={roomId}
         />
       </>
     );
@@ -1438,7 +1474,6 @@ export default function App() {
             onRemoveSavedPlayer={handleRemoveSavedPlayer}
             onAddDirectoryPlayer={handleAddPlayerToDirectory}
             onRenameDirectoryPlayer={handleRenameDirectoryPlayer}
-            onImportFromMainDirectory={handleImportFromMainDirectory}
             numTeams={numTeams}
             setNumTeams={handleUpdateNumTeams}
             goalScore={goalScore}
@@ -1481,6 +1516,8 @@ export default function App() {
           <BracketView
             bracket={bracket}
             teams={teams}
+            playersById={playersById}
+            roomId={roomId}
             onOpenMatch={openMatch}
             onOpenRosterModal={() => {
               setRosterModalTeamId(null);
@@ -1496,6 +1533,9 @@ export default function App() {
             teamA={activeTeamA}
             teamB={activeTeamB}
             playersById={playersById}
+            bracket={bracket}
+            teams={teams}
+            roomId={roomId}
             onSaveGame={handleSaveGame}
             onToggleInProgress={handleToggleGameInProgress}
             onOpenEditMatchup={(game) => setEditingMatchupGame(game)}
@@ -1548,6 +1588,10 @@ export default function App() {
           <LeaderboardView
             globalStats={globalStats}
             partnershipStats={partnershipStats}
+            bracket={bracket}
+            teams={teams}
+            playersById={playersById}
+            roomId={roomId}
           />
         )}
       </main>

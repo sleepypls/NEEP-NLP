@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { X, Cloud, Check, ExternalLink, RefreshCw, KeyRound } from 'lucide-react';
-import { getFirebaseConfig, saveFirebaseConfig, isCloudEnabled } from '../services/firebase';
+import { X, Cloud, Check, ExternalLink, RefreshCw, KeyRound, Trash2, AlertTriangle } from 'lucide-react';
+import { getFirebaseConfig, saveFirebaseConfig, isCloudEnabled, wipeAllDatabaseData } from '../services/firebase';
 
-export function CloudConfigModal({ isOpen, onClose, onConfigSaved }) {
+export function CloudConfigModal({ isOpen, onClose, onConfigSaved, currentRoomId }) {
   const currentConfig = getFirebaseConfig();
   const [jsonText, setJsonText] = useState(
     currentConfig ? JSON.stringify(currentConfig, null, 2) : ''
   );
   const [statusMsg, setStatusMsg] = useState('');
+  const [confirmWipe, setConfirmWipe] = useState(false);
+  const [isWiping, setIsWiping] = useState(false);
   const cloudActive = isCloudEnabled();
 
   if (!isOpen) return null;
@@ -35,6 +37,21 @@ export function CloudConfigModal({ isOpen, onClose, onConfigSaved }) {
     setTimeout(() => {
       window.location.reload();
     }, 1000);
+  }
+
+  async function handleConfirmWipeAll() {
+    setIsWiping(true);
+    setStatusMsg('Wiping all tournaments, player directories, and stats...');
+    try {
+      await wipeAllDatabaseData(currentRoomId ? [currentRoomId] : []);
+      setStatusMsg('Database cleared! Returning to clean home page...');
+      setTimeout(() => {
+        window.location.href = window.location.origin + window.location.pathname;
+      }, 900);
+    } catch (e) {
+      setStatusMsg('Error clearing database. Please try again.');
+      setIsWiping(false);
+    }
   }
 
   return (
@@ -100,6 +117,47 @@ export function CloudConfigModal({ isOpen, onClose, onConfigSaved }) {
           >
             <Check size={15} /> Save & Connect
           </button>
+        </div>
+
+        {/* Danger Zone: Clear All Tournaments & Names from Database */}
+        <div className="mt-5 pt-4 border-t border-slate-800">
+          {!confirmWipe ? (
+            <button
+              type="button"
+              onClick={() => setConfirmWipe(true)}
+              className="w-full py-2.5 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95"
+            >
+              <Trash2 size={14} />
+              <span>Clear All Tournaments, Rooms & Player Names</span>
+            </button>
+          ) : (
+            <div className="bg-red-950/30 border border-red-500/40 rounded-2xl p-3.5 space-y-2.5 animate-in fade-in duration-150">
+              <div className="flex items-start gap-2 text-xs text-red-200">
+                <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                <span>
+                  This will permanently delete all active tournaments, saved rooms, player directories, and stats from both <strong>Firebase Cloud</strong> and <strong>this browser</strong>.
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={isWiping}
+                  onClick={() => setConfirmWipe(false)}
+                  className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-bold transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isWiping}
+                  onClick={handleConfirmWipeAll}
+                  className="flex-1 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-black transition active:scale-95 shadow-lg shadow-red-500/20"
+                >
+                  {isWiping ? 'Clearing...' : 'Yes, Wipe Everything'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

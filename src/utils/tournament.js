@@ -552,6 +552,237 @@ export function parsePlayersFromCSV(csvText) {
   return unique;
 }
 
+function escapeCsvCell(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  if (/[",\r\n]/.test(str)) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+export function triggerCsvDownload(filename, csvContent) {
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function generateDirectoryCSV(savedPlayers = [], playerPool = []) {
+  const activeSet = new Set(
+    (playerPool || []).map((p) => String(p?.name || '').trim().toLowerCase()).filter(Boolean)
+  );
+  const header = ['Player Name', 'In Active Tournament'];
+  const rows = (savedPlayers || []).map((name) => {
+    const clean = String(name || '').trim();
+    const inPool = activeSet.has(clean.toLowerCase()) ? 'Yes' : 'No';
+    return [escapeCsvCell(clean), escapeCsvCell(inPool)].join(',');
+  });
+  return [header.join(','), ...rows].join('\r\n');
+}
+
+export function generateMatchScoresCSV({ bracket, teams = [], playersById = {}, roomId = '' }) {
+  const header = [
+    'Room ID',
+    'Round',
+    'Match ID',
+    'Match Status',
+    'Team A',
+    'Team B',
+    'Game #',
+    'Game Type',
+    'Team A Pair',
+    'Team B Pair',
+    'Score A',
+    'Score B',
+    'Winner',
+  ];
+
+  const rows = [];
+  if (!bracket || !Array.isArray(bracket.rounds)) {
+    return header.join(',');
+  }
+
+  const totalRounds = bracket.rounds.length;
+  const pName = (id) => playersById[id] || `Player ${id}`;
+
+  bracket.rounds.forEach((round, rIdx) => {
+    const rLabel = roundName(totalRounds, rIdx);
+    (round || []).forEach((match) => {
+      if (match.isBye) return;
+      const teamA = teams.find((t) => t.id === match.teamAId);
+      const teamB = teams.find((t) => t.id === match.teamBId);
+      const teamAName = teamA?.name || 'TBD';
+      const teamBName = teamB?.name || 'TBD';
+
+      if (Array.isArray(match.games) && match.games.length > 0) {
+        match.games.forEach((g, gIdx) => {
+          const pairALabel = (g.pairA || []).map(pName).join(' & ');
+          const pairBLabel = (g.pairB || []).map(pName).join(' & ');
+          let winnerLabel = 'Pending';
+          if (g.saved) {
+            if (g.scoreA > g.scoreB) winnerLabel = teamAName;
+            else if (g.scoreB > g.scoreA) winnerLabel = teamBName;
+            else winnerLabel = 'Tie';
+          } else if (g.inProgress) {
+            winnerLabel = 'In Progress';
+          }
+
+          rows.push(
+            [
+              roomId,
+              rLabel,
+              match.id,
+              match.status,
+              teamAName,
+              teamBName,
+              gIdx + 1,
+              g.isExtra ? 'Regulation (Extra)' : 'Regulation',
+              pairALabel,
+              pairBLabel,
+              g.saved ? g.scoreA : '',
+              g.saved ? g.scoreB : '',
+              winnerLabel,
+            ]
+              .map(escapeCsvCell)
+              .join(',')
+          );
+        });
+      }
+
+      if (match.dreambreaker && (match.dreambreaker.started || match.dreambreaker.completed)) {
+        const db = match.dreambreaker;
+        const dbWinner =
+          db.winnerId === match.teamAId
+            ? teamAName
+            : db.winnerId === match.teamBId
+            ? teamBName
+            : 'In Progress';
+
+        rows.push(
+          [
+            roomId,
+            rLabel,
+            match.id,
+            match.status,
+            teamAName,
+            teamBName,
+            'TB',
+            'Dreambreaker',
+            (db.lineupA || []).map(pName).join(' / '),
+            (db.lineupB || []).map(pName).join(' / '),
+            db.scoreA,
+            db.scoreB,
+            dbWinner,
+          ]
+            .map(escapeCsvCell)
+            .join(',')
+        );
+      }
+    });
+  });
+
+  return [header.join(','), ...rows].join('\r\n');
+}
+
+export function generateLeaderboardCSV({ globalStats = {}, partnershipStats = {}, roomId = '' }) {
+  const lines = [];
+
+  // Section 1: Individual Player Leaderboard
+  lines.push('INDIVIDUAL LEADERBOARD');
+  lines.push(
+    [
+      'Rank',
+      'Room ID',
+      'Player',
+      'Matches Played',
+      'Wins',
+      'Losses',
+      'Win %',
+      'Points Won',
+      'Points Lost',
+      'Point Diff',
+      'Dreambreaker +/-',
+    ].join(',')
+  );
+
+  const playerRows = Object.values(globalStats || {}).sort((a, b) => {
+    const wrA = a.matchesPlayed ? a.wins / a.matchesPlayed : 0;
+    const wrB = b.matchesPlayed ? b.wins / b.matchesPlayed : 0;
+    return wrB - wrA || b.wins - a.wins;
+  });
+
+  playerRows.forEach((r, idx) => {
+    const winPct = r.matchesPlayed ? `${Math.round((r.wins / r.matchesPlayed) * 100)}%` : '0%';
+    const ptDiff = (r.pointsWon || 0) - (r.pointsLost || 0);
+    lines.push(
+      [
+        idx + 1,
+        roomId,
+        r.name,
+        r.matchesPlayed || 0,
+        r.wins || 0,
+        r.losses || 0,
+        winPct,
+        r.pointsWon || 0,
+        r.pointsLost || 0,
+        ptDiff,
+        r.dreambreakerDiff || 0,
+      ]
+        .map(escapeCsvCell)
+        .join(',')
+    );
+  });
+
+  lines.push('');
+  lines.push('PARTNERSHIP LEADERBOARD');
+  lines.push(
+    [
+      'Rank',
+      'Room ID',
+      'Partnership',
+      'Games Played',
+      'Wins',
+      'Losses',
+      'Win %',
+      'Points Won',
+      'Points Lost',
+      'Point Diff',
+    ].join(',')
+  );
+
+  const pairRows = Object.values(partnershipStats || {}).sort((a, b) => {
+    return b.pointDiff - a.pointDiff || b.wins - a.wins || b.gamesPlayed - a.gamesPlayed;
+  });
+
+  pairRows.forEach((r, idx) => {
+    const winPct = r.gamesPlayed ? `${Math.round((r.wins / r.gamesPlayed) * 100)}%` : '0%';
+    lines.push(
+      [
+        idx + 1,
+        roomId,
+        r.name,
+        r.gamesPlayed || 0,
+        r.wins || 0,
+        r.losses || 0,
+        winPct,
+        r.pointsWon || 0,
+        r.pointsLost || 0,
+        r.pointDiff || 0,
+      ]
+        .map(escapeCsvCell)
+        .join(',')
+    );
+  });
+
+  return lines.join('\r\n');
+}
+
 export function initializeDraftState(playerPool, numTeams, allowUneven = true, selectedCaptainIds = []) {
   const teams = [];
   const draftPlayers = [...playerPool];

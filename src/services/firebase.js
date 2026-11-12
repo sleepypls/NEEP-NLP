@@ -5,6 +5,9 @@ import {
   setDoc,
   onSnapshot,
   getDoc,
+  collection,
+  getDocs,
+  deleteDoc,
 } from 'firebase/firestore';
 
 const STORAGE_KEY_FIREBASE_CONFIG = 'neep_firebase_config_v1';
@@ -281,4 +284,86 @@ export async function saveKnownPlayersToCloud(clubId = DEFAULT_CLUB_ID, roster) 
     console.error('[Firebase] Error saving players to cloud:', err);
     return false;
   }
+}
+
+/**
+ * Deletes active tournament, stats, and known player documents in Firestore for all known/discovered rooms,
+ * and wipes all NEEP-NLP localStorage keys on this device.
+ */
+export async function wipeAllDatabaseData(additionalRoomIds = []) {
+  const db = getDb();
+  const roomIdsToClear = new Set([
+    DEFAULT_CLUB_ID,
+    'neep-main',
+    ...additionalRoomIds.filter(Boolean),
+  ]);
+
+  // Discover any rooms stored in localStorage keys
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      const match = k.match(/^neep_(?:tourn|stats|pairs|players)_(.+)_v1$/);
+      if (match && match[1]) {
+        roomIdsToClear.add(match[1]);
+      }
+    }
+    const savedRoomsRaw = localStorage.getItem('neep_saved_rooms_v1');
+    if (savedRoomsRaw) {
+      const parsed = JSON.parse(savedRoomsRaw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((r) => {
+          if (r?.roomId) roomIdsToClear.add(r.roomId);
+        });
+      }
+    }
+    const currRoom = localStorage.getItem('neep_current_room');
+    if (currRoom) roomIdsToClear.add(currRoom);
+  } catch (e) {}
+
+  // Also try listing top-level `clubs` documents if any exist in Firestore
+  if (db) {
+    try {
+      const clubsSnap = await getDocs(collection(db, 'clubs'));
+      clubsSnap.forEach((docSnap) => {
+        if (docSnap.id) roomIdsToClear.add(docSnap.id);
+      });
+    } catch (e) {
+      // ignore if top-level docs don't exist
+    }
+
+    // Delete subcollection docs for every roomId
+    for (const rid of roomIdsToClear) {
+      try {
+        await deleteDoc(doc(db, 'clubs', rid, 'tournaments', 'active'));
+      } catch (e) {}
+      try {
+        await deleteDoc(doc(db, 'clubs', rid, 'data', 'players'));
+      } catch (e) {}
+      try {
+        await deleteDoc(doc(db, 'clubs', rid, 'data', 'stats'));
+      } catch (e) {}
+      try {
+        await deleteDoc(doc(db, 'clubs', rid));
+      } catch (e) {}
+    }
+  }
+
+  // Clear local storage keys for all tournaments, players, stats, and room history
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (
+        k &&
+        (k.startsWith('neep_') || k.startsWith('neep-pickleball-')) &&
+        k !== STORAGE_KEY_FIREBASE_CONFIG
+      ) {
+        keysToRemove.push(k);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (e) {}
+
+  return Array.from(roomIdsToClear);
 }

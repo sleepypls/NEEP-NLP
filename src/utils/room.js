@@ -1,4 +1,3 @@
-export const DEFAULT_ROOM_ID = 'neep-main';
 export const DEFAULT_ADMIN_PIN = '1234';
 
 const ROOM_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -38,7 +37,7 @@ export function sanitizeRoomId(raw) {
  * Returns localStorage key for tournament state of a given room
  */
 export function getTournStorageKey(rid) {
-  return rid === DEFAULT_ROOM_ID ? 'neep-pickleball-tournament-state-v1' : `neep_tourn_${rid}_v1`;
+  return `neep_tourn_${rid}_v1`;
 }
 
 /**
