@@ -462,6 +462,7 @@ export function ScorekeeperDashboardView({
               gameId: g.id,
               gameIndex: gIdx,
               preCourt: g.court ? Number(g.court) : null,
+              assignedCourts: m.assignedCourts || [],
               label: `G${gIdx + 1} (${matchLabel}): ${nA} vs ${nB}`,
             });
           }
@@ -473,7 +474,10 @@ export function ScorekeeperDashboardView({
     for (let c = 1; c <= totalCourts; c++) {
       if (mlpLiveByCourt.has(c)) continue;
       const pre = mlpEligible.find((e) => e.preCourt === c && !usedMlpKeys.has(e.key));
-      const next = pre || mlpEligible.find((e) => !usedMlpKeys.has(e.key));
+      const matchPref =
+        pre ||
+        mlpEligible.find((e) => (e.assignedCourts || []).includes(c) && !usedMlpKeys.has(e.key));
+      const next = matchPref || mlpEligible.find((e) => !usedMlpKeys.has(e.key));
       if (next) {
         mlpSuggestions[c] = next.key;
         usedMlpKeys.add(next.key);
@@ -706,3 +710,4 @@ export function ScorekeeperDashboardView({
     </div>
   );
 }
+

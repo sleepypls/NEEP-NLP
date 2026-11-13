@@ -32,6 +32,7 @@ import {
   initializeDraftState,
   generateBracket,
   advanceWinner,
+  distributeCourtsToMatches,
   computeAllStats,
   randomizePendingMatchups,
   revertPendingMatchups,
@@ -910,10 +911,50 @@ export default function App() {
   }
 
   function handleGenerateBracket() {
-    const newBracket = generateBracket(teams);
+    const rawBracket = generateBracket(teams);
+    const newBracket = distributeCourtsToMatches(
+      rawBracket,
+      teams,
+      numCourts,
+      goalScore,
+      matchupConfig
+    );
     setBracket(newBracket);
     setView('bracket');
     broadcastTournamentChange({ bracket: newBracket, view: 'bracket' });
+  }
+
+  function handleSetMlpMatchAssignedCourts(roundIdx, matchIdx, courts) {
+    if (!bracket || !bracket.rounds[roundIdx]?.[matchIdx]) return;
+    const nb = JSON.parse(JSON.stringify(bracket));
+    const m = nb.rounds[roundIdx][matchIdx];
+    const cleanCourts = (courts || []).map((c) => Number(c)).filter(Boolean);
+    m.assignedCourts = cleanCourts;
+
+    // Ensure games exist for this matchup if it has both teams
+    if (!m.games && m.teamAId !== null && m.teamBId !== null) {
+      const teamA = teams.find((t) => t.id === m.teamAId);
+      const teamB = teams.find((t) => t.id === m.teamBId);
+      if (teamA && teamB) {
+        m.games = generateGames(teamA, teamB, goalScore, matchupConfig);
+      }
+    }
+
+    // Re-align upcoming unsaved/non-live games' default courts to match assignedCourts
+    if (Array.isArray(m.games)) {
+      let cIdx = 0;
+      m.games = m.games.map((g) => {
+        if (g.saved || g.inProgress) return g;
+        if (cleanCourts.length === 0) return { ...g, court: null };
+        if (cIdx < cleanCourts.length) {
+          return { ...g, court: cleanCourts[cIdx++] };
+        }
+        return g;
+      });
+    }
+
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
   }
 
   function getActiveMatch() {
@@ -1004,7 +1045,13 @@ export default function App() {
         const winnerId = gamesWonA > gamesWonB ? match.teamAId : match.teamBId;
         m.status = 'complete';
         m.winnerId = winnerId;
-        nb = advanceWinner(nb, round, idx, winnerId);
+        nb = distributeCourtsToMatches(
+          advanceWinner(nb, round, idx, winnerId),
+          teams,
+          numCourts,
+          goalScore,
+          matchupConfig
+        );
       }
     } else {
       m.status = 'in_progress';
@@ -2664,7 +2711,11 @@ export default function App() {
             teams={teams}
             playersById={playersById}
             roomId={roomId}
+            numCourts={numCourts}
+            isAdmin={isAdmin}
             onOpenMatch={openMatch}
+            onBatchAssignCourtsLive={handleBatchAssignMlpCourtsAndLive}
+            onSetMatchAssignedCourts={handleSetMlpMatchAssignedCourts}
             onOpenRosterModal={() => {
               setRosterModalTeamId(null);
               setIsRosterModalOpen(true);

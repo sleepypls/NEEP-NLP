@@ -32,3 +32,4 @@ export function LiveTimer({ startedAt, className = '' }) {
     </span>
   );
 }
+

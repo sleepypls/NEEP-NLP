@@ -1071,6 +1071,79 @@ export function advanceWinner(bracket, roundIdx, matchIdx, winnerId) {
   return nb;
 }
 
+/**
+ * Evenly distributes `1..numCourts` across ready/active matchups in each bracket round
+ * and pre-generates games for ready matchups so both sides of the bracket can be
+ * assigned courts and scored immediately.
+ */
+export function distributeCourtsToMatches(
+  bracket,
+  teams = [],
+  numCourts = 2,
+  goalScore = 11,
+  matchupConfig = { preset: 'adjacent', customSlotPairs: [] }
+) {
+  if (!bracket || !Array.isArray(bracket.rounds)) return bracket;
+  const nb = JSON.parse(JSON.stringify(bracket));
+  const totalCourts = Math.max(1, Number(numCourts) || 2);
+  const teamMap = new Map((teams || []).map((t) => [t.id, t]));
+
+  nb.rounds.forEach((round) => {
+    const activeMatches = round.filter(
+      (m) => m.teamAId !== null && m.teamBId !== null && !m.isBye && m.status !== 'complete'
+    );
+    const mCount = activeMatches.length;
+    if (mCount === 0) return;
+
+    // Split 1..totalCourts evenly across activeMatches in this round
+    const buckets = Array.from({ length: mCount }, () => []);
+    if (totalCourts >= mCount) {
+      const base = Math.floor(totalCourts / mCount);
+      const extra = totalCourts % mCount;
+      let cursor = 1;
+      for (let i = 0; i < mCount; i++) {
+        const size = base + (i < extra ? 1 : 0);
+        for (let j = 0; j < size; j++) {
+          buckets[i].push(cursor++);
+        }
+      }
+    } else {
+      for (let i = 0; i < mCount; i++) {
+        buckets[i].push((i % totalCourts) + 1);
+      }
+    }
+
+    const usedInitialCourts = new Set();
+    activeMatches.forEach((m, idx) => {
+      m.assignedCourts = buckets[idx] || [1];
+      if (!m.games) {
+        const teamA = teamMap.get(m.teamAId);
+        const teamB = teamMap.get(m.teamBId);
+        if (teamA && teamB) {
+          m.games = generateGames(teamA, teamB, goalScore, matchupConfig);
+        }
+      }
+      // Pre-assign court numbers to initial games matching this matchup's assignedCourts
+      if (Array.isArray(m.games)) {
+        let cIdx = 0;
+        m.games.forEach((g) => {
+          if (g.saved || g.inProgress || g.court) return;
+          while (cIdx < m.assignedCourts.length && usedInitialCourts.has(m.assignedCourts[cIdx])) {
+            cIdx++;
+          }
+          if (cIdx < m.assignedCourts.length) {
+            g.court = m.assignedCourts[cIdx];
+            usedInitialCourts.add(g.court);
+            cIdx++;
+          }
+        });
+      }
+    });
+  });
+
+  return nb;
+}
+
 export function roundName(totalRounds, roundIdx) {
   const remaining = totalRounds - roundIdx;
   if (remaining === 1) return 'Final';

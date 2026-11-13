@@ -229,6 +229,7 @@ export function MlpCourtAssignModal({
   teams = [],
   numCourts = 2,
   playersById = {},
+  showAllBracketGames = false,
   onApply,
 }) {
   const [selections, setSelections] = useState({});
@@ -242,10 +243,10 @@ export function MlpCourtAssignModal({
 
   const totalCourts = Math.max(1, Number(numCourts) || 2);
   const liveByCourt = new Map();
+  const teamMap = new Map((teams || []).map((t) => [t.id, t.name]));
 
   // Scan ALL matches in bracket (if provided) so courts live in any match are marked occupied
   if (bracket && Array.isArray(bracket.rounds)) {
-    const teamMap = new Map((teams || []).map((t) => [t.id, t.name]));
     bracket.rounds.forEach((round) => {
       round.forEach((m) => {
         (m.games || []).forEach((g, gIdx) => {
@@ -283,34 +284,72 @@ export function MlpCourtAssignModal({
     if (!liveByCourt.has(c)) freeCourts.push(c);
   }
 
-  const eligibleGames = games
-    .map((g, idx) => ({ game: g, index: idx }))
-    .filter(({ game }) => !game.saved && !game.inProgress);
+  let eligibleGames = [];
+  if (showAllBracketGames && bracket && Array.isArray(bracket.rounds)) {
+    bracket.rounds.forEach((round, rIdx) => {
+      round.forEach((m, mIdx) => {
+        if (m.isBye || !m.games || m.status === 'complete') return;
+        const tA = teamMap.get(m.teamAId) || 'Team A';
+        const tB = teamMap.get(m.teamBId) || 'Team B';
+        const matchLabel = `${tA} vs ${tB}`;
+        m.games.forEach((g, gIdx) => {
+          if (!g.saved && !g.inProgress) {
+            eligibleGames.push({
+              key: `${rIdx}:${mIdx}:${g.id}`,
+              round: rIdx,
+              idx: mIdx,
+              game: g,
+              index: gIdx,
+              matchLabel,
+              assignedCourts: m.assignedCourts || [],
+            });
+          }
+        });
+      });
+    });
+  } else {
+    eligibleGames = games
+      .map((g, idx) => ({
+        key: g.id,
+        game: g,
+        index: idx,
+        assignedCourts: [],
+      }))
+      .filter(({ game }) => !game.saved && !game.inProgress);
+  }
 
-  function gameLabel({ game, index }) {
-    const namesA = (game.pairA || []).map(getPlayerName).join(' & ');
-    const namesB = (game.pairB || []).map(getPlayerName).join(' & ');
-    return `Game ${index + 1}: ${namesA} vs ${namesB}`;
+  function gameLabel(item) {
+    const namesA = (item.game.pairA || []).map(getPlayerName).join(' & ');
+    const namesB = (item.game.pairB || []).map(getPlayerName).join(' & ');
+    const prefix = item.matchLabel ? `${item.matchLabel} • G${item.index + 1}` : `Game ${item.index + 1}`;
+    return `${prefix}: ${namesA} vs ${namesB}`;
   }
 
   function buildSuggestions() {
     const next = {};
-    const usedIds = new Set();
-    // Pass 1: pre-assigned court
+    const usedKeys = new Set();
+    // Pass 1: pre-assigned court or matchup's designated courts
     freeCourts.forEach((c) => {
-      const pre = eligibleGames.find(({ game }) => Number(game.court) === c && !usedIds.has(game.id));
-      if (pre) {
-        next[c] = pre.game.id;
-        usedIds.add(pre.game.id);
+      const exactPre = eligibleGames.find(
+        (item) => Number(item.game.court) === c && !usedKeys.has(item.key)
+      );
+      const matchPref =
+        exactPre ||
+        eligibleGames.find(
+          (item) => (item.assignedCourts || []).includes(c) && !usedKeys.has(item.key)
+        );
+      if (matchPref) {
+        next[c] = matchPref.key;
+        usedKeys.add(matchPref.key);
       }
     });
     // Pass 2: remaining games in order
     freeCourts.forEach((c) => {
       if (next[c]) return;
-      const cand = eligibleGames.find(({ game }) => !usedIds.has(game.id));
+      const cand = eligibleGames.find((item) => !usedKeys.has(item.key));
       if (cand) {
-        next[c] = cand.game.id;
-        usedIds.add(cand.game.id);
+        next[c] = cand.key;
+        usedKeys.add(cand.key);
       } else {
         next[c] = '';
       }
@@ -322,13 +361,22 @@ export function MlpCourtAssignModal({
     if (isOpen) {
       setSelections(buildSuggestions());
     }
-  }, [isOpen, games, numCourts]);
+  }, [isOpen, games, bracket, numCourts, showAllBracketGames]);
 
   if (!isOpen) return null;
 
+  const eligibleByKey = new Map(eligibleGames.map((item) => [item.key, item]));
   const selectedList = Object.entries(selections)
-    .filter(([, gameId]) => Boolean(gameId))
-    .map(([courtStr, gameId]) => ({ court: Number(courtStr), gameId }));
+    .filter(([, key]) => Boolean(key) && eligibleByKey.has(key))
+    .map(([courtStr, key]) => {
+      const item = eligibleByKey.get(key);
+      return {
+        court: Number(courtStr),
+        gameId: item.game.id,
+        round: item.round,
+        idx: item.idx,
+      };
+    });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
@@ -414,7 +462,7 @@ export function MlpCourtAssignModal({
                   >
                     <option value="">— Leave Unassigned —</option>
                     {eligibleGames.map((item) => (
-                      <option key={item.game.id} value={item.game.id}>
+                      <option key={item.key} value={item.key}>
                         {gameLabel(item)}
                       </option>
                     ))}

@@ -1,24 +1,41 @@
-import React from 'react';
-import { Trophy, Swords, Zap, Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trophy, Swords, Zap, Download, Play } from 'lucide-react';
 import { roundName, generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
+import { MlpCourtAssignModal } from './CourtAssignModal';
+import { LiveTimer } from './LiveTimer';
 
 function TeamDot({ color, className = '' }) {
   return <span className={`inline-block w-3 h-3 rounded-full flex-shrink-0 ${className}`} style={{ backgroundColor: color?.accent || '#64748b' }} />;
 }
 
-function MatchCard({ match, teams, onOpen }) {
+function MatchCard({
+  match,
+  teams,
+  numCourts = 2,
+  isAdmin = false,
+  onToggleCourt,
+  onOpen,
+}) {
   const teamA = teams.find((t) => t.id === match.teamAId);
   const teamB = teams.find((t) => t.id === match.teamBId);
   const clickable = match.status !== 'pending' && !match.isBye;
   const isComplete = match.status === 'complete';
+  const assignedCourts = Array.isArray(match.assignedCourts) ? match.assignedCourts : [];
 
   return (
-    <button
+    <div
       onClick={() => clickable && onOpen()}
-      disabled={!clickable}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (clickable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
       className={`w-full text-left bg-slate-900 border rounded-2xl p-3.5 mb-3 transition shadow-lg ${
         clickable
-          ? 'border-slate-800 hover:border-slate-700 active:scale-[0.98] cursor-pointer'
+          ? 'border-slate-800 hover:border-slate-700 active:scale-[0.99] cursor-pointer'
           : 'border-slate-850 opacity-60 cursor-default'
       }`}
     >
@@ -67,14 +84,16 @@ function MatchCard({ match, teams, onOpen }) {
           </p>
           <div className="flex items-center gap-1 flex-wrap">
             {match.games &&
-              Array.from(new Set(match.games.filter((g) => !g.saved && g.court).map((g) => g.court)))
-                .sort((a, b) => a - b)
-                .map((ct) => (
+              match.games
+                .filter((g) => g.inProgress && !g.saved && g.court)
+                .sort((a, b) => Number(a.court) - Number(b.court))
+                .map((g) => (
                   <span
-                    key={ct}
-                    className="text-[#d7f24c] text-[10px] font-mono font-bold bg-[#d7f24c]/10 border border-[#d7f24c]/30 px-1.5 py-0.5 rounded-full"
+                    key={g.id}
+                    className="inline-flex items-center gap-1 text-[#d7f24c] text-[10px] font-mono font-bold bg-[#d7f24c]/10 border border-[#d7f24c]/30 px-1.5 py-0.5 rounded-full"
                   >
-                    Ct {ct}
+                    Ct {g.court}
+                    {g.liveStartedAt && <LiveTimer startedAt={g.liveStartedAt} className="text-[9px]" />}
                   </span>
                 ))}
             {match.games && match.games.filter((g) => g.inProgress).length > 0 && (
@@ -85,11 +104,67 @@ function MatchCard({ match, teams, onOpen }) {
           </div>
         </div>
       )}
-    </button>
+
+      {/* Designated Courts per Matchup (both sides of the bracket) */}
+      {!match.isBye && teamA && teamB && !isComplete && (
+        <div
+          className="mt-2 pt-2 border-t border-slate-800/80 px-2 flex items-center justify-between gap-2 flex-wrap"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            Courts:
+          </span>
+          {isAdmin && onToggleCourt ? (
+            <div className="flex items-center gap-1 flex-wrap">
+              {Array.from({ length: Math.max(1, Number(numCourts) || 2) }, (_, i) => i + 1).map((c) => {
+                const selected = assignedCourts.includes(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleCourt(c);
+                    }}
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold border transition ${
+                      selected
+                        ? 'bg-[#d7f24c] text-slate-950 border-[#d7f24c]'
+                        : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'
+                    }`}
+                    title={`Toggle Court ${c} for this matchup`}
+                  >
+                    C{c}
+                  </button>
+                );
+              })}
+            </div>
+          ) : assignedCourts.length > 0 ? (
+            <span className="text-[10px] font-mono font-bold text-[#d7f24c]">
+              {assignedCourts.map((c) => `Ct ${c}`).join(', ')}
+            </span>
+          ) : (
+            <span className="text-[10px] text-slate-500 italic">Unassigned</span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
-export function BracketView({ bracket, teams, playersById = {}, roomId = '', onOpenMatch, onOpenRosterModal }) {
+export function BracketView({
+  bracket,
+  teams,
+  playersById = {},
+  roomId = '',
+  numCourts = 2,
+  isAdmin = false,
+  onOpenMatch,
+  onOpenRosterModal,
+  onBatchAssignCourtsLive,
+  onSetMatchAssignedCourts,
+}) {
+  const [isCourtAssignOpen, setIsCourtAssignOpen] = useState(false);
+
   if (!bracket || !bracket.rounds) return null;
   const totalRounds = bracket.rounds.length;
   const champion = bracket.championId !== null ? teams.find((t) => t.id === bracket.championId) : null;
@@ -114,7 +189,17 @@ export function BracketView({ bracket, teams, playersById = {}, roomId = '', onO
         <h2 className="text-white text-2xl sm:text-3xl font-display uppercase tracking-wide font-semibold flex items-center gap-2">
           <Swords size={24} className="text-[#d7f24c]" /> Tournament Bracket
         </h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && onBatchAssignCourtsLive && (
+            <button
+              type="button"
+              onClick={() => setIsCourtAssignOpen(true)}
+              className="px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+              title="Assign upcoming games across all bracket matchups to courts and mark live"
+            >
+              <Play size={12} className="fill-current" /> Assign Courts &amp; Live
+            </button>
+          )}
           {hasAnyGames && (
             <button
               type="button"
@@ -143,11 +228,40 @@ export function BracketView({ bracket, teams, playersById = {}, roomId = '', onO
               {roundName(totalRounds, ri)}
             </p>
             {round.map((match, mi) => (
-              <MatchCard key={match.id} match={match} teams={teams} onOpen={() => onOpenMatch(ri, mi)} />
+              <MatchCard
+                key={match.id}
+                match={match}
+                teams={teams}
+                numCourts={numCourts}
+                isAdmin={isAdmin}
+                onToggleCourt={
+                  onSetMatchAssignedCourts
+                    ? (courtNum) => {
+                        const curr = Array.isArray(match.assignedCourts) ? match.assignedCourts : [];
+                        const next = curr.includes(courtNum)
+                          ? curr.filter((c) => c !== courtNum)
+                          : [...curr, courtNum].sort((a, b) => a - b);
+                        onSetMatchAssignedCourts(ri, mi, next);
+                      }
+                    : undefined
+                }
+                onOpen={() => onOpenMatch(ri, mi)}
+              />
             ))}
           </div>
         ))}
       </div>
+
+      <MlpCourtAssignModal
+        isOpen={isCourtAssignOpen}
+        onClose={() => setIsCourtAssignOpen(false)}
+        bracket={bracket}
+        teams={teams}
+        numCourts={numCourts}
+        playersById={playersById}
+        showAllBracketGames={true}
+        onApply={(assignments) => onBatchAssignCourtsLive && onBatchAssignCourtsLive(assignments)}
+      />
     </div>
   );
 }
