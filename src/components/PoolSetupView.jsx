@@ -689,64 +689,65 @@ export function PoolSetupView({
             No {discipline === 'doubles' ? 'teams' : 'players'} added yet. Add at least {isKnockoutOnly ? 2 : 3} to start.
           </p>
         ) : (
-          <div className="max-h-[380px] lg:max-h-[440px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
-                <tr>
-                  <th className="py-1.5 px-3 font-bold w-14">Seed</th>
-                  <th className="py-1.5 px-3 font-bold">
-                    {discipline === 'doubles' ? 'Doubles Team' : 'Player'}
-                  </th>
-                  {isAdmin && <th className="py-1.5 px-3 font-bold text-right">Actions</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/70">
-                {entries.map((entry, idx) => (
-                  <tr key={entry.id} className="hover:bg-slate-900/60 transition">
-                    <td className="py-1.5 px-3 font-mono font-bold text-[#d7f24c]">
-                      #{idx + 1}
-                    </td>
-                    <td className="py-1.5 px-3 font-semibold text-white">
-                      {getEntryDisplayName(entry)}
-                    </td>
+          <div className="max-h-[380px] lg:max-h-[440px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl p-2.5">
+            <div
+              className={`grid gap-2 ${
+                discipline === 'doubles'
+                  ? 'grid-cols-1 sm:grid-cols-2'
+                  : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+              }`}
+            >
+              {entries.map((entry, idx) => {
+                const displayName = getEntryDisplayName(entry);
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 text-xs transition"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono font-bold text-[11px] text-[#d7f24c] shrink-0">
+                        #{idx + 1}
+                      </span>
+                      <span className="font-semibold text-white truncate" title={displayName}>
+                        {displayName}
+                      </span>
+                    </div>
                     {isAdmin && (
-                      <td className="py-1.5 px-3 text-right">
-                        <div className="inline-flex items-center gap-0.5">
-                          {onMoveEntry && idx > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => onMoveEntry(idx, idx - 1)}
-                              className="text-slate-400 hover:text-white p-1 rounded-lg transition"
-                              title="Move seed up"
-                            >
-                              <ChevronUp size={14} />
-                            </button>
-                          )}
-                          {onMoveEntry && idx < entries.length - 1 && (
-                            <button
-                              type="button"
-                              onClick={() => onMoveEntry(idx, idx + 1)}
-                              className="text-slate-400 hover:text-white p-1 rounded-lg transition"
-                              title="Move seed down"
-                            >
-                              <ChevronDown size={14} />
-                            </button>
-                          )}
+                      <div className="inline-flex items-center gap-0.5 shrink-0">
+                        {onMoveEntry && idx > 0 && (
                           <button
                             type="button"
-                            onClick={() => onRemoveEntry(entry.id)}
-                            className="text-slate-400 hover:text-red-400 p-1 rounded-lg transition"
-                            title="Remove entry"
+                            onClick={() => onMoveEntry(idx, idx - 1)}
+                            className="text-slate-400 hover:text-white p-0.5 rounded-lg transition"
+                            title="Move seed up"
                           >
-                            <X size={14} />
+                            <ChevronUp size={13} />
                           </button>
-                        </div>
-                      </td>
+                        )}
+                        {onMoveEntry && idx < entries.length - 1 && (
+                          <button
+                            type="button"
+                            onClick={() => onMoveEntry(idx, idx + 1)}
+                            className="text-slate-400 hover:text-white p-0.5 rounded-lg transition"
+                            title="Move seed down"
+                          >
+                            <ChevronDown size={13} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onRemoveEntry(entry.id)}
+                          className="text-slate-400 hover:text-red-400 p-0.5 rounded-lg transition"
+                          title="Remove entry"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
                     )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
