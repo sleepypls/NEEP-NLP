@@ -237,6 +237,7 @@ export default function App() {
   const [configPresets, setConfigPresets] = useState(() => initialConfigs.presets || []);
   const [adminPin, setAdminPin] = useState(() => initialSaved?.adminPin || DEFAULT_ADMIN_PIN);
   const [isTournamentLocked, setIsTournamentLocked] = useState(() => Boolean(initialSaved?.isTournamentLocked));
+  const [cloudError, setCloudError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -483,8 +484,11 @@ export default function App() {
     let unsubConfigs = () => {};
 
     if (isCloudEnabled()) {
-      unsubTourn = subscribeToActiveTournament(roomId, (cloudTourn) => {
-        if (cloudTourn) {
+      unsubTourn = subscribeToActiveTournament(
+        roomId,
+        (cloudTourn) => {
+          setCloudError(null);
+          if (cloudTourn) {
           if (cloudTourn.tournamentStyle) setTournamentStyle(cloudTourn.tournamentStyle);
           if (cloudTourn.poolDiscipline) setPoolDiscipline(cloudTourn.poolDiscipline);
           if (cloudTourn.poolStructure) setPoolStructure(cloudTourn.poolStructure);
@@ -548,7 +552,11 @@ export default function App() {
             setView((curr) => (curr === 'setup' && cloudTourn.bracket ? 'bracket' : curr));
           }
         }
-      });
+        },
+        (err) => {
+          setCloudError(err?.code || err?.message || 'sync-error');
+        }
+      );
 
       unsubStats = subscribeToStats(roomId, ({ playerStats, partnershipStats }) => {
         if (playerStats) setGlobalStats(playerStats);
@@ -718,6 +726,9 @@ export default function App() {
         captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig,
         teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         ...updates,
+      }).then((ok) => {
+        if (!ok) setCloudError((prev) => prev || 'permission-denied');
+        else setCloudError(null);
       });
     }
   }
@@ -2940,6 +2951,7 @@ export default function App() {
         onWipeStats={requestWipeStats}
         onOpenShare={() => setIsShareOpen(true)}
         onOpenCloudConfig={() => setIsCloudConfigOpen(true)}
+        cloudError={cloudError}
         roomId={roomId}
         onOpenRoomModal={() => setIsRoomModalOpen(true)}
         isAdmin={isAdmin}
@@ -3359,6 +3371,8 @@ export default function App() {
       <CloudConfigModal
         isOpen={isCloudConfigOpen}
         onClose={() => setIsCloudConfigOpen(false)}
+        cloudError={cloudError}
+        currentRoomId={roomId}
       />
       <EditMatchupModal
         isOpen={!!editingMatchupGame}

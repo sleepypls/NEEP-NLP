@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Cloud, Check, ExternalLink, RefreshCw, KeyRound, Trash2, AlertTriangle } from 'lucide-react';
 import { getFirebaseConfig, saveFirebaseConfig, isCloudEnabled, wipeAllDatabaseData } from '../services/firebase';
 
-export function CloudConfigModal({ isOpen, onClose, onConfigSaved, currentRoomId }) {
+export function CloudConfigModal({ isOpen, onClose, onConfigSaved, currentRoomId, cloudError = null }) {
   const currentConfig = getFirebaseConfig();
   const [jsonText, setJsonText] = useState(
     currentConfig ? JSON.stringify(currentConfig, null, 2) : ''
@@ -65,7 +65,11 @@ export function CloudConfigModal({ isOpen, onClose, onConfigSaved, currentRoomId
             <div>
               <h3 className="text-white text-lg font-bold">Cloud Database Connection</h3>
               <p className="text-xs text-slate-400">
-                {cloudActive ? '🟢 Connected to Firebase Firestore' : '🟡 Running in Local Mode (Offline)'}
+                {cloudError
+                  ? `🔴 Sync Error (${cloudError})`
+                  : cloudActive
+                    ? '🟢 Connected to Firebase Firestore'
+                    : '🟡 Running in Local Mode (Offline)'}
               </p>
             </div>
           </div>
@@ -73,6 +77,17 @@ export function CloudConfigModal({ isOpen, onClose, onConfigSaved, currentRoomId
             <X size={18} />
           </button>
         </div>
+
+        {cloudError && (
+          <div className="bg-rose-500/15 border border-rose-500/40 rounded-2xl p-3.5 mb-4 text-xs text-rose-200 space-y-2">
+            <p className="font-bold flex items-center gap-1.5 text-rose-300">
+              <AlertTriangle size={14} /> Firestore Sync Blocked ({cloudError})
+            </p>
+            <p className="text-rose-200/90">
+              Firebase Test Mode rules expire after 30 days. Open <strong>Firebase Console &rarr; Firestore Database &rarr; Rules</strong> and publish updated rules for <code className="bg-slate-900 px-1 rounded">/clubs/{'{document=**}'}</code> so devices can read and write rooms.
+            </p>
+          </div>
+        )}
 
         <div className="bg-slate-850 border border-slate-750 rounded-2xl p-4 mb-4 text-xs text-slate-300 space-y-2">
           <p className="font-semibold text-slate-200">How to connect free Firebase Firestore:</p>

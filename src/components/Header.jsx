@@ -13,6 +13,7 @@ export function Header({
   onWipeStats,
   onOpenShare,
   onOpenCloudConfig,
+  cloudError = null,
   roomId,
   onOpenRoomModal,
   isAdmin,
@@ -173,12 +174,30 @@ export function Header({
           {!isPlayerOnly && (
             <button
               onClick={onOpenCloudConfig}
-              title={cloudActive ? 'Connected to Firebase Firestore' : 'Running in Local Mode. Click to connect cloud!'}
-              className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-900 hover:bg-slate-850 border border-slate-800 text-xs font-medium transition"
+              title={
+                cloudError
+                  ? `Cloud Sync Error (${cloudError}) — Check Firebase Firestore rules! Click for details.`
+                  : cloudActive
+                    ? 'Connected to Firebase Firestore'
+                    : 'Running in Local Mode. Click to connect cloud!'
+              }
+              className={`flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 rounded-full border text-xs font-medium transition ${
+                cloudError
+                  ? 'bg-rose-500/15 hover:bg-rose-500/25 border-rose-500/50 text-rose-300'
+                  : 'bg-slate-900 hover:bg-slate-850 border-slate-800'
+              }`}
             >
-              <span className={`w-2 h-2 rounded-full ${cloudActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-              <span className="hidden md:inline text-slate-300 text-[11px] font-mono">
-                {cloudActive ? 'Cloud Live' : 'Local'}
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  cloudError
+                    ? 'bg-rose-500 animate-ping'
+                    : cloudActive
+                      ? 'bg-emerald-400 animate-pulse'
+                      : 'bg-amber-400'
+                }`}
+              />
+              <span className={`hidden md:inline text-[11px] font-mono ${cloudError ? 'text-rose-300 font-bold' : 'text-slate-300'}`}>
+                {cloudError ? 'Sync Error' : cloudActive ? 'Cloud Live' : 'Local'}
               </span>
             </button>
           )}
