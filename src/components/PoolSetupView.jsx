@@ -339,7 +339,7 @@ export function PoolSetupView({
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 pb-24 animate-in fade-in duration-200">
+    <div className="max-w-lg lg:max-w-6xl mx-auto px-4 lg:px-6 py-6 pb-24 animate-in fade-in duration-200">
       {/* Hero Banner */}
       <div className="flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-900/95 to-emerald-950/30 border border-slate-800 rounded-3xl p-4 mb-6 shadow-xl">
         <div className="w-14 h-16 flex-shrink-0 flex items-center justify-center filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
@@ -379,7 +379,9 @@ export function PoolSetupView({
           : 'Configure Singles or Doubles entries, Pool Play round-robin groups, and Knockout elimination rules.'}
       </p>
 
-      {/* Discipline & Structure Card */}
+      <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
+        <div className="lg:col-span-6">
+          {/* Discipline & Structure Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4">
         <div>
           <div className="flex items-center justify-between gap-2 mb-2">
@@ -833,7 +835,9 @@ export function PoolSetupView({
         )}
       </div>
 
-      {/* Pool & Knockout Rules Card */}
+        </div>
+        <div className="lg:col-span-6">
+          {/* Pool & Knockout Rules Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4">
         <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
           <Trophy size={16} className="text-amber-400" />{' '}
@@ -1641,6 +1645,9 @@ export function PoolSetupView({
           </button>
         </div>
       )}
+
+        </div>
+      </div>
 
       {/* Dedicated Directory Management Modal */}
       <DirectoryModal

@@ -181,7 +181,7 @@ export function SetupView({
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 pb-24 animate-in fade-in duration-200">
+    <div className="max-w-lg lg:max-w-6xl mx-auto px-4 lg:px-6 py-6 pb-24 animate-in fade-in duration-200">
       {/* Club Hero Card */}
       <div className="flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-900/95 to-blue-950/40 border border-slate-800 rounded-3xl p-4 mb-6 shadow-xl relative overflow-hidden">
         <div className="w-14 h-16 flex-shrink-0 flex items-center justify-center filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
@@ -213,7 +213,9 @@ export function SetupView({
           : 'Viewing tournament setup. Unlock Scorekeeper mode with PIN to make changes.'}
       </p>
 
-      {/* Player Pool Card */}
+      <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
+        <div className="lg:col-span-6">
+          {/* Player Pool Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <label className="text-slate-300 text-sm font-semibold">
@@ -550,7 +552,9 @@ export function SetupView({
         </div>
       </div>
 
-      {/* Number of Teams */}
+        </div>
+        <div className="lg:col-span-6">
+          {/* Number of Teams */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
         <label className="text-slate-300 text-sm font-semibold mb-2 block">Number of Teams</label>
         <select
@@ -1356,6 +1360,9 @@ export function SetupView({
           Initialize Draft
         </button>
       )}
+
+        </div>
+      </div>
 
       {/* Dedicated Directory Management Modal */}
       <DirectoryModal
