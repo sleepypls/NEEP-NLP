@@ -2652,54 +2652,65 @@ export default function App() {
   }
 
   function requestClearTournament() {
+    const isPoolStyle = tournamentStyle === 'tournament';
     setModal({
       title: 'New Tournament or Reset?',
-      message: 'Choose whether to start a new tournament keeping your current player pool, or clear the active pool. All stats remain permanently saved in the leaderboard.',
+      message: 'Choose whether to start a new tournament keeping your current players/entries, or clear everything and reset. All stats remain permanently saved in the leaderboard.',
       secondaryConfirm: {
         label: 'Start New (Keep Same Players)',
         onAction: () => {
           setPriorStats(globalStats);
           setPriorPartnershipStats(partnershipStats);
-          setTeams([]);
-          setPlayersById({});
-          setRemainingPool([]);
-          setPickSequence([]);
-          setPickPointer(0);
-          setSittingOut([]);
-          setBracket(null);
-          setActivePath(null);
-          setView('setup');
-          try {
-            localStorage.removeItem(getTournStorageKey(roomId));
-          } catch (e) {}
-          broadcastTournamentChange({
-            teams: [],
-            playersById: {},
-            remainingPool: [],
-            pickSequence: [],
-            pickPointer: 0,
-            sittingOut: [],
-            bracket: null,
-            activePath: null,
-            view: 'setup',
-          });
+          if (isPoolStyle) {
+            setPoolTournament(null);
+            setView('poolSetup');
+            broadcastTournamentChange({
+              poolTournament: null,
+              view: 'poolSetup',
+            });
+          } else {
+            setTeams([]);
+            setPlayersById({});
+            setRemainingPool([]);
+            setPickSequence([]);
+            setPickPointer(0);
+            setSittingOut([]);
+            setBracket(null);
+            setActivePath(null);
+            setView('setup');
+            broadcastTournamentChange({
+              teams: [],
+              playersById: {},
+              remainingPool: [],
+              pickSequence: [],
+              pickPointer: 0,
+              sittingOut: [],
+              bracket: null,
+              activePath: null,
+              view: 'setup',
+            });
+          }
           setModal(null);
         },
       },
       confirmLabel: 'Clear All',
       onConfirm: () => {
         const defCfg = getEffectiveDefaultConfig(roomId);
+        const nextView = isPoolStyle ? 'poolSetup' : 'setup';
         setPriorStats(globalStats);
         setPriorPartnershipStats(partnershipStats);
         setPlayerPool([]);
         setNextPlayerId(1);
         setNumTeams(defCfg.numTeams);
+        setNumCourts(defCfg.numCourts || 2);
         setGoalScore(defCfg.goalScore);
         setDreambreakerScore(defCfg.dreambreakerScore);
         setDreambreakerFormat(defCfg.dreambreakerFormat);
         setAllowUneven(defCfg.allowUneven);
         setCaptainMode(defCfg.captainMode);
         setSelectedCaptainIds([]);
+        setCustomTeamNames([]);
+        setMatchupCourtsConfig({});
         setMatchupConfig(defCfg.matchupConfig);
         setTeams([]);
         setPlayersById({});
@@ -2709,7 +2720,9 @@ export default function App() {
         setSittingOut([]);
         setBracket(null);
         setActivePath(null);
-        setView('setup');
+        setPoolEntries([]);
+        setPoolTournament(null);
+        setView(nextView);
         try {
           localStorage.removeItem(getTournStorageKey(roomId));
         } catch (e) {}
@@ -2717,12 +2730,15 @@ export default function App() {
           playerPool: [],
           nextPlayerId: 1,
           numTeams: defCfg.numTeams,
+          numCourts: defCfg.numCourts || 2,
           goalScore: defCfg.goalScore,
           dreambreakerScore: defCfg.dreambreakerScore,
           dreambreakerFormat: defCfg.dreambreakerFormat,
           allowUneven: defCfg.allowUneven,
           captainMode: defCfg.captainMode,
           selectedCaptainIds: [],
+          customTeamNames: [],
+          matchupCourtsConfig: {},
           matchupConfig: defCfg.matchupConfig,
           teams: [],
           playersById: {},
@@ -2732,7 +2748,9 @@ export default function App() {
           sittingOut: [],
           bracket: null,
           activePath: null,
-          view: 'setup',
+          poolEntries: [],
+          poolTournament: null,
+          view: nextView,
         });
         setModal(null);
       },

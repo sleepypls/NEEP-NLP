@@ -809,7 +809,8 @@ export function SetupView({
             ) : (
               <div className="flex flex-wrap gap-2">
                 {playerPool.map((p) => {
-                  const isCaptain = selectedCaptainIds.includes(p.id);
+                  const captainIdx = selectedCaptainIds.indexOf(p.id);
+                  const isCaptain = captainIdx !== -1;
                   return (
                     <button
                       key={p.id}
@@ -824,7 +825,11 @@ export function SetupView({
                     >
                       <Crown size={12} className={isCaptain ? 'text-slate-950 fill-current' : 'text-slate-500'} />
                       <span>{p.name}</span>
-                      {isCaptain && <Check size={13} />}
+                      {isCaptain && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-slate-950 text-amber-300 text-[10px] font-mono font-bold">
+                          Team {captainIdx + 1}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -1003,21 +1008,34 @@ export function SetupView({
             Leave blank to default each team name to its Captain&apos;s name.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {Array.from({ length: numTeams }, (_, i) => (
-              <input
-                key={i}
-                type="text"
-                disabled={!isAdmin}
-                value={customTeamNames[i] || ''}
-                onChange={(e) => {
-                  const next = [...(customTeamNames || [])];
-                  next[i] = e.target.value;
-                  setCustomTeamNames(next);
-                }}
-                placeholder={`Team ${i + 1} (Defaults to Captain)`}
-                className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
-              />
-            ))}
+            {Array.from({ length: numTeams }, (_, i) => {
+              const assignedCapId = captainMode === 'manual' ? selectedCaptainIds[i] : null;
+              const assignedCap = assignedCapId ? playerPool.find((p) => p.id === assignedCapId) : null;
+              return (
+                <div key={i} className="space-y-1">
+                  <div className="flex items-center justify-between gap-1 px-0.5">
+                    <span className="text-[10px] font-mono font-bold text-slate-400">Team {i + 1}</span>
+                    {assignedCap && (
+                      <span className="text-[10px] font-semibold text-amber-300 truncate">
+                        Capt: {assignedCap.name}
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    disabled={!isAdmin}
+                    value={customTeamNames[i] || ''}
+                    onChange={(e) => {
+                      const next = [...(customTeamNames || [])];
+                      next[i] = e.target.value;
+                      setCustomTeamNames(next);
+                    }}
+                    placeholder={assignedCap ? `Team ${assignedCap.name}` : `Team ${i + 1} (Defaults to Captain)`}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
