@@ -20,6 +20,7 @@ import { PoolPlayView } from './components/PoolPlayView';
 import { ScorekeeperDashboardView } from './components/ScorekeeperDashboardView';
 import { PlayerLoginModal } from './components/PlayerLoginModal';
 import { PlayerPortalBanner } from './components/PlayerPortalBanner';
+import { SpectatorPortalBanner } from './components/SpectatorPortalBanner';
 import {
   generatePoolsAndSchedule,
   generateKnockoutBracket,
@@ -278,6 +279,7 @@ export default function App() {
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
   const [playerViewTab, setPlayerViewTab] = useState('current');
+  const [spectatorViewTab, setSpectatorViewTab] = useState('current');
 
   const [view, setView] = useState(() => {
     try {
@@ -2936,6 +2938,9 @@ export default function App() {
 
   const isPlayerPortalActive =
     !isAdmin && Boolean(loggedInPlayerName) && Boolean(poolTournament || bracket);
+  const isSpectatorPortalActive =
+    !isAdmin && !loggedInPlayerName && Boolean(poolTournament || bracket);
+  const isViewerPortalActive = isPlayerPortalActive || isSpectatorPortalActive;
   const playerHasPools = Boolean(
     tournamentStyle === 'tournament' &&
       poolTournament?.pools &&
@@ -2944,6 +2949,9 @@ export default function App() {
   );
   const effectivePlayerTab =
     playerViewTab === 'pools' && !playerHasPools ? 'knockout' : playerViewTab;
+  const effectiveSpectatorTab =
+    spectatorViewTab === 'pools' && !playerHasPools ? 'knockout' : spectatorViewTab;
+  const activeViewerTab = isPlayerPortalActive ? effectivePlayerTab : effectiveSpectatorTab;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -2977,6 +2985,7 @@ export default function App() {
           setIsRosterModalOpen(true);
         }}
         onExitToLanding={handleExitToLanding}
+        hideNavTabs={isViewerPortalActive}
       />
 
       {isPlayerPortalActive && (
@@ -2998,6 +3007,18 @@ export default function App() {
           onRejectMlpPendingScore={(item) => updateMlpGamePendingScore(item, null)}
           activePlayerTab={effectivePlayerTab}
           onChangePlayerTab={setPlayerViewTab}
+        />
+      )}
+
+      {isSpectatorPortalActive && (
+        <SpectatorPortalBanner
+          tournamentStyle={tournamentStyle}
+          poolTournament={poolTournament}
+          bracket={bracket}
+          teams={teams}
+          playersById={playersById}
+          activeTab={effectiveSpectatorTab}
+          onChangeTab={setSpectatorViewTab}
         />
       )}
 
@@ -3100,7 +3121,7 @@ export default function App() {
           />
         )}
 
-        {view === 'bracket' && bracket && (!isPlayerPortalActive || effectivePlayerTab === 'knockout') && (
+        {view === 'bracket' && bracket && (!isViewerPortalActive || activeViewerTab === 'knockout') && (
           <BracketView
             bracket={bracket}
             teams={teams}
@@ -3303,9 +3324,9 @@ export default function App() {
         )}
 
         {view === 'poolPlay' &&
-          (!isPlayerPortalActive ||
-            effectivePlayerTab === 'pools' ||
-            effectivePlayerTab === 'knockout') && (
+          (!isViewerPortalActive ||
+            activeViewerTab === 'pools' ||
+            activeViewerTab === 'knockout') && (
           <PoolPlayView
             tournament={poolTournament}
             numCourts={poolTournament?.numCourts || poolNumCourts}
@@ -3322,8 +3343,8 @@ export default function App() {
             onBatchAssignCourtsLive={handleBatchAssignPoolCourtsAndLive}
             onOpenSetup={() => setView('poolSetup')}
             isAdmin={isAdmin}
-            forcedTab={isPlayerPortalActive ? effectivePlayerTab : null}
-            hideStageTabs={isPlayerPortalActive}
+            forcedTab={isViewerPortalActive ? activeViewerTab : null}
+            hideStageTabs={isViewerPortalActive}
           />
         )}
 

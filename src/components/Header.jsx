@@ -24,6 +24,7 @@ export function Header({
   onOpenPlayerLogin,
   onOpenRosterModal,
   onExitToLanding,
+  hideNavTabs = false,
 }) {
   const cloudActive = isCloudEnabled();
   const isPlayerOnly = !isAdmin && Boolean(loggedInPlayerName);
@@ -68,7 +69,7 @@ export function Header({
         </div>
 
         {/* Desktop Navigation Tabs */}
-        {!isPlayerOnly && hasTournament && (
+        {!hideNavTabs && !isPlayerOnly && hasTournament && (
           <nav className="hidden sm:flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-xl p-1">
             {tournamentStyle === 'tournament' ? (
               <>
@@ -352,7 +353,7 @@ export function Header({
       )}
 
       {/* Mobile Navigation Tabs */}
-      {!isPlayerOnly && hasTournament && (
+      {!hideNavTabs && !isPlayerOnly && hasTournament && (
         <div className="sm:hidden flex border-t border-slate-800/80 bg-slate-950/90">
           {tournamentStyle === 'tournament' ? (
             <>
