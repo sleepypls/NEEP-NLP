@@ -319,11 +319,13 @@ export default function App() {
   const [knockoutMatchFormat, setKnockoutMatchFormat] = useState(() => initialSaved?.knockoutMatchFormat || { bestOf: 3, pointsTo: 11 });
   const [poolIncludeBronze, setPoolIncludeBronze] = useState(() => (initialSaved?.poolIncludeBronze !== undefined ? initialSaved.poolIncludeBronze : true));
   const [poolNumCourts, setPoolNumCourts] = useState(() => initialSaved?.poolNumCourts || 2);
+  const [poolCourtNames, setPoolCourtNames] = useState(() => initialSaved?.poolCourtNames || {});
   const [poolTournament, setPoolTournament] = useState(() => initialSaved?.poolTournament || null);
   const [playerPool, setPlayerPool] = useState(() => initialSaved?.playerPool || []);
   const [nextPlayerId, setNextPlayerId] = useState(() => initialSaved?.nextPlayerId || (initialSaved?.playerPool?.length ? Math.max(...initialSaved.playerPool.map((p) => p.id)) + 1 : 1));
   const [numTeams, setNumTeams] = useState(() => initialSaved?.numTeams || initialDefaultCfg.numTeams || 4);
   const [numCourts, setNumCourts] = useState(() => initialSaved?.numCourts || initialDefaultCfg.numCourts || 2);
+  const [customCourtNames, setCustomCourtNames] = useState(() => initialSaved?.customCourtNames || {});
   const [goalScore, setGoalScore] = useState(() => initialSaved?.goalScore || initialDefaultCfg.goalScore || 11);
   const [dreambreakerScore, setDreambreakerScore] = useState(() => initialSaved?.dreambreakerScore || initialDefaultCfg.dreambreakerScore || 21);
   const [dreambreakerFormat, setDreambreakerFormat] = useState(() => initialSaved?.dreambreakerFormat || initialDefaultCfg.dreambreakerFormat || 'singles');
@@ -527,6 +529,8 @@ export default function App() {
           if (cloudTourn.nextPlayerId) setNextPlayerId(cloudTourn.nextPlayerId);
           if (cloudTourn.numTeams) setNumTeams(cloudTourn.numTeams);
           if (cloudTourn.numCourts) setNumCourts(cloudTourn.numCourts);
+          if (cloudTourn.customCourtNames !== undefined) setCustomCourtNames(cloudTourn.customCourtNames);
+          if (cloudTourn.poolCourtNames !== undefined) setPoolCourtNames(cloudTourn.poolCourtNames);
           if (cloudTourn.goalScore) setGoalScore(cloudTourn.goalScore);
           if (cloudTourn.dreambreakerScore) setDreambreakerScore(cloudTourn.dreambreakerScore);
           if (cloudTourn.dreambreakerFormat) setDreambreakerFormat(cloudTourn.dreambreakerFormat);
@@ -678,9 +682,10 @@ export default function App() {
           knockoutMatchFormat,
           poolIncludeBronze,
           poolNumCourts,
+          poolCourtNames,
           poolTournament,
           isTournamentLocked,
-          view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
+          view, playerPool, nextPlayerId, numTeams, numCourts, customCourtNames, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
           captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig,
           teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         })
@@ -688,7 +693,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
-  }, [roomId, adminPin, isTournamentLocked, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolTiebreakerRules, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolNumCourts, poolTournament, view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+  }, [roomId, adminPin, isTournamentLocked, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolTiebreakerRules, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolNumCourts, poolCourtNames, poolTournament, view, playerPool, nextPlayerId, numTeams, numCourts, customCourtNames, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
 
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
@@ -728,8 +733,9 @@ export default function App() {
         knockoutMatchFormat,
         poolIncludeBronze,
         poolNumCourts,
+        poolCourtNames,
         poolTournament,
-        view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
+        view, playerPool, nextPlayerId, numTeams, numCourts, customCourtNames, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
         captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig,
         teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         ...updates,
@@ -2011,21 +2017,24 @@ export default function App() {
 
   function handleStartPoolTournament() {
     if (poolEntries.length < 2) return;
-    const built = generatePoolsAndSchedule({
-      entries: poolEntries,
-      discipline: poolDiscipline,
-      structure: poolStructure,
-      numPools: poolNumPools,
-      numCourts: poolNumCourts,
-      poolFormat: poolMatchFormat,
-      knockoutFormat: knockoutMatchFormat,
-      advancePerPool: poolAdvancePerPool,
-      knockoutFillMode: poolKnockoutFillMode,
-      targetBracketSize: poolTargetBracketSize,
-      includeBronze: poolIncludeBronze,
-      seedingMode: poolSeedingMode,
-      tiebreakerRules: poolTiebreakerRules,
-    });
+    const built = {
+      ...generatePoolsAndSchedule({
+        entries: poolEntries,
+        discipline: poolDiscipline,
+        structure: poolStructure,
+        numPools: poolNumPools,
+        numCourts: poolNumCourts,
+        poolFormat: poolMatchFormat,
+        knockoutFormat: knockoutMatchFormat,
+        advancePerPool: poolAdvancePerPool,
+        knockoutFillMode: poolKnockoutFillMode,
+        targetBracketSize: poolTargetBracketSize,
+        includeBronze: poolIncludeBronze,
+        seedingMode: poolSeedingMode,
+        tiebreakerRules: poolTiebreakerRules,
+      }),
+      courtNames: poolCourtNames,
+    };
     setPoolTournament(built);
     setView('poolPlay');
     broadcastTournamentChange({
@@ -2095,6 +2104,7 @@ export default function App() {
       seedingMode: poolSeedingMode,
       tiebreakerRules: poolTiebreakerRules,
       numCourts: poolNumCourts,
+      courtNames: poolCourtNames,
       pools: nextPools,
       knockout: nextKnockout,
     };
@@ -2760,6 +2770,8 @@ export default function App() {
         setCaptainMode(defCfg.captainMode);
         setSelectedCaptainIds([]);
         setCustomTeamNames([]);
+        setCustomCourtNames({});
+        setPoolCourtNames({});
         setMatchupCourtsConfig({});
         setMatchupConfig(defCfg.matchupConfig);
         setTeams([]);
@@ -2788,6 +2800,8 @@ export default function App() {
           captainMode: defCfg.captainMode,
           selectedCaptainIds: [],
           customTeamNames: [],
+          customCourtNames: {},
+          poolCourtNames: {},
           matchupCourtsConfig: {},
           matchupConfig: defCfg.matchupConfig,
           teams: [],
@@ -3011,6 +3025,11 @@ export default function App() {
           onRejectMlpPendingScore={(item) => updateMlpGamePendingScore(item, null)}
           activePlayerTab={effectivePlayerTab}
           onChangePlayerTab={setPlayerViewTab}
+          courtNames={
+            tournamentStyle === 'tournament'
+              ? poolTournament?.courtNames || poolCourtNames
+              : customCourtNames
+          }
         />
       )}
 
@@ -3023,6 +3042,11 @@ export default function App() {
           playersById={playersById}
           activeTab={effectiveSpectatorTab}
           onChangeTab={setSpectatorViewTab}
+          courtNames={
+            tournamentStyle === 'tournament'
+              ? poolTournament?.courtNames || poolCourtNames
+              : customCourtNames
+          }
         />
       )}
 
@@ -3043,6 +3067,11 @@ export default function App() {
             setNumTeams={handleUpdateNumTeams}
             numCourts={numCourts}
             setNumCourts={handleUpdateNumCourts}
+            courtNames={customCourtNames}
+            setCourtNames={(val) => {
+              setCustomCourtNames(val);
+              broadcastTournamentChange({ customCourtNames: val });
+            }}
             goalScore={goalScore}
             setGoalScore={handleUpdateGoalScore}
             dreambreakerScore={dreambreakerScore}
@@ -3132,6 +3161,7 @@ export default function App() {
             playersById={playersById}
             roomId={roomId}
             numCourts={numCourts}
+            courtNames={customCourtNames}
             isAdmin={isAdmin}
             onOpenMatch={openMatch}
             onBatchAssignCourtsLive={handleBatchAssignMlpCourtsAndLive}
@@ -3156,6 +3186,7 @@ export default function App() {
             onSaveGame={handleSaveGame}
             onToggleInProgress={handleToggleGameInProgress}
             numCourts={numCourts}
+            courtNames={customCourtNames}
             onSetGameCourt={handleSetGameCourt}
             onBatchAssignCourtsLive={handleBatchAssignMlpCourtsAndLive}
             onOpenEditMatchup={(game) => setEditingMatchupGame(game)}
@@ -3314,6 +3345,17 @@ export default function App() {
               setPoolNumCourts(v);
               broadcastTournamentChange({ poolNumCourts: v });
             }}
+            courtNames={poolCourtNames}
+            setCourtNames={(val) => {
+              setPoolCourtNames(val);
+              if (poolTournament) {
+                const updated = { ...poolTournament, courtNames: val };
+                setPoolTournament(updated);
+                broadcastTournamentChange({ poolCourtNames: val, poolTournament: updated });
+              } else {
+                broadcastTournamentChange({ poolCourtNames: val });
+              }
+            }}
             roomId={roomId}
             setRoomId={(newId) => handleSwitchRoom(newId, adminPin)}
             adminPin={adminPin}
@@ -3334,6 +3376,7 @@ export default function App() {
           <PoolPlayView
             tournament={poolTournament}
             numCourts={poolTournament?.numCourts || poolNumCourts}
+            courtNames={poolTournament?.courtNames || poolCourtNames}
             roomId={roomId}
             onSavePoolMatch={handleSavePoolMatch}
             onTogglePoolMatchLive={handleTogglePoolMatchLive}
@@ -3360,6 +3403,11 @@ export default function App() {
               tournamentStyle === 'tournament'
                 ? poolTournament?.numCourts || poolNumCourts
                 : numCourts
+            }
+            courtNames={
+              tournamentStyle === 'tournament'
+                ? poolTournament?.courtNames || poolCourtNames
+                : customCourtNames
             }
             poolTournament={poolTournament}
             onSavePoolMatch={handleSavePoolMatch}

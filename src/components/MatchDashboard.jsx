@@ -21,6 +21,7 @@ import {
 import { generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
 import { MlpCourtAssignModal } from './CourtAssignModal';
 import { LiveTimer } from './LiveTimer';
+import { getCourtDisplayName } from '../utils/courtNames';
 
 function TeamDot({ color, className = '' }) {
   return (
@@ -42,6 +43,7 @@ function GameRow({
   onSave,
   onToggleInProgress,
   numCourts = 2,
+  courtNames = {},
   onSetGameCourt,
   onOpenEditMatchup,
   onShuffleGame,
@@ -112,7 +114,7 @@ function GameRow({
 
             {game.court && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30">
-                Court {game.court}
+                {getCourtDisplayName(game.court, courtNames)}
               </span>
             )}
 
@@ -188,7 +190,7 @@ function GameRow({
                     <option value="">Court —</option>
                     {Array.from({ length: Math.max(1, Number(numCourts) || 2) }, (_, i) => i + 1).map((c) => (
                       <option key={c} value={c}>
-                        Court {c}
+                        {getCourtDisplayName(c, courtNames)}
                       </option>
                     ))}
                   </select>
@@ -336,6 +338,7 @@ export function MatchDashboard({
   onSaveGame,
   onToggleInProgress,
   numCourts = 2,
+  courtNames = {},
   onSetGameCourt,
   onBatchAssignCourtsLive,
   onOpenEditMatchup,
@@ -526,6 +529,7 @@ export function MatchDashboard({
           onSave={(a, b) => onSaveGame(g.id, a, b)}
           onToggleInProgress={onToggleInProgress}
           numCourts={numCourts}
+          courtNames={courtNames}
           onSetGameCourt={onSetGameCourt}
           onOpenEditMatchup={onOpenEditMatchup}
           onShuffleGame={onShuffleGame}
@@ -541,6 +545,7 @@ export function MatchDashboard({
         bracket={bracket}
         teams={teams}
         numCourts={numCourts}
+        courtNames={courtNames}
         playersById={playersById}
         onApply={(assignments) => onBatchAssignCourtsLive && onBatchAssignCourtsLive(assignments)}
       />

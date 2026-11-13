@@ -6,8 +6,9 @@ import {
   getKnockoutRoundLabel,
   getEffectiveMatchFormat,
 } from '../utils/poolTournament';
+import { getCourtDisplayName } from '../utils/courtNames';
 
-function SpectatorMatchCard({ item }) {
+function SpectatorMatchCard({ item, courtNames }) {
   const { isLive, court, stage, subtitle, nameA, nameB, liveStartedAt, formatText } = item;
 
   return (
@@ -34,7 +35,7 @@ function SpectatorMatchCard({ item }) {
           )}
           {court && (
             <span className="text-[11px] font-mono font-black bg-[#d7f24c] text-slate-950 px-2.5 py-0.5 rounded-full">
-              Court {court}
+              {getCourtDisplayName(court, courtNames)}
             </span>
           )}
           <span className="text-[11px] font-bold text-slate-300">{stage}</span>
@@ -68,6 +69,7 @@ export function SpectatorPortalBanner({
   playersById = {},
   activeTab = 'current',
   onChangeTab,
+  courtNames = {},
 }) {
   const isTournament = tournamentStyle === 'tournament';
   const hasPools = Boolean(
@@ -292,7 +294,7 @@ export function SpectatorPortalBanner({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {currentMatches.map((item) => (
-              <SpectatorMatchCard key={item.key} item={item} />
+              <SpectatorMatchCard key={item.key} item={item} courtNames={courtNames} />
             ))}
           </div>
         )
@@ -334,7 +336,7 @@ export function SpectatorPortalBanner({
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {group.items.map((item) => (
-                          <SpectatorMatchCard key={item.key} item={item} />
+                          <SpectatorMatchCard key={item.key} item={item} courtNames={courtNames} />
                         ))}
                       </div>
                     </div>
@@ -375,7 +377,7 @@ export function SpectatorPortalBanner({
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             {poolGroup.items.map((item) => (
-                              <SpectatorMatchCard key={item.key} item={item} />
+                              <SpectatorMatchCard key={item.key} item={item} courtNames={courtNames} />
                             ))}
                           </div>
                         </div>

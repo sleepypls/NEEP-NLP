@@ -21,9 +21,11 @@ import {
   resizeGamesForBestOf,
 } from '../utils/poolTournament';
 import { getBusyMlpPlayerIds, getMlpGamePlayerIds, roundName } from '../utils/tournament';
+import { getCourtDisplayName } from '../utils/courtNames';
 
 function PoolLiveCourtCard({
   courtNum,
+  courtNames = {},
   liveItem,
   tournament,
   onSavePoolMatch,
@@ -104,7 +106,7 @@ function PoolLiveCourtCard({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs font-mono font-black bg-[#d7f24c] text-slate-950 px-2.5 py-0.5 rounded-full">
-            Court {courtNum}
+            {getCourtDisplayName(courtNum, courtNames)}
           </span>
           <span className="text-[10px] font-bold bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
             <Flame size={10} /> LIVE
@@ -208,6 +210,7 @@ function PoolLiveCourtCard({
 
 function MlpLiveCourtCard({
   courtNum,
+  courtNames = {},
   liveItem,
   playersById,
   onSaveGameAt,
@@ -256,7 +259,7 @@ function MlpLiveCourtCard({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-xs font-mono font-black bg-[#d7f24c] text-slate-950 px-2.5 py-0.5 rounded-full">
-            Court {courtNum}
+            {getCourtDisplayName(courtNum, courtNames)}
           </span>
           <span className="text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
             <Play size={10} className="fill-current" /> LIVE
@@ -371,6 +374,7 @@ export function ScorekeeperDashboardView({
   isAdmin,
   tournamentStyle = 'mlp',
   numCourts = 2,
+  courtNames = {},
   // Pools + Knockout props
   poolTournament = null,
   onSavePoolMatch,
@@ -740,6 +744,7 @@ export function ScorekeeperDashboardView({
               <PoolLiveCourtCard
                 key={courtNum}
                 courtNum={courtNum}
+                courtNames={courtNames}
                 liveItem={liveItem}
                 tournament={poolTournament}
                 onSavePoolMatch={onSavePoolMatch}
@@ -751,6 +756,7 @@ export function ScorekeeperDashboardView({
               <MlpLiveCourtCard
                 key={courtNum}
                 courtNum={courtNum}
+                courtNames={courtNames}
                 liveItem={liveItem}
                 playersById={playersById}
                 onSaveGameAt={onSaveMlpGameAt}
@@ -767,7 +773,7 @@ export function ScorekeeperDashboardView({
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-mono font-bold bg-slate-800 text-[#d7f24c] border border-slate-700 px-2.5 py-0.5 rounded-full">
-                  Court {courtNum}
+                  {getCourtDisplayName(courtNum, courtNames)}
                 </span>
                 <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                   Available
@@ -796,7 +802,7 @@ export function ScorekeeperDashboardView({
                 <>
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
-                      Select Matchup for Court {courtNum}
+                      Select Matchup for {getCourtDisplayName(courtNum, courtNames)}
                     </label>
                     <select
                       value={selectedKey}
@@ -830,7 +836,7 @@ export function ScorekeeperDashboardView({
                     onClick={() => handleStartSingleCourt(courtNum)}
                     className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-[#d7f24c] hover:text-slate-950 text-[#d7f24c] border border-[#d7f24c]/30 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95"
                   >
-                    <Play size={13} className="fill-current" /> Start Live on Court {courtNum}
+                    <Play size={13} className="fill-current" /> Start Live on {getCourtDisplayName(courtNum, courtNames)}
                   </button>
                 </>
                 );
@@ -1078,7 +1084,7 @@ export function ScorekeeperDashboardView({
                             )}
                           </td>
                           <td className="py-2 px-3 text-right font-mono text-[#d7f24c]">
-                            {item.court ? `Court ${item.court}` : '—'}
+                            {item.court ? getCourtDisplayName(item.court, courtNames) : '—'}
                           </td>
                         </tr>
                       );

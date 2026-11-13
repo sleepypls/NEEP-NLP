@@ -3,6 +3,7 @@ import { Trophy, Swords, Zap, Download, Play } from 'lucide-react';
 import { roundName, generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
 import { MlpCourtAssignModal } from './CourtAssignModal';
 import { LiveTimer } from './LiveTimer';
+import { getCourtDisplayName } from '../utils/courtNames';
 
 function TeamDot({ color, className = '' }) {
   return <span className={`inline-block w-3 h-3 rounded-full flex-shrink-0 ${className}`} style={{ backgroundColor: color?.accent || '#64748b' }} />;
@@ -12,6 +13,7 @@ function MatchCard({
   match,
   teams,
   numCourts = 2,
+  courtNames = {},
   isAdmin = false,
   onToggleCourt,
   onOpen,
@@ -143,16 +145,16 @@ function MatchCard({
                         ? 'bg-[#d7f24c] text-slate-950 border-[#d7f24c]'
                         : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'
                     }`}
-                    title={`Toggle Court ${c} for this matchup`}
+                    title={`Toggle ${getCourtDisplayName(c, courtNames)} for this matchup`}
                   >
-                    C{c}
+                    {courtNames?.[String(c)]?.trim() ? getCourtDisplayName(c, courtNames) : `C${c}`}
                   </button>
                 );
               })}
             </div>
           ) : assignedCourts.length > 0 ? (
             <span className="text-[10px] font-mono font-bold text-[#d7f24c]">
-              {assignedCourts.map((c) => `Ct ${c}`).join(', ')}
+              {assignedCourts.map((c) => getCourtDisplayName(c, courtNames)).join(', ')}
             </span>
           ) : (
             <span className="text-[10px] text-slate-500 italic">Unassigned</span>
@@ -169,6 +171,7 @@ export function BracketView({
   playersById = {},
   roomId = '',
   numCourts = 2,
+  courtNames = {},
   isAdmin = false,
   onOpenMatch,
   onOpenRosterModal,
@@ -250,6 +253,7 @@ export function BracketView({
                       match={match}
                       teams={teams}
                       numCourts={numCourts}
+                      courtNames={courtNames}
                       isAdmin={isAdmin}
                       onToggleCourt={
                         onSetMatchAssignedCourts
@@ -299,6 +303,7 @@ export function BracketView({
         bracket={bracket}
         teams={teams}
         numCourts={numCourts}
+        courtNames={courtNames}
         playersById={playersById}
         showAllBracketGames={true}
         onApply={(assignments) => onBatchAssignCourtsLive && onBatchAssignCourtsLive(assignments)}

@@ -32,6 +32,7 @@ import {
   DEFAULT_TIEBREAKER_RULES,
 } from '../utils/poolTournament';
 import { triggerCsvDownload } from '../utils/tournament';
+import { getCourtDisplayName } from '../utils/courtNames';
 import { EditPoolMatchModal } from './EditPoolMatchModal';
 import { PoolCourtAssignModal } from './CourtAssignModal';
 import { LiveTimer } from './LiveTimer';
@@ -44,6 +45,7 @@ function MatchScoreEditor({
   pointsTo,
   isCustomFormat,
   numCourts = 2,
+  courtNames = {},
   onSetCourt,
   onSave,
   onToggleLive,
@@ -104,7 +106,7 @@ function MatchScoreEditor({
           )}
           {match.court && (
             <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-md">
-              Court {match.court}
+              {getCourtDisplayName(match.court, courtNames)}
             </span>
           )}
           {isCustomFormat && (
@@ -140,7 +142,7 @@ function MatchScoreEditor({
                   (_, i) => i + 1
                 ).map((c) => (
                   <option key={c} value={c}>
-                    Ct {c}
+                    {getCourtDisplayName(c, courtNames)}
                   </option>
                 ))}
               </select>
@@ -314,6 +316,7 @@ function MatchScoreEditor({
 export function PoolPlayView({
   tournament,
   numCourts = 2,
+  courtNames = {},
   roomId,
   onSavePoolMatch,
   onTogglePoolMatchLive,
@@ -537,7 +540,7 @@ export function PoolPlayView({
                     <div className="flex items-center gap-1.5 mb-0.5">
                       {item.court && (
                         <span className="text-[10px] font-mono font-black bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded">
-                          Ct {item.court}
+                          {getCourtDisplayName(item.court, courtNames)}
                         </span>
                       )}
                       <span className="text-[10px] text-slate-400 font-semibold truncate">
@@ -720,9 +723,7 @@ export function PoolPlayView({
                       </h3>
                       {Array.isArray(pool.assignedCourts) && pool.assignedCourts.length > 0 && (
                         <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
-                          {pool.assignedCourts.length === 1
-                            ? `Court ${pool.assignedCourts[0]}`
-                            : `Courts ${pool.assignedCourts.join(', ')}`}
+                          {pool.assignedCourts.map((c) => getCourtDisplayName(c, courtNames)).join(', ')}
                         </span>
                       )}
                     </div>
@@ -916,6 +917,7 @@ export function PoolPlayView({
                                   pointsTo={fmt.pointsTo}
                                   isCustomFormat={fmt.isCustom}
                                   numCourts={numCourts}
+                                  courtNames={courtNames}
                                   onSetCourt={
                                     onSetPoolMatchCourt
                                       ? (ct) => onSetPoolMatchCourt(pool.id, match.id, ct)
@@ -1091,6 +1093,7 @@ export function PoolPlayView({
                                 pointsTo={matchFmt.pointsTo}
                                 isCustomFormat={matchFmt.isCustom}
                                 numCourts={numCourts}
+                                courtNames={courtNames}
                                 onSetCourt={
                                   onSetKnockoutMatchCourt
                                     ? (ct) => onSetKnockoutMatchCourt(rIdx, m.matchIdx, false, ct)
@@ -1176,6 +1179,7 @@ export function PoolPlayView({
                       pointsTo={bronzeFmt.pointsTo}
                       isCustomFormat={bronzeFmt.isCustom}
                       numCourts={numCourts}
+                      courtNames={courtNames}
                       onSetCourt={
                         onSetKnockoutMatchCourt
                           ? (ct) => onSetKnockoutMatchCourt(0, 0, true, ct)
@@ -1356,6 +1360,7 @@ export function PoolPlayView({
         onClose={() => setIsCourtAssignOpen(false)}
         tournament={tournament}
         numCourts={numCourts}
+        courtNames={courtNames}
         onApply={(assignments) => onBatchAssignCourtsLive && onBatchAssignCourtsLive(assignments)}
       />
 

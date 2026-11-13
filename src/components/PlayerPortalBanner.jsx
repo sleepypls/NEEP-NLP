@@ -21,6 +21,7 @@ import {
   evaluatePoolOrKnockoutMatch,
   resizeGamesForBestOf,
 } from '../utils/poolTournament';
+import { getCourtDisplayName } from '../utils/courtNames';
 
 function playNotificationChime() {
   try {
@@ -55,6 +56,7 @@ function PoolMatchSelfScoreRow({
   onSubmitPending,
   onApprovePending,
   onRejectPending,
+  courtNames,
 }) {
   const { match, mySide, stage, nameA, nameB, format } = item;
   const bestOf = format?.bestOf || 1;
@@ -122,7 +124,7 @@ function PoolMatchSelfScoreRow({
           )}
           {match.court && (
             <span className="text-[11px] font-mono font-black bg-[#d7f24c] text-slate-950 px-2.5 py-0.5 rounded-full">
-              Court {match.court}
+              {getCourtDisplayName(match.court, courtNames)}
             </span>
           )}
           <span className="text-[11px] font-bold text-slate-300">{stage}</span>
@@ -345,6 +347,7 @@ function MlpGameSelfScoreRow({
   onSubmitPending,
   onApprovePending,
   onRejectPending,
+  courtNames,
 }) {
   const { game, mySide, matchLabel, gameIndex, namesA, namesB } = item;
   const [scoreA, setScoreA] = useState(
@@ -410,7 +413,7 @@ function MlpGameSelfScoreRow({
           )}
           {game.court && (
             <span className="text-[11px] font-mono font-black bg-[#d7f24c] text-slate-950 px-2.5 py-0.5 rounded-full">
-              Court {game.court}
+              {getCourtDisplayName(game.court, courtNames)}
             </span>
           )}
           <span className="text-[11px] font-bold text-slate-300">
@@ -595,7 +598,7 @@ function MlpGameSelfScoreRow({
   );
 }
 
-function CompletedMatchCard({ item, isTournament }) {
+function CompletedMatchCard({ item, isTournament, courtNames }) {
   if (isTournament) {
     const { match, mySide, stage, nameA, nameB } = item;
     const games = Array.isArray(match.games) ? match.games : [];
@@ -618,7 +621,7 @@ function CompletedMatchCard({ item, isTournament }) {
             </span>
             {match.court && (
               <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">
-                Court {match.court}
+                {getCourtDisplayName(match.court, courtNames)}
               </span>
             )}
             <span className="text-[11px] font-bold text-slate-300">{stage}</span>
@@ -705,7 +708,7 @@ function CompletedMatchCard({ item, isTournament }) {
           </span>
           {game.court && (
             <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">
-              Court {game.court}
+              {getCourtDisplayName(game.court, courtNames)}
             </span>
           )}
           <span className="text-[11px] font-bold text-slate-300">
@@ -790,6 +793,7 @@ export function PlayerPortalBanner({
   onRejectMlpPendingScore,
   activePlayerTab = 'current',
   onChangePlayerTab,
+  courtNames = {},
 }) {
   const [alertBanner, setAlertBanner] = useState(null);
   const seenAlertsRef = useRef(new Set());
@@ -972,7 +976,7 @@ export function PlayerPortalBanner({
         if (!seenAlertsRef.current.has(alertId)) {
           seenAlertsRef.current.add(alertId);
           const title = obj.court
-            ? `Court ${obj.court}: Your match is LIVE!`
+            ? `${getCourtDisplayName(obj.court, courtNames)}: Your match is LIVE!`
             : 'Your match is LIVE!';
           const body =
             tournamentStyle === 'tournament'
@@ -1072,6 +1076,7 @@ export function PlayerPortalBanner({
         onSubmitPending={onSubmitPoolPendingScore}
         onApprovePending={onApprovePoolPendingScore}
         onRejectPending={onRejectPoolPendingScore}
+        courtNames={courtNames}
       />
     ) : (
       <MlpGameSelfScoreRow
@@ -1081,6 +1086,7 @@ export function PlayerPortalBanner({
         onSubmitPending={onSubmitMlpPendingScore}
         onApprovePending={onApproveMlpPendingScore}
         onRejectPending={onRejectMlpPendingScore}
+        courtNames={courtNames}
       />
     );
 
@@ -1266,7 +1272,7 @@ export function PlayerPortalBanner({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {completedItems.map((item) => (
-                  <CompletedMatchCard key={item.key} item={item} isTournament={isTournament} />
+                  <CompletedMatchCard key={item.key} item={item} isTournament={isTournament} courtNames={courtNames} />
                 ))}
               </div>
             )}

@@ -3,12 +3,14 @@ import { X, Flame, RefreshCw, AlertTriangle, Check } from 'lucide-react';
 import { buildPoolCourtSuggestions, getEntryDisplayName } from '../utils/poolTournament';
 import { getBusyMlpPlayerIds, getMlpGamePlayerIds, hasMlpPlayerConflict } from '../utils/tournament';
 import { LiveTimer } from './LiveTimer';
+import { getCourtDisplayName } from '../utils/courtNames';
 
 export function PoolCourtAssignModal({
   isOpen,
   onClose,
   tournament,
   numCourts = 2,
+  courtNames = {},
   onApply,
 }) {
   const [selections, setSelections] = useState({});
@@ -46,7 +48,7 @@ export function PoolCourtAssignModal({
     seenMatchKeys.add(item.key);
     if (seenEntrants.has(item.entryAId) || seenEntrants.has(item.entryBId)) {
       conflictWarnings.push(
-        `Court ${item.court}: "${item.shortLabel}" includes a player/team already on another court.`
+        `${getCourtDisplayName(item.court, courtNames)}: "${item.shortLabel}" includes a player/team already on another court.`
       );
     }
     seenEntrants.add(item.entryAId);
@@ -104,7 +106,7 @@ export function PoolCourtAssignModal({
                       className="flex items-center justify-between gap-2 text-xs bg-slate-950/60 border border-amber-500/20 rounded-xl px-2.5 py-1.5"
                     >
                       <span className="font-mono font-bold text-amber-300 shrink-0">
-                        Court {courtNum}
+                        {getCourtDisplayName(courtNum, courtNames)}
                       </span>
                       <span className="text-slate-200 truncate flex-1">
                         {nA} vs {nB}
@@ -168,7 +170,7 @@ export function PoolCourtAssignModal({
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-mono font-bold text-[#d7f24c]">
-                        Court {courtNum}
+                        {getCourtDisplayName(courtNum, courtNames)}
                       </span>
                       {designatedPool && (
                         <span className="text-[10px] font-semibold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
@@ -251,6 +253,7 @@ export function MlpCourtAssignModal({
   bracket = null,
   teams = [],
   numCourts = 2,
+  courtNames = {},
   playersById = {},
   showAllBracketGames = false,
   onApply,
@@ -431,7 +434,7 @@ export function MlpCourtAssignModal({
     const pIds = getMlpGamePlayerIds(item.game);
     if (pIds.some((pid) => seenPlayerIds.has(pid))) {
       conflictWarnings.push(
-        `Court ${court}: "${gameLabel(item)}" includes a player already playing on another court.`
+        `${getCourtDisplayName(court, courtNames)}: "${gameLabel(item)}" includes a player already playing on another court.`
       );
     }
     pIds.forEach((pid) => seenPlayerIds.add(pid));
@@ -474,7 +477,7 @@ export function MlpCourtAssignModal({
                     className="flex items-center justify-between gap-2 text-xs bg-slate-950/60 border border-cyan-500/20 rounded-xl px-2.5 py-1.5"
                   >
                     <span className="font-mono font-bold text-cyan-300 shrink-0">
-                      Court {courtNum}
+                      {getCourtDisplayName(courtNum, courtNames)}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-slate-200 truncate">{label}</div>
@@ -518,7 +521,7 @@ export function MlpCourtAssignModal({
                     className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3 space-y-1.5"
                   >
                     <span className="text-xs font-mono font-bold text-[#d7f24c] block">
-                      Court {courtNum}
+                      {getCourtDisplayName(courtNum, courtNames)}
                     </span>
                     <select
                       value={selections[courtNum] || ''}

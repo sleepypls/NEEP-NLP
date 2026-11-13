@@ -20,6 +20,8 @@ export function SetupView({
   setNumTeams,
   numCourts = 2,
   setNumCourts,
+  courtNames = {},
+  setCourtNames,
   goalScore,
   setGoalScore,
   dreambreakerScore,
@@ -753,6 +755,39 @@ export function SetupView({
                 placeholder="Custom number of courts (e.g. 4)"
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
               />
+              {setCourtNames && (
+                <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                  <span className="text-[11px] font-bold text-slate-300 block">
+                    Rename Courts (Optional)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    {Array.from({ length: Math.max(1, Number(numCourts) || 2) }, (_, idx) => {
+                      const cNum = idx + 1;
+                      return (
+                        <div key={cNum} className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-mono font-bold text-slate-400 w-7 shrink-0">
+                            C{cNum}
+                          </span>
+                          <input
+                            type="text"
+                            disabled={!isAdmin}
+                            value={courtNames?.[String(cNum)] ?? ''}
+                            onChange={(e) =>
+                              setCourtNames({
+                                ...(courtNames || {}),
+                                [String(cNum)]: e.target.value,
+                              })
+                            }
+                            placeholder={`Court ${cNum}`}
+                            maxLength={24}
+                            className="flex-1 min-w-0 bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:ring-1 focus:ring-[#d7f24c] disabled:opacity-60"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
