@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, ArrowRight, ShieldCheck, KeyRound, Lock, History, Cloud, AlertCircle, Loader2, Eye, Trash2 } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, KeyRound, Lock, History, Cloud, AlertCircle, Loader2, Eye, Trash2, Trophy, Users } from 'lucide-react';
 import { APP_VERSION } from '../version';
 import { sanitizeRoomId } from '../utils/room';
 
@@ -14,6 +14,7 @@ export function LandingView({
   onOpenAdminPortal,
   isCloudActive,
 }) {
+  const [selectedStyle, setSelectedStyle] = useState('mlp');
   const [joinRoomId, setJoinRoomId] = useState('');
   const [joinPin, setJoinPin] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
@@ -142,6 +143,15 @@ export function LandingView({
                           {entry.roomId}
                         </div>
                         <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              entry.tournamentStyle === 'tournament'
+                                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                                : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                            }`}
+                          >
+                            {entry.tournamentStyle === 'tournament' ? 'Pools + Knockout' : 'MLP Style'}
+                          </span>
                           {entry.isAdmin ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
                               <ShieldCheck size={11} /> Scorekeeper Admin
@@ -205,11 +215,55 @@ export function LandingView({
                 <h2 className="text-xl sm:text-2xl font-black text-white mb-2">
                   Create Private Room
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-6">
-                  Create a clean, isolated room for your tournament. Room IDs and secret admin PINs are always randomly generated to ensure unique and collision-free sessions.
+                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-4">
+                  Choose your tournament format below, then generate a private room with a unique Room ID &amp; Admin PIN.
                 </p>
 
-                <div className="bg-slate-950/60 border border-slate-850 rounded-2xl p-3.5 mb-6 space-y-2">
+                {/* Format Style Selector: MLP Style vs Tournament Style */}
+                <div className="mb-4">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                    Select Format Style
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStyle('mlp')}
+                      className={`text-left p-3 rounded-2xl border transition ${
+                        selectedStyle === 'mlp'
+                          ? 'bg-[#d7f24c]/15 border-[#d7f24c] shadow-md shadow-[#d7f24c]/10'
+                          : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-black text-xs text-white mb-1">
+                        <Users size={14} className="text-[#d7f24c]" />
+                        <span>MLP Style</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-snug">
+                        Snake draft teams, mirrored doubles matchups &amp; Dreambreakers.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStyle('tournament')}
+                      className={`text-left p-3 rounded-2xl border transition ${
+                        selectedStyle === 'tournament'
+                          ? 'bg-emerald-500/15 border-emerald-400 shadow-md shadow-emerald-500/10'
+                          : 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 font-black text-xs text-white mb-1">
+                        <Trophy size={14} className="text-emerald-400" />
+                        <span>Tournament Style</span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 leading-snug">
+                        Pools + Knockout bracket for Singles &amp; Doubles (Gold/Silver/Bronze).
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/60 border border-slate-850 rounded-2xl p-3 mb-5 space-y-1.5">
                   <div className="flex items-center gap-2 text-xs text-slate-300">
                     <ShieldCheck size={14} className="text-emerald-400 shrink-0" />
                     <span>Always randomly generated (e.g. <span className="font-mono font-bold text-white">NLP-XXXX</span>)</span>
@@ -223,14 +277,22 @@ export function LandingView({
 
               <div>
                 <button
-                  onClick={onCreatePrivateRoom}
-                  className="w-full py-4 px-6 rounded-2xl font-black text-sm bg-[#d7f24c] hover:bg-[#c8e33a] text-slate-950 flex items-center justify-center gap-2.5 shadow-xl shadow-[#d7f24c]/15 active:scale-95 transition"
+                  onClick={() => onCreatePrivateRoom(selectedStyle)}
+                  className={`w-full py-4 px-6 rounded-2xl font-black text-sm flex items-center justify-center gap-2.5 shadow-xl active:scale-95 transition ${
+                    selectedStyle === 'tournament'
+                      ? 'bg-emerald-400 hover:bg-emerald-300 text-slate-950 shadow-emerald-500/15'
+                      : 'bg-[#d7f24c] hover:bg-[#c8e33a] text-slate-950 shadow-[#d7f24c]/15'
+                  }`}
                 >
                   <Sparkles size={18} />
-                  <span>Generate New Private Room</span>
+                  <span>
+                    {selectedStyle === 'tournament'
+                      ? 'Create Pools + Knockout Room'
+                      : 'Create MLP Style Room'}
+                  </span>
                 </button>
                 <p className="text-[11px] text-slate-400 text-center mt-2.5">
-                  Custom room names are disabled. Your room code will be created instantly.
+                  Your room code &amp; Admin PIN will be created instantly.
                 </p>
               </div>
             </div>

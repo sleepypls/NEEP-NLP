@@ -234,6 +234,17 @@ export function encodeStateForFirestore(state) {
       })),
     };
   }
+  if (clone.poolTournament && clone.poolTournament.knockout && Array.isArray(clone.poolTournament.knockout.rounds)) {
+    clone.poolTournament = {
+      ...clone.poolTournament,
+      knockout: {
+        ...clone.poolTournament.knockout,
+        rounds: clone.poolTournament.knockout.rounds.map((round) => ({
+          matches: Array.isArray(round) ? round : [],
+        })),
+      },
+    };
+  }
   return clone;
 }
 
@@ -250,6 +261,15 @@ export function decodeStateFromFirestore(data) {
     clone.matchupConfig = {
       ...clone.matchupConfig,
       customSlotPairs: clone.matchupConfig.customSlotPairs.map((p) => (p && p.slots ? p.slots : p)),
+    };
+  }
+  if (clone.poolTournament && clone.poolTournament.knockout && Array.isArray(clone.poolTournament.knockout.rounds)) {
+    clone.poolTournament = {
+      ...clone.poolTournament,
+      knockout: {
+        ...clone.poolTournament.knockout,
+        rounds: clone.poolTournament.knockout.rounds.map((r) => (r && r.matches ? r.matches : r)),
+      },
     };
   }
   return clone;

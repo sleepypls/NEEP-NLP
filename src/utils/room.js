@@ -96,7 +96,7 @@ export function loadSavedRoomsHistory() {
  * Saves or updates a room entry in the device's saved rooms history.
  * Preserves an existing adminPin if the user previously had admin access to this room.
  */
-export function upsertSavedRoomHistory(roomId, adminPin = null, isAdmin = false) {
+export function upsertSavedRoomHistory(roomId, adminPin = null, isAdmin = false, tournamentStyle = null) {
   const cleanId = sanitizeRoomId(roomId);
   if (!cleanId) return [];
   try {
@@ -104,11 +104,13 @@ export function upsertSavedRoomHistory(roomId, adminPin = null, isAdmin = false)
     const existing = current.find((r) => r.roomId === cleanId);
     const resolvedPin = (isAdmin && adminPin) ? String(adminPin) : (existing?.adminPin || null);
     const resolvedIsAdmin = Boolean(isAdmin || existing?.isAdmin);
+    const resolvedStyle = tournamentStyle || existing?.tournamentStyle || 'mlp';
 
     const updatedEntry = {
       roomId: cleanId,
       adminPin: resolvedPin,
       isAdmin: resolvedIsAdmin,
+      tournamentStyle: resolvedStyle,
       lastVisited: Date.now(),
     };
 

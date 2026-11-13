@@ -5,6 +5,7 @@ import { APP_VERSION } from '../version';
 
 export function Header({
   hasTournament,
+  tournamentStyle = 'mlp',
   view,
   setView,
   onBracketTab,
@@ -38,7 +39,7 @@ export function Header({
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-2 sm:gap-3">
         {/* Logo and Brand */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
-          <button onClick={() => setView('setup')} className="text-left flex items-center gap-2 sm:gap-2.5 group">
+          <button onClick={() => setView(tournamentStyle === 'tournament' ? 'poolSetup' : 'setup')} className="text-left flex items-center gap-2 sm:gap-2.5 group">
             <div className="w-7 h-9 sm:w-8 sm:h-10 shrink-0 flex items-center justify-center filter drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] group-hover:scale-105 transition duration-150">
               <img
                 src="/logo.png"
@@ -63,34 +64,61 @@ export function Header({
         {/* Desktop Navigation Tabs */}
         {hasTournament && (
           <nav className="hidden sm:flex items-center gap-1 bg-slate-900/90 border border-slate-800 rounded-xl p-1">
-            <button
-              onClick={onBracketTab}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                view === 'bracket' || view === 'match' || view === 'dreambreakerSetup' || view === 'dreambreakerPlay' || view === 'draft'
-                  ? 'bg-[#d7f24c] text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Swords size={13} /> Bracket
-            </button>
-            {onOpenRosterModal && (
-              <button
-                onClick={onOpenRosterModal}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800"
-              >
-                <Users size={13} /> Rosters & Subs
-              </button>
+            {tournamentStyle === 'tournament' ? (
+              <>
+                <button
+                  onClick={() => setView('poolSetup')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    view === 'poolSetup'
+                      ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Setup
+                </button>
+                <button
+                  onClick={onBracketTab}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    view === 'poolPlay'
+                      ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Swords size={13} /> Pools &amp; Bracket
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={onBracketTab}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    view === 'bracket' || view === 'match' || view === 'dreambreakerSetup' || view === 'dreambreakerPlay' || view === 'draft'
+                      ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Swords size={13} /> Bracket
+                </button>
+                {onOpenRosterModal && (
+                  <button
+                    onClick={onOpenRosterModal}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800"
+                  >
+                    <Users size={13} /> Rosters & Subs
+                  </button>
+                )}
+                <button
+                  onClick={() => setView('leaderboard')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    view === 'leaderboard'
+                      ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Trophy size={13} /> Leaderboard
+                </button>
+              </>
             )}
-            <button
-              onClick={() => setView('leaderboard')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                view === 'leaderboard'
-                  ? 'bg-[#d7f24c] text-slate-950 shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Trophy size={13} /> Leaderboard
-            </button>
           </nav>
         )}
 
@@ -219,34 +247,61 @@ export function Header({
       {/* Mobile Navigation Tabs */}
       {hasTournament && (
         <div className="sm:hidden flex border-t border-slate-800/80 bg-slate-950/90">
-          <button
-            onClick={onBracketTab}
-            className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-              view === 'bracket' || view === 'match' || view === 'dreambreakerSetup' || view === 'dreambreakerPlay' || view === 'draft'
-                ? 'text-[#d7f24c] border-b-2 border-[#d7f24c] bg-[#d7f24c]/5'
-                : 'text-slate-500'
-            }`}
-          >
-            <Swords size={13} /> Bracket
-          </button>
-          {onOpenRosterModal && (
-            <button
-              onClick={onOpenRosterModal}
-              className="flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white"
-            >
-              <Users size={13} /> Rosters
-            </button>
+          {tournamentStyle === 'tournament' ? (
+            <>
+              <button
+                onClick={() => setView('poolSetup')}
+                className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  view === 'poolSetup'
+                    ? 'text-[#d7f24c] border-b-2 border-[#d7f24c] bg-[#d7f24c]/5'
+                    : 'text-slate-500'
+                }`}
+              >
+                Setup
+              </button>
+              <button
+                onClick={onBracketTab}
+                className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  view === 'poolPlay'
+                    ? 'text-[#d7f24c] border-b-2 border-[#d7f24c] bg-[#d7f24c]/5'
+                    : 'text-slate-500'
+                }`}
+              >
+                <Swords size={13} /> Pools &amp; Bracket
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={onBracketTab}
+                className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  view === 'bracket' || view === 'match' || view === 'dreambreakerSetup' || view === 'dreambreakerPlay' || view === 'draft'
+                    ? 'text-[#d7f24c] border-b-2 border-[#d7f24c] bg-[#d7f24c]/5'
+                    : 'text-slate-500'
+                }`}
+              >
+                <Swords size={13} /> Bracket
+              </button>
+              {onOpenRosterModal && (
+                <button
+                  onClick={onOpenRosterModal}
+                  className="flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 text-slate-400 hover:text-white"
+                >
+                  <Users size={13} /> Rosters
+                </button>
+              )}
+              <button
+                onClick={() => setView('leaderboard')}
+                className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  view === 'leaderboard'
+                    ? 'text-[#d7f24c] border-b-2 border-[#d7f24c] bg-[#d7f24c]/5'
+                    : 'text-slate-500'
+                }`}
+              >
+                <Trophy size={13} /> Leaderboard
+              </button>
+            </>
           )}
-          <button
-            onClick={() => setView('leaderboard')}
-            className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-              view === 'leaderboard'
-                ? 'text-[#d7f24c] border-b-2 border-[#d7f24c] bg-[#d7f24c]/5'
-                : 'text-slate-500'
-            }`}
-          >
-            <Trophy size={13} /> Leaderboard
-          </button>
         </div>
       )}
     </header>
