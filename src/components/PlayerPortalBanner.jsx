@@ -9,8 +9,8 @@ import {
   Send,
   Clock,
   ShieldAlert,
-  ChevronDown,
-  ChevronUp,
+  Swords,
+  Trophy,
 } from 'lucide-react';
 import { LiveTimer } from './LiveTimer';
 import {
@@ -610,8 +610,9 @@ export function PlayerPortalBanner({
   onSubmitMlpPendingScore,
   onApproveMlpPendingScore,
   onRejectMlpPendingScore,
+  activePlayerTab = 'current',
+  onChangePlayerTab,
 }) {
-  const [collapsed, setCollapsed] = useState(false);
   const [alertBanner, setAlertBanner] = useState(null);
   const seenAlertsRef = useRef(new Set());
 
@@ -805,20 +806,47 @@ export function PlayerPortalBanner({
   if (!loggedInPlayerName) return null;
 
   const isTournament = tournamentStyle === 'tournament';
+  const hasPools = Boolean(
+    isTournament &&
+      poolTournament?.pools &&
+      poolTournament.pools.length > 0 &&
+      poolTournament?.structure !== 'knockout_only'
+  );
   const allItems = isTournament ? myPoolMatches : myMlpGames;
-  const totalPending = allItems.length;
 
   const isFeaturedItem = (item) => {
     const obj = item.match || item.game;
     const isLive = Boolean(obj?.inProgress && !obj?.saved);
-    const needsApproval = Boolean(
-      obj?.pendingScore && obj.pendingScore.submittedBySide !== item.mySide
-    );
-    return isLive || needsApproval;
+    const hasPending = Boolean(obj?.pendingScore);
+    return isLive || hasPending;
   };
 
   const featuredItems = allItems.filter(isFeaturedItem);
   const upcomingItems = allItems.filter((item) => !isFeaturedItem(item));
+
+  const resolvedTab = activePlayerTab === 'pools' && !hasPools ? 'knockout' : activePlayerTab;
+
+  const tabs = [
+    {
+      id: 'current',
+      label: 'Current Match',
+      count: featuredItems.length,
+      icon: Flame,
+      isLive: featuredItems.length > 0,
+    },
+    {
+      id: 'upcoming',
+      label: 'Upcoming Matches',
+      count: upcomingItems.length,
+      icon: Clock,
+    },
+    ...(hasPools ? [{ id: 'pools', label: 'Pools', icon: Swords }] : []),
+    {
+      id: 'knockout',
+      label: 'Knockout',
+      icon: Trophy,
+    },
+  ];
 
   const renderItemCard = (item) =>
     isTournament ? (
@@ -850,9 +878,6 @@ export function PlayerPortalBanner({
             <span className="inline-flex items-center gap-1.5 text-xs font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-full">
               <UserCheck size={13} /> Player: {loggedInPlayerName}
             </span>
-            <span className="text-xs font-bold text-slate-300">
-              {totalPending} active/upcoming match{totalPending === 1 ? '' : 'es'}
-            </span>
           </div>
 
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -870,14 +895,6 @@ export function PlayerPortalBanner({
                 <BellRing size={11} /> Alerts On
               </span>
             )}
-            <button
-              type="button"
-              onClick={() => setCollapsed((v) => !v)}
-              className="p-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 transition"
-              title={collapsed ? 'Expand My Matches' : 'Collapse My Matches'}
-            >
-              {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-            </button>
           </div>
         </div>
 
@@ -901,42 +918,91 @@ export function PlayerPortalBanner({
           </div>
         )}
 
-        {/* Matches List */}
-        {!collapsed && (
-          totalPending === 0 ? (
-            <p className="text-xs text-slate-400 italic py-2">
-              No active or upcoming matches found for <strong>{loggedInPlayerName}</strong> right now.
-            </p>
-          ) : (
-            <div className="space-y-3.5">
-              {featuredItems.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-amber-300">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                    <span>Live Match — Enter or Approve Score</span>
-                  </div>
-                  <div
-                    className={`grid grid-cols-1 ${
-                      featuredItems.length > 1 ? 'md:grid-cols-2' : ''
-                    } gap-3`}
+        {/* Player View Tabs */}
+        <div className="grid grid-cols-2 sm:flex bg-slate-950/80 border border-slate-800 rounded-2xl p-1 gap-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = resolvedTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onChangePlayerTab?.(tab.id)}
+                className={`sm:flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                  isActive
+                    ? tab.id === 'current' && tab.isLive
+                      ? 'bg-amber-400 text-slate-950 shadow-md'
+                      : 'bg-[#d7f24c] text-slate-950 shadow-md'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                {tab.isLive && !isActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+                )}
+                <Icon size={13} className="shrink-0" />
+                <span className="truncate">{tab.label}</span>
+                {typeof tab.count === 'number' && tab.count > 0 && (
+                  <span
+                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black font-mono ${
+                      isActive
+                        ? 'bg-slate-950/20 text-slate-950'
+                        : tab.isLive
+                          ? 'bg-amber-400/20 text-amber-300'
+                          : 'bg-slate-800 text-slate-300'
+                    }`}
                   >
-                    {featuredItems.map(renderItemCard)}
-                  </div>
-                </div>
-              )}
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
 
+        {/* Tab Body for Current Match & Upcoming Matches */}
+        {resolvedTab === 'current' && (
+          featuredItems.length === 0 ? (
+            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center space-y-2">
+              <p className="text-xs text-slate-400">
+                No live match on court right now for <strong className="text-slate-200">{loggedInPlayerName}</strong>.
+              </p>
               {upcomingItems.length > 0 && (
-                <div className="space-y-2">
-                  {featuredItems.length > 0 && (
-                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                      Upcoming
-                    </div>
-                  )}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {upcomingItems.map(renderItemCard)}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => onChangePlayerTab?.('upcoming')}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[#d7f24c] text-xs font-bold border border-slate-700 transition"
+                >
+                  <Clock size={12} /> View Upcoming Matches ({upcomingItems.length})
+                </button>
               )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-amber-300">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span>Live Match — Enter or Approve Score</span>
+              </div>
+              <div
+                className={`grid grid-cols-1 ${
+                  featuredItems.length > 1 ? 'md:grid-cols-2' : ''
+                } gap-3`}
+              >
+                {featuredItems.map(renderItemCard)}
+              </div>
+            </div>
+          )
+        )}
+
+        {resolvedTab === 'upcoming' && (
+          upcomingItems.length === 0 ? (
+            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center">
+              <p className="text-xs text-slate-400 italic">
+                No upcoming matches queued right now for <strong className="text-slate-200">{loggedInPlayerName}</strong>.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {upcomingItems.map(renderItemCard)}
             </div>
           )
         )}

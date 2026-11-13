@@ -277,6 +277,7 @@ export default function App() {
   const [notifPermission, setNotifPermission] = useState(() =>
     typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
   );
+  const [playerViewTab, setPlayerViewTab] = useState('current');
 
   const [view, setView] = useState(() => {
     try {
@@ -2933,6 +2934,17 @@ export default function App() {
     );
   }
 
+  const isPlayerPortalActive =
+    !isAdmin && Boolean(loggedInPlayerName) && Boolean(poolTournament || bracket);
+  const playerHasPools = Boolean(
+    tournamentStyle === 'tournament' &&
+      poolTournament?.pools &&
+      poolTournament.pools.length > 0 &&
+      poolTournament?.structure !== 'knockout_only'
+  );
+  const effectivePlayerTab =
+    playerViewTab === 'pools' && !playerHasPools ? 'knockout' : playerViewTab;
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <Header
@@ -2967,7 +2979,7 @@ export default function App() {
         onExitToLanding={handleExitToLanding}
       />
 
-      {!isAdmin && loggedInPlayerName && (poolTournament || bracket) && (
+      {isPlayerPortalActive && (
         <PlayerPortalBanner
           loggedInPlayerName={loggedInPlayerName}
           onOpenPlayerLogin={() => setIsPlayerLoginOpen(true)}
@@ -2984,6 +2996,8 @@ export default function App() {
           onSubmitMlpPendingScore={updateMlpGamePendingScore}
           onApproveMlpPendingScore={handleApproveMlpPendingScore}
           onRejectMlpPendingScore={(item) => updateMlpGamePendingScore(item, null)}
+          activePlayerTab={effectivePlayerTab}
+          onChangePlayerTab={setPlayerViewTab}
         />
       )}
 
@@ -3086,7 +3100,7 @@ export default function App() {
           />
         )}
 
-        {view === 'bracket' && bracket && (
+        {view === 'bracket' && bracket && (!isPlayerPortalActive || effectivePlayerTab === 'knockout') && (
           <BracketView
             bracket={bracket}
             teams={teams}
@@ -3288,7 +3302,10 @@ export default function App() {
           />
         )}
 
-        {view === 'poolPlay' && (
+        {view === 'poolPlay' &&
+          (!isPlayerPortalActive ||
+            effectivePlayerTab === 'pools' ||
+            effectivePlayerTab === 'knockout') && (
           <PoolPlayView
             tournament={poolTournament}
             numCourts={poolTournament?.numCourts || poolNumCourts}
@@ -3305,6 +3322,8 @@ export default function App() {
             onBatchAssignCourtsLive={handleBatchAssignPoolCourtsAndLive}
             onOpenSetup={() => setView('poolSetup')}
             isAdmin={isAdmin}
+            forcedTab={isPlayerPortalActive ? effectivePlayerTab : null}
+            hideStageTabs={isPlayerPortalActive}
           />
         )}
 

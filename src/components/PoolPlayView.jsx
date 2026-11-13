@@ -325,6 +325,8 @@ export function PoolPlayView({
   onBatchAssignCourtsLive,
   onOpenSetup,
   isAdmin,
+  forcedTab = null,
+  hideStageTabs = false,
 }) {
   const hasPools = Boolean(tournament?.pools && tournament.pools.length > 0 && tournament?.structure !== 'knockout_only');
   const [activeTab, setActiveTab] = useState(!hasPools || tournament?.knockout ? 'knockout' : 'pools');
@@ -365,7 +367,8 @@ export function PoolPlayView({
   const visiblePools =
     selectedPoolId === 'all' ? pools : pools.filter((p) => p.id === selectedPoolId);
 
-  const effectiveTab = isKnockoutOnly && activeTab === 'pools' ? 'knockout' : activeTab;
+  const resolvedTab = forcedTab || activeTab;
+  const effectiveTab = isKnockoutOnly && resolvedTab === 'pools' ? 'knockout' : resolvedTab;
   const { entryStats, playerStats } = computeTournamentPlayerStats(tournament);
   const activeLeaderboardRows =
     discipline === 'doubles' && leaderboardMode === 'players' ? playerStats : entryStats;
@@ -547,6 +550,7 @@ export function PoolPlayView({
       })()}
 
       {/* Main Stage Tabs: Pools vs Knockout vs Leaderboard */}
+      {!hideStageTabs && (
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
         {!isKnockoutOnly ? (
           <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 w-full max-w-lg shadow-lg">
@@ -636,6 +640,7 @@ export function PoolPlayView({
           </button>
         )}
       </div>
+      )}
 
       {/* POOLS TAB */}
       {effectiveTab === 'pools' && (
