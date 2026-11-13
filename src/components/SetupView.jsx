@@ -257,9 +257,10 @@ export function SetupView({
       {/* Setup Configuration Tabs */}
       <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-5 shadow-lg overflow-x-auto">
         {[
-          { id: 'players', label: '1. Players & Teams' },
-          { id: 'courts', label: '2. Courts & Matchups' },
-          { id: 'presets', label: '3. Room & Presets' },
+          { id: 'players', label: '1. Players' },
+          { id: 'teams', label: '2. Teams' },
+          { id: 'courts', label: '3. Matchup Config' },
+          { id: 'presets', label: '4. Room & Presets' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -277,7 +278,7 @@ export function SetupView({
       </div>
 
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
-        <div className={activeTab === 'courts' ? 'hidden' : activeTab === 'players' ? 'lg:col-span-7' : 'lg:col-span-6'}>
+        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'hidden' : activeTab === 'players' ? 'lg:col-span-7' : 'lg:col-span-6'}>
           {/* Player Pool Card */}
       <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
@@ -686,9 +687,58 @@ export function SetupView({
       </div>
 
         </div>
-        <div className={activeTab === 'courts' ? 'lg:col-span-12 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start' : activeTab === 'players' ? 'lg:col-span-5' : 'lg:col-span-6'}>
-          {/* Number of Teams */}
-      <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'lg:col-span-12 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start' : activeTab === 'players' ? 'lg:col-span-5' : 'lg:col-span-6'}>
+          {/* Number of Courts (Tab 1: Players) */}
+          {setNumCourts && (
+            <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-2' : 'hidden'}>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-slate-200 text-sm font-bold">Number of Courts</label>
+                <span className="text-[11px] font-mono text-slate-400">
+                  Assign Court 1–{Math.max(1, Number(numCourts) || 2)} to matchups
+                </span>
+              </div>
+              <p className="text-slate-500 text-xs">
+                Set how many courts are available so scorekeepers can assign court numbers to each game.
+              </p>
+              <div className="grid grid-cols-6 gap-1.5">
+                {[1, 2, 3, 4, 6, 8].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    disabled={!isAdmin}
+                    onClick={() => setNumCourts(n)}
+                    className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                      Number(numCourts) === n
+                        ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                disabled={!isAdmin}
+                value={numCourts === '' ? '' : numCourts}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setNumCourts(val === '' ? '' : Math.min(50, Number(val)));
+                }}
+                onBlur={() => {
+                  if (!numCourts || Number(numCourts) < 1) setNumCourts(2);
+                }}
+                placeholder="Custom number of courts (e.g. 4)"
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
+              />
+            </div>
+          )}
+
+          {/* Number of Teams (Tab 2: Teams) */}
+      <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <label className="text-slate-300 text-sm font-semibold mb-2 block">Number of Teams</label>
         <select
           disabled={!isAdmin}
@@ -704,56 +754,10 @@ export function SetupView({
           <option value={7}>7 Teams (Quarters, Semis, Final, with Byes)</option>
           <option value={8}>8 Teams (Quarters, Semis, Final)</option>
         </select>
-
-        {/* Number of Courts */}
-        {setNumCourts && (
-          <div className="pt-3 mt-3 border-t border-slate-800 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <label className="text-slate-200 text-xs font-bold">Number of Courts</label>
-              <span className="text-[11px] font-mono text-slate-400">
-                Assign Court 1–{Math.max(1, Number(numCourts) || 2)} to matchups
-              </span>
-            </div>
-            <div className="grid grid-cols-6 gap-1.5">
-              {[1, 2, 3, 4, 6, 8].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  disabled={!isAdmin}
-                  onClick={() => setNumCourts(n)}
-                  className={`py-1.5 rounded-xl text-xs font-bold transition ${
-                    Number(numCourts) === n
-                      ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
-                  }`}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              disabled={!isAdmin}
-              value={numCourts === '' ? '' : numCourts}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, '');
-                setNumCourts(val === '' ? '' : Math.min(50, Number(val)));
-              }}
-              onBlur={() => {
-                if (!numCourts || Number(numCourts) < 1) setNumCourts(2);
-              }}
-              placeholder="Custom number of courts (e.g. 4)"
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
-            />
-          </div>
-        )}
       </div>
 
       {/* Captain Selection Card */}
-      <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+      <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-2">
           <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
             <Crown size={16} className="text-amber-400" /> Captain Selection
@@ -1000,7 +1004,7 @@ export function SetupView({
 
       {/* Custom Team Names (Optional) */}
       {setCustomTeamNames && (
-        <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+        <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
           <label className="text-slate-300 text-sm font-semibold mb-1 block">
             Custom Team Names <span className="text-slate-500 text-xs font-normal">(Optional)</span>
           </label>
@@ -1265,7 +1269,7 @@ export function SetupView({
       </div>
 
       {/* Uneven Teams Toggle */}
-      <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+      <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <label className="flex items-start gap-3 cursor-pointer select-none">
           <input
             type="checkbox"

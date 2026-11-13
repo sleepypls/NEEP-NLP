@@ -10,7 +10,6 @@ export function EditPoolMatchModal({
   stageLabel = 'Match',
   defaultFormat = { bestOf: 1, pointsTo: 11 },
   allowBye = false,
-  numCourts = 2,
   onSave,
   isAdmin,
 }) {
@@ -19,13 +18,11 @@ export function EditPoolMatchModal({
   const [useCustomFormat, setUseCustomFormat] = useState(false);
   const [bestOf, setBestOf] = useState(defaultFormat.bestOf || 1);
   const [pointsTo, setPointsTo] = useState(defaultFormat.pointsTo || 11);
-  const [court, setCourt] = useState('');
 
   useEffect(() => {
     if (!match) return;
     setEntryAId(match.entryAId || '');
     setEntryBId(match.entryBId || '');
-    setCourt(match.court ? String(match.court) : '');
     if (match.customFormat && match.customFormat.bestOf) {
       setUseCustomFormat(true);
       setBestOf(match.customFormat.bestOf);
@@ -62,7 +59,6 @@ export function EditPoolMatchModal({
     onSave({
       entryAId: entryAId || null,
       entryBId: entryBId || null,
-      court: court ? Number(court) : null,
       customFormat: useCustomFormat
         ? { bestOf: Number(bestOf) || 1, pointsTo: cleanPoints }
         : null,
@@ -157,31 +153,6 @@ export function EditPoolMatchModal({
                 Leaving one side as BYE advances the assigned entrant automatically.
               </p>
             )}
-          </div>
-
-          {/* Court Assignment */}
-          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3.5 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-200">Court Assignment</span>
-              <span className="text-[11px] font-mono text-slate-400">
-                1–{Math.max(1, Number(numCourts) || 2)} configured
-              </span>
-            </div>
-            <select
-              value={court}
-              onChange={(e) => setCourt(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
-            >
-              <option value="">Unassigned</option>
-              {Array.from(
-                { length: Math.max(Number(numCourts) || 2, Number(court) || 0, 1) },
-                (_, i) => i + 1
-              ).map((c) => (
-                <option key={c} value={String(c)}>
-                  Court {c}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* Match Format Override */}
