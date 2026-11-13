@@ -29,6 +29,7 @@ import {
 } from '../utils/poolTournament';
 import { triggerCsvDownload } from '../utils/tournament';
 import { EditPoolMatchModal } from './EditPoolMatchModal';
+import { PoolCourtAssignModal } from './CourtAssignModal';
 
 function MatchScoreEditor({
   match,
@@ -317,6 +318,7 @@ export function PoolPlayView({
   onToggleKnockoutMatchLive,
   onSetKnockoutMatchCourt,
   onEditKnockoutMatch,
+  onBatchAssignCourtsLive,
   onOpenSetup,
   isAdmin,
 }) {
@@ -325,6 +327,7 @@ export function PoolPlayView({
   const [selectedPoolId, setSelectedPoolId] = useState('all');
   const [editingMatchCtx, setEditingMatchCtx] = useState(null);
   const [leaderboardMode, setLeaderboardMode] = useState('entries');
+  const [isCourtAssignOpen, setIsCourtAssignOpen] = useState(false);
 
   useEffect(() => {
     if (!hasPools) {
@@ -403,6 +406,16 @@ export function PoolPlayView({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && onBatchAssignCourtsLive && (
+            <button
+              type="button"
+              onClick={() => setIsCourtAssignOpen(true)}
+              className="px-3 py-2 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 text-xs font-black flex items-center gap-1.5 transition active:scale-95 shadow-lg shadow-[#d7f24c]/15"
+              title="Assign next matchups to available courts and mark them live"
+            >
+              <Flame size={13} /> Assign Courts &amp; Mark Live
+            </button>
+          )}
           {isAdmin && onOpenSetup && (
             <button
               type="button"
@@ -569,10 +582,19 @@ export function PoolPlayView({
                 key={pool.id}
                 className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-5"
               >
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-black text-white font-display uppercase tracking-wide">
-                    {pool.name}
-                  </h3>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-lg font-black text-white font-display uppercase tracking-wide">
+                      {pool.name}
+                    </h3>
+                    {Array.isArray(pool.assignedCourts) && pool.assignedCourts.length > 0 && (
+                      <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
+                        {pool.assignedCourts.length === 1
+                          ? `Court ${pool.assignedCourts[0]}`
+                          : `Courts ${pool.assignedCourts.join(', ')}`}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs text-slate-400 font-semibold">
                     Top {advancePerPool} qualify for Knockout
                   </span>
@@ -1070,6 +1092,14 @@ export function PoolPlayView({
           )}
         </div>
       )}
+
+      <PoolCourtAssignModal
+        isOpen={isCourtAssignOpen}
+        onClose={() => setIsCourtAssignOpen(false)}
+        tournament={tournament}
+        numCourts={numCourts}
+        onApply={(assignments) => onBatchAssignCourtsLive && onBatchAssignCourtsLive(assignments)}
+      />
 
       {/* Edit Matchup & Format Modal */}
       <EditPoolMatchModal

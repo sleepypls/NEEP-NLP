@@ -83,11 +83,40 @@ export function getEffectiveMatchFormat(
  * - Pool Play + Seeded Knockout (`structure === 'pools_knockout'`)
  * - Direct Single-Elimination Knockout (`structure === 'knockout_only'`)
  */
+/**
+ * Evenly distributes courts (1..numCourts) across `poolCount` pools.
+ * E.g. 4 courts / 2 pools -> [[1,2], [3,4]]; 5 courts / 2 pools -> [[1,2,3], [4,5]].
+ * If fewer courts than pools, assigns round-robin primary court per pool.
+ */
+export function distributeCourtsToPools(poolCount, numCourts = 2) {
+  const pCount = Math.max(1, Number(poolCount) || 1);
+  const cCount = Math.max(1, Number(numCourts) || 2);
+  const buckets = Array.from({ length: pCount }, () => []);
+
+  if (cCount >= pCount) {
+    const base = Math.floor(cCount / pCount);
+    const extra = cCount % pCount;
+    let cursor = 1;
+    for (let i = 0; i < pCount; i++) {
+      const size = base + (i < extra ? 1 : 0);
+      for (let j = 0; j < size; j++) {
+        buckets[i].push(cursor++);
+      }
+    }
+  } else {
+    for (let i = 0; i < pCount; i++) {
+      buckets[i].push((i % cCount) + 1);
+    }
+  }
+  return buckets;
+}
+
 export function generatePoolsAndSchedule({
   entries = [],
   discipline = 'doubles',
   structure = 'pools_knockout',
   numPools = 2,
+  numCourts = 2,
   poolFormat = { bestOf: 1, pointsTo: 15, winByTwo: true },
   knockoutFormat = { bestOf: 3, pointsTo: 11, winByTwo: true },
   advancePerPool = 2,
@@ -127,10 +156,12 @@ export function generatePoolsAndSchedule({
 
   const poolCount = Math.max(1, Math.min(numPools, Math.floor(cleanEntries.length / 2) || 1));
   const poolLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const courtBuckets = distributeCourtsToPools(poolCount, numCourts);
   const pools = Array.from({ length: poolCount }, (_, i) => ({
     id: `pool-${poolLetters[i] || i + 1}`,
     name: `Pool ${poolLetters[i] || i + 1}`,
     entryIds: [],
+    assignedCourts: courtBuckets[i] || [1],
     matches: [],
   }));
 
@@ -181,11 +212,33 @@ export function generatePoolsAndSchedule({
     }
   });
 
+  // Pre-assign initial Round 1 (or earliest non-conflicting) matches evenly to each pool's courts
+  const usedInitialCourts = new Set();
+  pools.forEach((pool) => {
+    const busyEntries = new Set();
+    let courtIdx = 0;
+    const poolCourts = pool.assignedCourts || [];
+    for (const m of pool.matches) {
+      while (courtIdx < poolCourts.length && usedInitialCourts.has(poolCourts[courtIdx])) {
+        courtIdx++;
+      }
+      if (courtIdx >= poolCourts.length) break;
+      if (!busyEntries.has(m.entryAId) && !busyEntries.has(m.entryBId)) {
+        m.court = poolCourts[courtIdx];
+        usedInitialCourts.add(m.court);
+        busyEntries.add(m.entryAId);
+        busyEntries.add(m.entryBId);
+        courtIdx++;
+      }
+    }
+  });
+
   return {
     structure: 'pools_knockout',
     discipline,
     entries: cleanEntries,
     pools,
+    numCourts: Math.max(1, Number(numCourts) || 2),
     poolFormat,
     knockoutFormat,
     advancePerPool,
@@ -729,6 +782,7 @@ export function generatePoolStandingsCSV(tournament, roomId = '') {
   return lines.join('\r\n');
 }
 
+
 export function generatePoolAndKnockoutMatchesCSV(tournament, roomId = '') {
   if (!tournament) return '';
   const entryMap = new Map((tournament.entries || []).map((e) => [e.id, getEntryDisplayName(e)]));
@@ -812,6 +866,7 @@ export function generatePoolAndKnockoutMatchesCSV(tournament, roomId = '') {
 
   return lines.join('\r\n');
 }
+
 
 /**
  * Computes combined Pool Play + Knockout player & entry statistics for Leaderboard tab.
@@ -960,4 +1015,164 @@ export function generateTournamentLeaderboardCSV(statsList = [], roomId = '', la
   });
   return lines.join('\r\n');
 }
+
+/**
+ * Computes currently live courts, free courts, eligible ready-to-play matches,
+ * and smart conflict-free court suggestions for Pools + Knockout.
+ */
+export function buildPoolCourtSuggestions(tournament, numCourtsOverride = null) {
+  const totalCourts = Math.max(1, Number(numCourtsOverride || tournament?.numCourts) || 2);
+  const entryMap = new Map((tournament?.entries || []).map((e) => [e.id, e]));
+  const liveByCourt = new Map();
+  const busyEntryIds = new Set();
+  const eligibleMatches = [];
+
+  const pools = tournament?.pools || [];
+  pools.forEach((pool) => {
+    (pool.matches || []).forEach((m) => {
+      if (m.inProgress && !m.saved) {
+        if (m.court) liveByCourt.set(Number(m.court), { match: m, stage: pool.name });
+        if (m.entryAId) busyEntryIds.add(m.entryAId);
+        if (m.entryBId) busyEntryIds.add(m.entryBId);
+      } else if (!m.saved && !m.inProgress && m.entryAId && m.entryBId) {
+        const nameA = getEntryDisplayName(entryMap.get(m.entryAId));
+        const nameB = getEntryDisplayName(entryMap.get(m.entryBId));
+        eligibleMatches.push({
+          key: `pool:${pool.id}:${m.id}`,
+          type: 'pool',
+          poolId: pool.id,
+          poolName: pool.name,
+          assignedCourts: pool.assignedCourts || [],
+          matchId: m.id,
+          round: m.round || 1,
+          entryAId: m.entryAId,
+          entryBId: m.entryBId,
+          preAssignedCourt: m.court ? Number(m.court) : null,
+          label: `${pool.name} (R${m.round || 1}): ${nameA} vs ${nameB}`,
+          shortLabel: `${nameA} vs ${nameB}`,
+        });
+      }
+    });
+  });
+
+  const knockout = tournament?.knockout;
+  if (knockout && Array.isArray(knockout.rounds)) {
+    const totalRounds = knockout.rounds.length;
+    knockout.rounds.forEach((round, rIdx) => {
+      const roundLabel = getKnockoutRoundLabel(totalRounds, rIdx);
+      round.forEach((m) => {
+        if (m.isBye) return;
+        if (m.inProgress && !m.saved) {
+          if (m.court) liveByCourt.set(Number(m.court), { match: m, stage: roundLabel });
+          if (m.entryAId) busyEntryIds.add(m.entryAId);
+          if (m.entryBId) busyEntryIds.add(m.entryBId);
+        } else if (!m.saved && !m.inProgress && m.entryAId && m.entryBId) {
+          const nameA = getEntryDisplayName(entryMap.get(m.entryAId));
+          const nameB = getEntryDisplayName(entryMap.get(m.entryBId));
+          eligibleMatches.push({
+            key: `ko:${rIdx}:${m.matchIdx}`,
+            type: 'knockout',
+            roundIdx: rIdx,
+            matchIdx: m.matchIdx,
+            isBronze: false,
+            assignedCourts: [],
+            matchId: m.id,
+            round: rIdx + 100,
+            entryAId: m.entryAId,
+            entryBId: m.entryBId,
+            preAssignedCourt: m.court ? Number(m.court) : null,
+            label: `${roundLabel}: ${nameA} vs ${nameB}`,
+            shortLabel: `${nameA} vs ${nameB}`,
+          });
+        }
+      });
+    });
+
+    if (knockout.bronzeMatch) {
+      const bm = knockout.bronzeMatch;
+      if (bm.inProgress && !bm.saved) {
+        if (bm.court) liveByCourt.set(Number(bm.court), { match: bm, stage: 'Bronze Medal' });
+        if (bm.entryAId) busyEntryIds.add(bm.entryAId);
+        if (bm.entryBId) busyEntryIds.add(bm.entryBId);
+      } else if (!bm.saved && !bm.inProgress && bm.entryAId && bm.entryBId) {
+        const nameA = getEntryDisplayName(entryMap.get(bm.entryAId));
+        const nameB = getEntryDisplayName(entryMap.get(bm.entryBId));
+        eligibleMatches.push({
+          key: 'ko:bronze',
+          type: 'knockout',
+          roundIdx: 0,
+          matchIdx: 0,
+          isBronze: true,
+          assignedCourts: [],
+          matchId: bm.id || 'bronze',
+          round: totalRounds + 100,
+          entryAId: bm.entryAId,
+          entryBId: bm.entryBId,
+          preAssignedCourt: bm.court ? Number(bm.court) : null,
+          label: `Bronze Medal: ${nameA} vs ${nameB}`,
+          shortLabel: `${nameA} vs ${nameB}`,
+        });
+      }
+    }
+  }
+
+  const freeCourts = [];
+  for (let c = 1; c <= totalCourts; c++) {
+    if (!liveByCourt.has(c)) freeCourts.push(c);
+  }
+
+  // Sort eligible matches by round ascending
+  eligibleMatches.sort((a, b) => a.round - b.round);
+
+  const suggestions = {};
+  const plannedBusy = new Set(busyEntryIds);
+  const usedKeys = new Set();
+
+  const isFreeOfConflict = (cand) =>
+    !usedKeys.has(cand.key) &&
+    !plannedBusy.has(cand.entryAId) &&
+    !plannedBusy.has(cand.entryBId);
+
+  // Pass 1: Match pre-assigned court or pool's designated court first
+  freeCourts.forEach((courtNum) => {
+    const exactPre = eligibleMatches.find(
+      (c) => c.preAssignedCourt === courtNum && isFreeOfConflict(c)
+    );
+    const poolPreferred =
+      exactPre ||
+      eligibleMatches.find(
+        (c) => c.assignedCourts.includes(courtNum) && isFreeOfConflict(c)
+      );
+    if (poolPreferred) {
+      suggestions[courtNum] = poolPreferred.key;
+      usedKeys.add(poolPreferred.key);
+      plannedBusy.add(poolPreferred.entryAId);
+      plannedBusy.add(poolPreferred.entryBId);
+    }
+  });
+
+  // Pass 2: Fill any remaining free courts with next non-conflicting eligible matches
+  freeCourts.forEach((courtNum) => {
+    if (suggestions[courtNum]) return;
+    const nextMatch = eligibleMatches.find((c) => isFreeOfConflict(c));
+    if (nextMatch) {
+      suggestions[courtNum] = nextMatch.key;
+      usedKeys.add(nextMatch.key);
+      plannedBusy.add(nextMatch.entryAId);
+      plannedBusy.add(nextMatch.entryBId);
+    } else {
+      suggestions[courtNum] = '';
+    }
+  });
+
+  return {
+    totalCourts,
+    liveByCourt,
+    busyEntryIds,
+    freeCourts,
+    eligibleMatches,
+    suggestions,
+  };
+}
+
 

@@ -23,6 +23,7 @@ import {
   advanceKnockoutWinner,
   getEffectiveMatchFormat,
   resizeGamesForBestOf,
+  distributeCourtsToPools,
 } from './utils/poolTournament';
 
 import {
@@ -1042,6 +1043,23 @@ export default function App() {
     broadcastTournamentChange({ bracket: nb });
   }
 
+  function handleBatchAssignMlpCourtsAndLive(assignments) {
+    if (!activePath || !bracket || !Array.isArray(assignments) || assignments.length === 0) return;
+    const { round, idx } = activePath;
+    const match = bracket.rounds[round][idx];
+    if (!match.games) return;
+    const mapByGameId = new Map(assignments.map((a) => [a.gameId, a.court]));
+    const updatedGames = match.games.map((g) =>
+      mapByGameId.has(g.id)
+        ? { ...g, court: Number(mapByGameId.get(g.id)), inProgress: true }
+        : g
+    );
+    const nb = JSON.parse(JSON.stringify(bracket));
+    nb.rounds[round][idx].games = updatedGames;
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
+  }
+
   function handleUpdateGameMatchup(gameId, pairA, pairB, slotPair) {
     if (!activePath || !bracket) return;
     const { round, idx } = activePath;
@@ -1804,22 +1822,20 @@ export default function App() {
 
   function handleStartPoolTournament() {
     if (poolEntries.length < 2) return;
-    const built = {
-      ...generatePoolsAndSchedule({
-        entries: poolEntries,
-        discipline: poolDiscipline,
-        structure: poolStructure,
-        numPools: poolNumPools,
-        poolFormat: poolMatchFormat,
-        knockoutFormat: knockoutMatchFormat,
-        advancePerPool: poolAdvancePerPool,
-        knockoutFillMode: poolKnockoutFillMode,
-        targetBracketSize: poolTargetBracketSize,
-        includeBronze: poolIncludeBronze,
-        seedingMode: poolSeedingMode,
-      }),
+    const built = generatePoolsAndSchedule({
+      entries: poolEntries,
+      discipline: poolDiscipline,
+      structure: poolStructure,
+      numPools: poolNumPools,
       numCourts: poolNumCourts,
-    };
+      poolFormat: poolMatchFormat,
+      knockoutFormat: knockoutMatchFormat,
+      advancePerPool: poolAdvancePerPool,
+      knockoutFillMode: poolKnockoutFillMode,
+      targetBracketSize: poolTargetBracketSize,
+      includeBronze: poolIncludeBronze,
+      seedingMode: poolSeedingMode,
+    });
     setPoolTournament(built);
     setView('poolPlay');
     broadcastTournamentChange({
@@ -1832,8 +1848,13 @@ export default function App() {
 
   function handleUpdatePoolTournamentSettings() {
     if (!poolTournament) return;
-    const nextPools = (poolTournament.pools || []).map((pool) => ({
+    const courtBuckets = distributeCourtsToPools(
+      (poolTournament.pools || []).length,
+      poolNumCourts
+    );
+    const nextPools = (poolTournament.pools || []).map((pool, pIdx) => ({
       ...pool,
+      assignedCourts: courtBuckets[pIdx] || [1],
       matches: (pool.matches || []).map((m) => {
         const bestOf = m.customFormat?.bestOf || poolMatchFormat.bestOf || 1;
         return {
@@ -2085,6 +2106,57 @@ export default function App() {
       updatedKnockout.rounds[roundIdx][matchIdx].court = cleanCourt;
     }
     const updated = { ...poolTournament, knockout: updatedKnockout };
+    setPoolTournament(updated);
+    broadcastTournamentChange({ poolTournament: updated });
+  }
+
+  function handleBatchAssignPoolCourtsAndLive(assignments) {
+    if (!poolTournament || !Array.isArray(assignments) || assignments.length === 0) return;
+    const poolAssignMap = new Map();
+    const koAssignMap = new Map();
+    let bronzeAssign = null;
+
+    assignments.forEach((a) => {
+      if (a.type === 'pool') {
+        poolAssignMap.set(`${a.poolId}:${a.matchId}`, a.court);
+      } else if (a.type === 'knockout') {
+        if (a.isBronze) bronzeAssign = a.court;
+        else koAssignMap.set(`${a.roundIdx}:${a.matchIdx}`, a.court);
+      }
+    });
+
+    const nextPools = (poolTournament.pools || []).map((pool) => ({
+      ...pool,
+      matches: (pool.matches || []).map((m) => {
+        const key = `${pool.id}:${m.id}`;
+        if (!poolAssignMap.has(key)) return m;
+        return { ...m, court: Number(poolAssignMap.get(key)), inProgress: true };
+      }),
+    }));
+
+    let nextKnockout = poolTournament.knockout
+      ? JSON.parse(JSON.stringify(poolTournament.knockout))
+      : null;
+    if (nextKnockout) {
+      if (Array.isArray(nextKnockout.rounds)) {
+        nextKnockout.rounds = nextKnockout.rounds.map((r, rIdx) =>
+          r.map((m, mIdx) => {
+            const key = `${rIdx}:${mIdx}`;
+            if (!koAssignMap.has(key)) return m;
+            return { ...m, court: Number(koAssignMap.get(key)), inProgress: true };
+          })
+        );
+      }
+      if (bronzeAssign !== null && nextKnockout.bronzeMatch) {
+        nextKnockout.bronzeMatch = {
+          ...nextKnockout.bronzeMatch,
+          court: Number(bronzeAssign),
+          inProgress: true,
+        };
+      }
+    }
+
+    const updated = { ...poolTournament, pools: nextPools, knockout: nextKnockout };
     setPoolTournament(updated);
     broadcastTournamentChange({ poolTournament: updated });
   }
@@ -2563,6 +2635,7 @@ export default function App() {
             onToggleInProgress={handleToggleGameInProgress}
             numCourts={numCourts}
             onSetGameCourt={handleSetGameCourt}
+            onBatchAssignCourtsLive={handleBatchAssignMlpCourtsAndLive}
             onOpenEditMatchup={(game) => setEditingMatchupGame(game)}
             onShuffleGame={handleShuffleSingleGame}
             onRevertGame={handleRevertSingleGame}
@@ -2739,6 +2812,7 @@ export default function App() {
             onToggleKnockoutMatchLive={handleToggleKnockoutMatchLive}
             onSetKnockoutMatchCourt={handleSetKnockoutMatchCourt}
             onEditKnockoutMatch={handleEditKnockoutMatch}
+            onBatchAssignCourtsLive={handleBatchAssignPoolCourtsAndLive}
             onOpenSetup={() => setView('poolSetup')}
             isAdmin={isAdmin}
           />

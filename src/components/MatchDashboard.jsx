@@ -19,6 +19,7 @@ import {
   Download,
 } from 'lucide-react';
 import { generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
+import { MlpCourtAssignModal } from './CourtAssignModal';
 
 function TeamDot({ color, className = '' }) {
   return (
@@ -334,6 +335,7 @@ export function MatchDashboard({
   onToggleInProgress,
   numCourts = 2,
   onSetGameCourt,
+  onBatchAssignCourtsLive,
   onOpenEditMatchup,
   onShuffleGame,
   onRandomizeUpcoming,
@@ -346,6 +348,7 @@ export function MatchDashboard({
   isAdmin,
 }) {
   const [expandedId, setExpandedId] = useState(null);
+  const [isCourtAssignOpen, setIsCourtAssignOpen] = useState(false);
 
   if (!match.games) return null;
   const isTie = match.status === 'tied';
@@ -369,6 +372,18 @@ export function MatchDashboard({
         </button>
 
         <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+          {isAdmin && hasUpcomingGames && onBatchAssignCourtsLive && (
+            <button
+              type="button"
+              onClick={() => setIsCourtAssignOpen(true)}
+              title="Assign upcoming games to available courts and mark them live"
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 text-xs font-bold border border-cyan-500/40 active:scale-95 transition shadow-sm"
+            >
+              <Play size={12} className="fill-current shrink-0" />
+              <span className="hidden xs:inline">Assign Courts &amp; Live</span>
+              <span className="xs:hidden">Courts</span>
+            </button>
+          )}
           {isAdmin && hasUpcomingGames && (
             <button
               onClick={onRandomizeUpcoming}
@@ -515,6 +530,15 @@ export function MatchDashboard({
           isAdmin={isAdmin}
         />
       ))}
+
+      <MlpCourtAssignModal
+        isOpen={isCourtAssignOpen}
+        onClose={() => setIsCourtAssignOpen(false)}
+        games={match.games}
+        numCourts={numCourts}
+        playersById={playersById}
+        onApply={(assignments) => onBatchAssignCourtsLive && onBatchAssignCourtsLive(assignments)}
+      />
     </div>
   );
 }
