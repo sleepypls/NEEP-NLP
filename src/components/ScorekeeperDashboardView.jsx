@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Flame,
   Check,
@@ -47,9 +47,14 @@ function PoolLiveCourtCard({
   });
 
   const [games, setGames] = useState(() => resizeGamesForBestOf(match.games || [], fmt.bestOf));
+  const matchKeyRef = useRef(`${match.id}:${fmt.bestOf}`);
 
   useEffect(() => {
-    setGames(resizeGamesForBestOf(match.games || [], fmt.bestOf));
+    const nextKey = `${match.id}:${fmt.bestOf}`;
+    if (matchKeyRef.current !== nextKey) {
+      matchKeyRef.current = nextKey;
+      setGames(resizeGamesForBestOf(match.games || [], fmt.bestOf));
+    }
   }, [match.id, match.games, fmt.bestOf]);
 
   const evalRes = evaluatePoolOrKnockoutMatch(games, fmt.bestOf);
@@ -211,11 +216,16 @@ function MlpLiveCourtCard({
   const { round, idx, game, gameIndex, matchLabel, teamAName, teamBName, roundLabel } = liveItem;
   const [scoreA, setScoreA] = useState(game.scoreA ? String(game.scoreA) : '');
   const [scoreB, setScoreB] = useState(game.scoreB ? String(game.scoreB) : '');
+  const gameKeyRef = useRef(`${round}:${idx}:${game.id}`);
 
   useEffect(() => {
-    setScoreA(game.scoreA ? String(game.scoreA) : '');
-    setScoreB(game.scoreB ? String(game.scoreB) : '');
-  }, [game.id, game.scoreA, game.scoreB]);
+    const nextKey = `${round}:${idx}:${game.id}`;
+    if (gameKeyRef.current !== nextKey) {
+      gameKeyRef.current = nextKey;
+      setScoreA(game.scoreA ? String(game.scoreA) : '');
+      setScoreB(game.scoreB ? String(game.scoreB) : '');
+    }
+  }, [round, idx, game.id, game.scoreA, game.scoreB]);
 
   function getPlayerName(id) {
     const val = playersById[id];
