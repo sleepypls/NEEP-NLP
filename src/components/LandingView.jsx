@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, ArrowRight, ShieldCheck, KeyRound, Lock, History, Cloud, AlertCircle, Loader2, Eye, Trash2, Trophy, Users } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, KeyRound, Lock, History, AlertCircle, Loader2, Eye, Trash2, Trophy, Users } from 'lucide-react';
 import { APP_VERSION } from '../version';
 import { sanitizeRoomId } from '../utils/room';
 
@@ -10,9 +10,7 @@ export function LandingView({
   savedRooms = [],
   onResumeRecentRoom,
   onRemoveSavedRoom,
-  onOpenCloudConfig,
   onOpenAdminPortal,
-  isCloudActive,
 }) {
   const [selectedStyle, setSelectedStyle] = useState('mlp');
   const [joinRoomId, setJoinRoomId] = useState('');
@@ -83,17 +81,6 @@ export function LandingView({
                 <span>Admin Portal</span>
               </button>
             )}
-            <button
-              onClick={onOpenCloudConfig}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
-                isCloudActive
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
-              }`}
-            >
-              <Cloud size={13} />
-              <span>{isCloudActive ? 'Cloud Online' : 'Local Mode'}</span>
-            </button>
           </div>
         </div>
       </header>
@@ -391,7 +378,7 @@ export function LandingView({
 
       {/* Minimal Footer */}
       <footer className="border-t border-slate-900 py-4 px-4 text-center text-xs text-slate-400 flex items-center justify-center gap-3 flex-wrap">
-        <span>NEEP-NLP Score Tracker ({APP_VERSION}) &middot; Real-time Cloud Sync</span>
+        <span>NEEP-NLP Score Tracker ({APP_VERSION})</span>
         {onOpenAdminPortal && (
           <>
             <span>&middot;</span>
