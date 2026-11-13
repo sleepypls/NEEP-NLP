@@ -14,6 +14,8 @@ import {
   BarChart3,
   Plus,
   Minus,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   getEntryDisplayName,
@@ -331,7 +333,17 @@ export function PoolPlayView({
   const hasPools = Boolean(tournament?.pools && tournament.pools.length > 0 && tournament?.structure !== 'knockout_only');
   const [activeTab, setActiveTab] = useState(!hasPools || tournament?.knockout ? 'knockout' : 'pools');
   const [selectedPoolId, setSelectedPoolId] = useState('all');
+  const [expandedPoolIds, setExpandedPoolIds] = useState(() => new Set());
   const [editingMatchCtx, setEditingMatchCtx] = useState(null);
+
+  function togglePoolSchedule(poolId) {
+    setExpandedPoolIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(poolId)) next.delete(poolId);
+      else next.add(poolId);
+      return next;
+    });
+  }
   const [leaderboardMode, setLeaderboardMode] = useState('entries');
   const [isCourtAssignOpen, setIsCourtAssignOpen] = useState(false);
 
@@ -682,31 +694,58 @@ export function PoolPlayView({
               poolFormat.bestOf,
               tournament?.tiebreakerRules
             );
+            const isScheduleExpanded = expandedPoolIds.has(pool.id);
             return (
               <div
                 key={pool.id}
-                className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-5"
+                className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4"
               >
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg font-black text-white font-display uppercase tracking-wide">
-                      {pool.name}
-                    </h3>
-                    {Array.isArray(pool.assignedCourts) && pool.assignedCourts.length > 0 && (
-                      <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
-                        {pool.assignedCourts.length === 1
-                          ? `Court ${pool.assignedCourts[0]}`
-                          : `Courts ${pool.assignedCourts.join(', ')}`}
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => togglePoolSchedule(pool.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      togglePoolSchedule(pool.id);
+                    }
+                  }}
+                  className="cursor-pointer select-none space-y-4 group"
+                  title={isScheduleExpanded ? 'Click to hide pool schedule' : 'Click to show pool schedule'}
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg font-black text-white font-display uppercase tracking-wide group-hover:text-[#d7f24c] transition">
+                        {pool.name}
+                      </h3>
+                      {Array.isArray(pool.assignedCourts) && pool.assignedCourts.length > 0 && (
+                        <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
+                          {pool.assignedCourts.length === 1
+                            ? `Court ${pool.assignedCourts[0]}`
+                            : `Courts ${pool.assignedCourts.join(', ')}`}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-slate-400 font-semibold">
+                        Top {advancePerPool} qualify
                       </span>
-                    )}
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-xl bg-slate-800/90 group-hover:bg-slate-800 text-slate-200 border border-slate-700 transition">
+                        {isScheduleExpanded ? (
+                          <>
+                            <ChevronUp size={13} className="text-[#d7f24c]" /> Hide Schedule
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown size={13} className="text-[#d7f24c]" /> Schedule ({pool.matches.length})
+                          </>
+                        )}
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-xs text-slate-400 font-semibold">
-                    Top {advancePerPool} qualify for Knockout
-                  </span>
-                </div>
 
-                {/* Standings Table */}
-                <div className="overflow-x-auto bg-slate-950/60 border border-slate-800/80 rounded-2xl">
+                  {/* Standings Table */}
+                  <div className="overflow-x-auto bg-slate-950/60 border border-slate-800/80 rounded-2xl">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-800">
@@ -837,50 +876,53 @@ export function PoolPlayView({
                     </span>
                   </div>
                 </div>
-
-                {/* Pool Matches Grid */}
-                <div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2.5">
-                    {pool.name} Match Schedule ({pool.matches.length} Matches)
-                  </span>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {pool.matches.map((match) => {
-                      const fmt = getEffectiveMatchFormat(tournament, match, { isKnockout: false });
-                      return (
-                        <MatchScoreEditor
-                          key={match.id}
-                          match={match}
-                          entryA={entryMap.get(match.entryAId)}
-                          entryB={entryMap.get(match.entryBId)}
-                          bestOf={fmt.bestOf}
-                          pointsTo={fmt.pointsTo}
-                          isCustomFormat={fmt.isCustom}
-                          numCourts={numCourts}
-                          onSetCourt={
-                            onSetPoolMatchCourt
-                              ? (ct) => onSetPoolMatchCourt(pool.id, match.id, ct)
-                              : undefined
-                          }
-                          isAdmin={isAdmin}
-                          onToggleLive={() => onTogglePoolMatchLive(pool.id, match.id)}
-                          onEditMatchup={() =>
-                            setEditingMatchCtx({
-                              type: 'pool',
-                              poolId: pool.id,
-                              match,
-                              stageLabel: `${pool.name} \u2022 R${match.round}`,
-                              defaultFormat: getEffectiveMatchFormat(tournament, null, { isKnockout: false }),
-                              allowBye: false,
-                            })
-                          }
-                          onSave={(games, winnerId) =>
-                            onSavePoolMatch(pool.id, match.id, games, winnerId)
-                          }
-                        />
-                      );
-                    })}
-                  </div>
                 </div>
+
+                {/* Pool Matches Grid (hidden until user clicks/touches pool) */}
+                {isScheduleExpanded && (
+                  <div className="pt-1 border-t border-slate-800/80">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2.5">
+                      {pool.name} Match Schedule ({pool.matches.length} Matches)
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {pool.matches.map((match) => {
+                        const fmt = getEffectiveMatchFormat(tournament, match, { isKnockout: false });
+                        return (
+                          <MatchScoreEditor
+                            key={match.id}
+                            match={match}
+                            entryA={entryMap.get(match.entryAId)}
+                            entryB={entryMap.get(match.entryBId)}
+                            bestOf={fmt.bestOf}
+                            pointsTo={fmt.pointsTo}
+                            isCustomFormat={fmt.isCustom}
+                            numCourts={numCourts}
+                            onSetCourt={
+                              onSetPoolMatchCourt
+                                ? (ct) => onSetPoolMatchCourt(pool.id, match.id, ct)
+                                : undefined
+                            }
+                            isAdmin={isAdmin}
+                            onToggleLive={() => onTogglePoolMatchLive(pool.id, match.id)}
+                            onEditMatchup={() =>
+                              setEditingMatchCtx({
+                                type: 'pool',
+                                poolId: pool.id,
+                                match,
+                                stageLabel: `${pool.name} \u2022 R${match.round}`,
+                                defaultFormat: getEffectiveMatchFormat(tournament, null, { isKnockout: false }),
+                                allowBye: false,
+                              })
+                            }
+                            onSave={(games, winnerId) =>
+                              onSavePoolMatch(pool.id, match.id, games, winnerId)
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
