@@ -95,145 +95,207 @@ function PoolMatchSelfScoreRow({
     });
   }
 
+  const isLive = Boolean(match.inProgress && !match.saved);
+  const needsMyApproval = Boolean(pending && pending.submittedBySide !== mySide);
+
   return (
     <div
-      className={`rounded-2xl p-3 border space-y-2.5 ${
-        pending && pending.submittedBySide !== mySide
-          ? 'bg-amber-500/10 border-amber-500/40'
-          : match.inProgress
-            ? 'bg-slate-950/90 border-amber-500/35'
+      className={`rounded-2xl p-3.5 border space-y-3 transition ${
+        needsMyApproval
+          ? 'bg-amber-500/15 border-2 border-amber-400/70 shadow-lg shadow-amber-500/10'
+          : isLive
+            ? 'bg-gradient-to-br from-amber-500/15 via-slate-950 to-slate-950 border-2 border-amber-400/75 shadow-lg shadow-amber-500/10'
             : 'bg-slate-950/70 border-slate-800'
       }`}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
-          {match.court && (
-            <span className="text-[10px] font-mono font-black bg-[#d7f24c] text-slate-950 px-2 py-0.5 rounded-full">
-              Court {match.court}
-            </span>
-          )}
-          <span className="text-[11px] font-bold text-slate-300">{stage}</span>
-          {match.inProgress && !match.saved && (
-            <span className="text-[10px] font-bold bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-              <Flame size={10} /> LIVE
+          {isLive && (
+            <span className="text-[10px] font-black bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />
+              <Flame size={11} /> LIVE NOW
               {match.liveStartedAt && (
                 <LiveTimer startedAt={match.liveStartedAt} className="text-[10px] text-slate-950 font-black" />
               )}
             </span>
           )}
+          {match.court && (
+            <span className="text-[11px] font-mono font-black bg-[#d7f24c] text-slate-950 px-2.5 py-0.5 rounded-full">
+              Court {match.court}
+            </span>
+          )}
+          <span className="text-[11px] font-bold text-slate-300">{stage}</span>
         </div>
         <span className="text-[10px] font-mono text-slate-400">
           {bestOf > 1 ? `Best of ${bestOf}` : '1 Game'} to {format?.pointsTo || 11}
         </span>
       </div>
 
-      <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
-        <span className={mySide === 'A' ? 'text-[#d7f24c]' : 'text-slate-200'}>
-          {nameA} {mySide === 'A' && '(You)'}
-        </span>
-        <span className="text-slate-500">vs</span>
-        <span className={mySide === 'B' ? 'text-[#d7f24c]' : 'text-slate-200'}>
-          {nameB} {mySide === 'B' && '(You)'}
-        </span>
-      </div>
-
       {pending ? (
-        pending.submittedBySide === mySide ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2 flex-wrap">
-            <div className="text-xs text-slate-300 flex items-center gap-1.5">
-              <Clock size={13} className="text-amber-400 shrink-0" />
-              <span>
-                Submitted <strong className="text-white font-mono">{pendingSummary}</strong> &mdash; waiting for opponent approval
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => onRejectPending(item)}
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 text-[11px] font-bold transition"
-            >
-              Withdraw
-            </button>
+        <div className="space-y-2.5">
+          <div className="space-y-1.5">
+            {[
+              { side: 'A', name: nameA },
+              { side: 'B', name: nameB },
+            ].map((team) => {
+              const isMe = mySide === team.side;
+              return (
+                <div
+                  key={team.side}
+                  className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border ${
+                    isMe
+                      ? 'bg-[#d7f24c]/10 border-[#d7f24c]/35'
+                      : 'bg-slate-900/75 border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-xs font-bold truncate ${isMe ? 'text-[#d7f24c]' : 'text-slate-100'}`}>
+                      {team.name}
+                    </span>
+                    {isMe && (
+                      <span className="text-[9px] font-black uppercase bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded shrink-0">
+                        You
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {(pending.games || [])
+                      .filter((g) => g.scoreA !== '' && g.scoreB !== '')
+                      .map((g, idx) => (
+                        <span
+                          key={g.gameNum || idx}
+                          className="min-w-[2rem] text-center font-mono text-xs font-black text-white bg-slate-950 border border-slate-700 rounded-lg px-2 py-1"
+                        >
+                          {team.side === 'A' ? g.scoreA : g.scoreB}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        ) : (
-          <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-2.5 space-y-2">
-            <div className="text-xs text-amber-200 font-semibold">
-              <strong>{pending.submittedByName}</strong> submitted score:{' '}
-              <span className="font-mono font-black text-white">{pendingSummary}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onApprovePending(item)}
-                className="flex-1 py-2 px-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95"
-              >
-                <Check size={14} /> Approve &amp; Finalize
-              </button>
+
+          {pending.submittedBySide === mySide ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2 flex-wrap">
+              <div className="text-xs text-slate-300 flex items-center gap-1.5">
+                <Clock size={13} className="text-amber-400 shrink-0" />
+                <span>
+                  Submitted <strong className="text-white font-mono">{pendingSummary}</strong> &mdash; waiting for opponent approval
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => onRejectPending(item)}
-                className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center gap-1 transition"
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 text-[11px] font-bold transition"
               >
-                <X size={13} /> Reject
+                Withdraw
               </button>
             </div>
-          </div>
-        )
-      ) : (
-        <form onSubmit={handleSubmit} className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {draftGames.map((g, gIdx) => (
-              <div
-                key={g.gameNum || gIdx}
-                className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5"
-              >
-                {bestOf > 1 && (
-                  <span className="text-[10px] font-mono text-slate-400 mr-0.5">
-                    G{gIdx + 1}:
-                  </span>
-                )}
-                <input
-                  type="number"
-                  min={0}
-                  max={99}
-                  value={g.scoreA}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setDraftGames((prev) =>
-                      prev.map((row, idx) => (idx === gIdx ? { ...row, scoreA: val } : row))
-                    );
-                  }}
-                  placeholder={mySide === 'A' ? 'You' : 'A'}
-                  className="w-12 bg-slate-950 border border-slate-700 rounded-lg px-1.5 py-1 text-center text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
-                />
-                <span className="text-slate-500 text-xs font-bold">-</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={99}
-                  value={g.scoreB}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setDraftGames((prev) =>
-                      prev.map((row, idx) => (idx === gIdx ? { ...row, scoreB: val } : row))
-                    );
-                  }}
-                  placeholder={mySide === 'B' ? 'You' : 'B'}
-                  className="w-12 bg-slate-950 border border-slate-700 rounded-lg px-1.5 py-1 text-center text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
-                />
+          ) : (
+            <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-2.5 space-y-2">
+              <div className="text-xs text-amber-200 font-semibold">
+                <strong>{pending.submittedByName}</strong> submitted score:{' '}
+                <span className="font-mono font-black text-white">{pendingSummary}</span>
               </div>
-            ))}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onApprovePending(item)}
+                  className="flex-1 py-2 px-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95"
+                >
+                  <Check size={14} /> Approve &amp; Finalize
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRejectPending(item)}
+                  className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center gap-1 transition"
+                >
+                  <X size={13} /> Reject
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-2.5">
+          {bestOf > 1 && (
+            <div className="flex items-center justify-end gap-1.5 pr-3">
+              {draftGames.map((g, gIdx) => (
+                <span
+                  key={g.gameNum || gIdx}
+                  className="w-12 text-center text-[10px] font-mono font-bold text-slate-400"
+                >
+                  G{gIdx + 1}
+                </span>
+              ))}
+            </div>
+          )}
+          <div className="space-y-1.5">
+            {[
+              { side: 'A', name: nameA, field: 'scoreA' },
+              { side: 'B', name: nameB, field: 'scoreB' },
+            ].map((team) => {
+              const isMe = mySide === team.side;
+              return (
+                <div
+                  key={team.side}
+                  className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border ${
+                    isMe
+                      ? 'bg-[#d7f24c]/10 border-[#d7f24c]/35'
+                      : 'bg-slate-900/75 border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-xs sm:text-sm font-bold truncate ${isMe ? 'text-[#d7f24c]' : 'text-slate-100'}`}>
+                      {team.name}
+                    </span>
+                    {isMe && (
+                      <span className="text-[9px] font-black uppercase bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded shrink-0">
+                        You
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {draftGames.map((g, gIdx) => (
+                      <input
+                        key={g.gameNum || gIdx}
+                        type="number"
+                        min={0}
+                        max={99}
+                        aria-label={`${team.name} Game ${gIdx + 1} score`}
+                        value={g[team.field]}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setDraftGames((prev) =>
+                            prev.map((row, idx) =>
+                              idx === gIdx ? { ...row, [team.field]: val } : row
+                            )
+                          );
+                        }}
+                        placeholder="0"
+                        className="w-12 sm:w-14 h-9 bg-slate-950 border border-slate-700 rounded-lg px-1.5 text-center text-sm font-mono font-bold text-white focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+            {errorMsg ? (
+              <p className="text-[11px] text-rose-400 flex items-center gap-1">
+                <ShieldAlert size={12} /> {errorMsg}
+              </p>
+            ) : (
+              <span className="text-[10px] text-slate-500">Enter score next to each team</span>
+            )}
             <button
               type="submit"
-              className="py-1.5 px-3 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 text-xs font-black flex items-center gap-1.5 transition active:scale-95"
+              className="ml-auto py-2 px-4 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 text-xs font-black flex items-center gap-1.5 transition active:scale-95"
             >
               <Send size={12} /> Submit Score
             </button>
           </div>
-          {errorMsg && (
-            <p className="text-[11px] text-rose-400 flex items-center gap-1">
-              <ShieldAlert size={12} /> {errorMsg}
-            </p>
-          )}
         </form>
       )}
     </div>
@@ -285,122 +347,175 @@ function MlpGameSelfScoreRow({
     });
   }
 
+  const isLive = Boolean(game.inProgress && !game.saved);
+  const needsMyApproval = Boolean(pending && pending.submittedBySide !== mySide);
+
   return (
     <div
-      className={`rounded-2xl p-3 border space-y-2.5 ${
-        pending && pending.submittedBySide !== mySide
-          ? 'bg-amber-500/10 border-amber-500/40'
-          : game.inProgress
-            ? 'bg-slate-950/90 border-cyan-500/35'
+      className={`rounded-2xl p-3.5 border space-y-3 transition ${
+        needsMyApproval
+          ? 'bg-amber-500/15 border-2 border-amber-400/70 shadow-lg shadow-amber-500/10'
+          : isLive
+            ? 'bg-gradient-to-br from-cyan-500/15 via-slate-950 to-slate-950 border-2 border-cyan-400/75 shadow-lg shadow-cyan-500/10'
             : 'bg-slate-950/70 border-slate-800'
       }`}
     >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 flex-wrap">
+          {isLive && (
+            <span className="text-[10px] font-black bg-cyan-400 text-slate-950 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-ping" />
+              <Flame size={11} /> LIVE NOW
+              {game.liveStartedAt && (
+                <LiveTimer startedAt={game.liveStartedAt} className="text-[10px] text-slate-950 font-black" />
+              )}
+            </span>
+          )}
           {game.court && (
-            <span className="text-[10px] font-mono font-black bg-[#d7f24c] text-slate-950 px-2 py-0.5 rounded-full">
+            <span className="text-[11px] font-mono font-black bg-[#d7f24c] text-slate-950 px-2.5 py-0.5 rounded-full">
               Court {game.court}
             </span>
           )}
           <span className="text-[11px] font-bold text-slate-300">
             {matchLabel} &bull; Game {gameIndex + 1}
           </span>
-          {game.inProgress && !game.saved && (
-            <span className="text-[10px] font-bold bg-cyan-400 text-slate-950 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-              <Flame size={10} /> LIVE
-              {game.liveStartedAt && (
-                <LiveTimer startedAt={game.liveStartedAt} className="text-[10px] text-slate-950 font-black" />
-              )}
-            </span>
-          )}
         </div>
       </div>
 
-      <div className="text-xs font-bold text-white flex items-center gap-1.5 flex-wrap">
-        <span className={mySide === 'A' ? 'text-[#d7f24c]' : 'text-slate-200'}>
-          {namesA} {mySide === 'A' && '(Your Side)'}
-        </span>
-        <span className="text-slate-500">vs</span>
-        <span className={mySide === 'B' ? 'text-[#d7f24c]' : 'text-slate-200'}>
-          {namesB} {mySide === 'B' && '(Your Side)'}
-        </span>
-      </div>
-
       {pending ? (
-        pending.submittedBySide === mySide ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2 flex-wrap">
-            <div className="text-xs text-slate-300 flex items-center gap-1.5">
-              <Clock size={13} className="text-amber-400 shrink-0" />
-              <span>
-                Submitted <strong className="text-white font-mono">{pending.scoreA} - {pending.scoreB}</strong> &mdash; waiting for opponent approval
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => onRejectPending(item)}
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 text-[11px] font-bold transition"
-            >
-              Withdraw
-            </button>
+        <div className="space-y-2.5">
+          <div className="space-y-1.5">
+            {[
+              { side: 'A', name: namesA, score: pending.scoreA },
+              { side: 'B', name: namesB, score: pending.scoreB },
+            ].map((team) => {
+              const isMe = mySide === team.side;
+              return (
+                <div
+                  key={team.side}
+                  className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border ${
+                    isMe
+                      ? 'bg-[#d7f24c]/10 border-[#d7f24c]/35'
+                      : 'bg-slate-900/75 border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-xs font-bold truncate ${isMe ? 'text-[#d7f24c]' : 'text-slate-100'}`}>
+                      {team.name}
+                    </span>
+                    {isMe && (
+                      <span className="text-[9px] font-black uppercase bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded shrink-0">
+                        You
+                      </span>
+                    )}
+                  </div>
+                  <span className="min-w-[2.5rem] text-center font-mono text-sm font-black text-white bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 shrink-0">
+                    {team.score}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-        ) : (
-          <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-2.5 space-y-2">
-            <div className="text-xs text-amber-200 font-semibold">
-              <strong>{pending.submittedByName}</strong> submitted score:{' '}
-              <span className="font-mono font-black text-white">
-                {pending.scoreA} - {pending.scoreB}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => onApprovePending(item)}
-                className="flex-1 py-2 px-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95"
-              >
-                <Check size={14} /> Approve &amp; Finalize
-              </button>
+
+          {pending.submittedBySide === mySide ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-2 flex-wrap">
+              <div className="text-xs text-slate-300 flex items-center gap-1.5">
+                <Clock size={13} className="text-amber-400 shrink-0" />
+                <span>
+                  Submitted <strong className="text-white font-mono">{pending.scoreA} - {pending.scoreB}</strong> &mdash; waiting for opponent approval
+                </span>
+              </div>
               <button
                 type="button"
                 onClick={() => onRejectPending(item)}
-                className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center gap-1 transition"
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 text-[11px] font-bold transition"
               >
-                <X size={13} /> Reject
+                Withdraw
               </button>
             </div>
-          </div>
-        )
-      ) : (
-        <form onSubmit={handleSubmit} className="flex flex-wrap items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            max={99}
-            value={scoreA}
-            onChange={(e) => setScoreA(e.target.value)}
-            placeholder={mySide === 'A' ? 'You' : 'A'}
-            className="w-14 bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-center text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
-          />
-          <span className="text-slate-500 font-bold">-</span>
-          <input
-            type="number"
-            min={0}
-            max={99}
-            value={scoreB}
-            onChange={(e) => setScoreB(e.target.value)}
-            placeholder={mySide === 'B' ? 'You' : 'B'}
-            className="w-14 bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-center text-xs font-mono font-bold text-white focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
-          />
-          <button
-            type="submit"
-            className="py-1.5 px-3 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 text-xs font-black flex items-center gap-1.5 transition active:scale-95"
-          >
-            <Send size={12} /> Submit Score
-          </button>
-          {errorMsg && (
-            <span className="text-[11px] text-rose-400 flex items-center gap-1 w-full">
-              <ShieldAlert size={12} /> {errorMsg}
-            </span>
+          ) : (
+            <div className="bg-amber-500/15 border border-amber-500/40 rounded-xl p-2.5 space-y-2">
+              <div className="text-xs text-amber-200 font-semibold">
+                <strong>{pending.submittedByName}</strong> submitted score:{' '}
+                <span className="font-mono font-black text-white">
+                  {pending.scoreA} - {pending.scoreB}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onApprovePending(item)}
+                  className="flex-1 py-2 px-3 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95"
+                >
+                  <Check size={14} /> Approve &amp; Finalize
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onRejectPending(item)}
+                  className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center gap-1 transition"
+                >
+                  <X size={13} /> Reject
+                </button>
+              </div>
+            </div>
           )}
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-2.5">
+          <div className="space-y-1.5">
+            {[
+              { side: 'A', name: namesA, value: scoreA, onChange: setScoreA },
+              { side: 'B', name: namesB, value: scoreB, onChange: setScoreB },
+            ].map((team) => {
+              const isMe = mySide === team.side;
+              return (
+                <div
+                  key={team.side}
+                  className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border ${
+                    isMe
+                      ? 'bg-[#d7f24c]/10 border-[#d7f24c]/35'
+                      : 'bg-slate-900/75 border-slate-800'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-xs sm:text-sm font-bold truncate ${isMe ? 'text-[#d7f24c]' : 'text-slate-100'}`}>
+                      {team.name}
+                    </span>
+                    {isMe && (
+                      <span className="text-[9px] font-black uppercase bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded shrink-0">
+                        You
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    max={99}
+                    aria-label={`${team.name} score`}
+                    value={team.value}
+                    onChange={(e) => team.onChange(e.target.value)}
+                    placeholder="0"
+                    className="w-16 h-9 bg-slate-950 border border-slate-700 rounded-lg px-2 text-center text-sm font-mono font-bold text-white focus:outline-none focus:ring-2 focus:ring-[#d7f24c] shrink-0"
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+            {errorMsg ? (
+              <span className="text-[11px] text-rose-400 flex items-center gap-1">
+                <ShieldAlert size={12} /> {errorMsg}
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-500">Enter score next to each team</span>
+            )}
+            <button
+              type="submit"
+              className="ml-auto py-2 px-4 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 text-xs font-black flex items-center gap-1.5 transition active:scale-95"
+            >
+              <Send size={12} /> Submit Score
+            </button>
+          </div>
         </form>
       )}
     </div>
@@ -617,8 +732,42 @@ export function PlayerPortalBanner({
 
   if (!loggedInPlayerName) return null;
 
-  const totalPending =
-    tournamentStyle === 'tournament' ? myPoolMatches.length : myMlpGames.length;
+  const isTournament = tournamentStyle === 'tournament';
+  const allItems = isTournament ? myPoolMatches : myMlpGames;
+  const totalPending = allItems.length;
+
+  const isFeaturedItem = (item) => {
+    const obj = item.match || item.game;
+    const isLive = Boolean(obj?.inProgress && !obj?.saved);
+    const needsApproval = Boolean(
+      obj?.pendingScore && obj.pendingScore.submittedBySide !== item.mySide
+    );
+    return isLive || needsApproval;
+  };
+
+  const featuredItems = allItems.filter(isFeaturedItem);
+  const upcomingItems = allItems.filter((item) => !isFeaturedItem(item));
+
+  const renderItemCard = (item) =>
+    isTournament ? (
+      <PoolMatchSelfScoreRow
+        key={item.key}
+        item={item}
+        playerName={loggedInPlayerName}
+        onSubmitPending={onSubmitPoolPendingScore}
+        onApprovePending={onApprovePoolPendingScore}
+        onRejectPending={onRejectPoolPendingScore}
+      />
+    ) : (
+      <MlpGameSelfScoreRow
+        key={item.key}
+        item={item}
+        playerName={loggedInPlayerName}
+        onSubmitPending={onSubmitMlpPendingScore}
+        onApprovePending={onApproveMlpPendingScore}
+        onRejectPending={onRejectMlpPendingScore}
+      />
+    );
 
   return (
     <div className="max-w-6xl mx-auto px-4 pt-4">
@@ -694,28 +843,35 @@ export function PlayerPortalBanner({
               No active or upcoming matches found for <strong>{loggedInPlayerName}</strong> right now.
             </p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {tournamentStyle === 'tournament'
-                ? myPoolMatches.map((item) => (
-                    <PoolMatchSelfScoreRow
-                      key={item.key}
-                      item={item}
-                      playerName={loggedInPlayerName}
-                      onSubmitPending={onSubmitPoolPendingScore}
-                      onApprovePending={onApprovePoolPendingScore}
-                      onRejectPending={onRejectPoolPendingScore}
-                    />
-                  ))
-                : myMlpGames.map((item) => (
-                    <MlpGameSelfScoreRow
-                      key={item.key}
-                      item={item}
-                      playerName={loggedInPlayerName}
-                      onSubmitPending={onSubmitMlpPendingScore}
-                      onApprovePending={onApproveMlpPendingScore}
-                      onRejectPending={onRejectMlpPendingScore}
-                    />
-                  ))}
+            <div className="space-y-3.5">
+              {featuredItems.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-amber-300">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                    <span>Live Match — Enter or Approve Score</span>
+                  </div>
+                  <div
+                    className={`grid grid-cols-1 ${
+                      featuredItems.length > 1 ? 'md:grid-cols-2' : ''
+                    } gap-3`}
+                  >
+                    {featuredItems.map(renderItemCard)}
+                  </div>
+                </div>
+              )}
+
+              {upcomingItems.length > 0 && (
+                <div className="space-y-2">
+                  {featuredItems.length > 0 && (
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                      Upcoming
+                    </div>
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {upcomingItems.map(renderItemCard)}
+                  </div>
+                </div>
+              )}
             </div>
           )
         )}
