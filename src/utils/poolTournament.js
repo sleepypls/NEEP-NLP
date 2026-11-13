@@ -487,6 +487,35 @@ export function computePoolStandings(pool, entries = [], bestOf = 1, tiebreakerR
     return (a.entry.seed || 999) - (b.entry.seed || 999);
   });
 
+  // Attach Head-to-Head record vs opponents tied on Wins / Win%
+  rows.forEach((row) => {
+    const tiedPeers = rows.filter((other) => {
+      if (other.entryId === row.entryId) return false;
+      if (rules.rankByWinPct) {
+        return Math.abs(other.winPct - row.winPct) <= 1e-9 && other.wins === row.wins;
+      }
+      return other.wins === row.wins;
+    });
+    let h2hW = 0;
+    let h2hL = 0;
+    const notes = [];
+    tiedPeers.forEach((peer) => {
+      const pairKey = [String(row.entryId), String(peer.entryId)].sort().join('|');
+      const wId = h2hWinners.get(pairKey);
+      if (wId === row.entryId) {
+        h2hW += 1;
+        notes.push(`Beat ${peer.name}`);
+      } else if (wId === peer.entryId) {
+        h2hL += 1;
+        notes.push(`Lost to ${peer.name}`);
+      }
+    });
+    row.h2hTiedWins = h2hW;
+    row.h2hTiedLosses = h2hL;
+    row.h2hTiedPlayed = h2hW + h2hL;
+    row.h2hTiedTooltip = notes.length > 0 ? notes.join(' • ') : '';
+  });
+
   return rows;
 }
 

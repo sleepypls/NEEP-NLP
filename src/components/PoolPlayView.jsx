@@ -707,6 +707,7 @@ export function PoolPlayView({
                         <th className="text-left py-2 px-2.5">Entry</th>
                         <th className="text-right py-2 px-2">W - L</th>
                         <th className="text-right py-2 px-2" title="Win Percentage">Win%</th>
+                        <th className="text-right py-2 px-2" title="Head-to-Head vs tied teams">H2H</th>
                         <th className="text-right py-2 px-2" title="Games Won - Games Lost">G (W-L)</th>
                         <th className="text-right py-2 px-2" title="Game Differential (GW − GL)">G+/-</th>
                         <th className="text-right py-2 px-2" title="Points For (Scored)">PF</th>
@@ -757,6 +758,22 @@ export function PoolPlayView({
                             </td>
                             <td className="py-2 px-2 text-right font-mono text-slate-300">
                               {winPct}
+                            </td>
+                            <td
+                              className={`py-2 px-2 text-right font-mono font-semibold whitespace-nowrap ${
+                                row.h2hTiedPlayed > 0
+                                  ? row.h2hTiedWins > row.h2hTiedLosses
+                                    ? 'text-emerald-300'
+                                    : row.h2hTiedWins < row.h2hTiedLosses
+                                    ? 'text-red-400'
+                                    : 'text-slate-300'
+                                  : 'text-slate-600'
+                              }`}
+                              title={row.h2hTiedTooltip || 'Head-to-Head vs tied teams'}
+                            >
+                              {row.h2hTiedPlayed > 0
+                                ? `${row.h2hTiedWins}-${row.h2hTiedLosses}`
+                                : '—'}
                             </td>
                             <td className="py-2 px-2 text-right font-mono text-slate-400 whitespace-nowrap">
                               {row.gamesWon}-{row.gamesLost}
