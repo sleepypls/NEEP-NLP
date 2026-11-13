@@ -255,7 +255,11 @@ export default function App() {
     try {
       const params = new URLSearchParams(window.location.search);
       const urlPlayer = params.get('player');
-      if (urlPlayer && urlPlayer.trim()) return urlPlayer.trim();
+      if (urlPlayer && urlPlayer.trim()) {
+        const clean = urlPlayer.trim();
+        localStorage.setItem(`neep_player_login_${initialRoomId || 'default'}`, clean);
+        return clean;
+      }
       return localStorage.getItem(`neep_player_login_${initialRoomId || 'default'}`) || '';
     } catch (e) {
       return '';
@@ -281,10 +285,11 @@ export default function App() {
       }
       if (!initialRoomId) return 'landing';
       const mode = params.get('mode');
-      if (mode === 'spectator' && initialSaved?.tournamentStyle === 'tournament' && initialSaved?.poolTournament) {
+      const isViewerMode = mode === 'spectator' || mode === 'player';
+      if (isViewerMode && initialSaved?.tournamentStyle === 'tournament' && initialSaved?.poolTournament) {
         return 'poolPlay';
       }
-      if (mode === 'spectator' && initialSaved?.bracket) {
+      if (isViewerMode && initialSaved?.bracket) {
         return 'bracket';
       }
     } catch (e) {
@@ -423,15 +428,23 @@ export default function App() {
         url.searchParams.set('room', roomId);
         changed = true;
       }
-      if (!isAdmin && url.searchParams.get('mode') !== 'spectator') {
-        url.searchParams.set('mode', 'spectator');
+      const desiredMode =
+        loggedInPlayerName || url.searchParams.get('mode') === 'player'
+          ? 'player'
+          : 'spectator';
+      if (!isAdmin && url.searchParams.get('mode') !== desiredMode) {
+        url.searchParams.set('mode', desiredMode);
+        changed = true;
+      }
+      if (!isAdmin && desiredMode === 'player' && loggedInPlayerName && url.searchParams.get('player') !== loggedInPlayerName) {
+        url.searchParams.set('player', loggedInPlayerName);
         changed = true;
       }
       if (changed) {
         window.history.replaceState({}, '', url.toString());
       }
     } catch (e) {}
-  }, [roomId, isAdmin, view]);
+  }, [roomId, isAdmin, view, loggedInPlayerName]);
 
   // 2. Load Stats & Setup Cloud Listeners for Active Room
   const isActiveRoomView = Boolean(roomId) && view !== 'landing' && view !== 'adminPortal';

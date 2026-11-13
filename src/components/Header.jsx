@@ -246,23 +246,13 @@ export function Header({
             </span>
           ) : null}
 
-          {/* Admin vs Spectator Role */}
-          {isAdmin ? (
+          {/* Admin Role Badge (Hidden in Player & Spectator views) */}
+          {isAdmin && (
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[#d7f24c]/15 border border-[#d7f24c]/30 text-[#d7f24c] text-[10px] sm:text-[11px] font-bold whitespace-nowrap">
               <ShieldCheck size={12} className="shrink-0" />
               <span className="hidden xs:inline">Scorekeeper</span>
               <span className="xs:hidden">Admin</span>
             </span>
-          ) : (
-            <button
-              onClick={() => setShowPinPrompt(!showPinPrompt)}
-              title="Click to enter Scorekeeper Admin PIN"
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-400 hover:text-white text-[10px] sm:text-[11px] font-semibold transition whitespace-nowrap"
-            >
-              <Eye size={12} className="shrink-0" />
-              <span className="hidden xs:inline">Spectator</span>
-              <span className="xs:hidden">Spec</span>
-            </button>
           )}
 
           {/* Share Tournament */}
