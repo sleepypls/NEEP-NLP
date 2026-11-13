@@ -11,6 +11,9 @@ import {
   RefreshCw,
   Pencil,
   Settings,
+  BarChart3,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import {
   getEntryDisplayName,
@@ -21,6 +24,8 @@ import {
   resizeGamesForBestOf,
   generatePoolStandingsCSV,
   generatePoolAndKnockoutMatchesCSV,
+  computeTournamentPlayerStats,
+  generateTournamentLeaderboardCSV,
 } from '../utils/poolTournament';
 import { triggerCsvDownload } from '../utils/tournament';
 import { EditPoolMatchModal } from './EditPoolMatchModal';
@@ -53,6 +58,17 @@ function MatchScoreEditor({
       prev.map((g, idx) =>
         idx === gameIdx ? { ...g, [side === 'A' ? 'scoreA' : 'scoreB']: clean === '' ? '' : Number(clean) } : g
       )
+    );
+  }
+
+  function stepScore(gameIdx, side, delta) {
+    const key = side === 'A' ? 'scoreA' : 'scoreB';
+    setGames((prev) =>
+      prev.map((g, idx) => {
+        if (idx !== gameIdx) return g;
+        const curr = g[key] === '' || g[key] == null ? 0 : Number(g[key]);
+        return { ...g, [key]: Math.max(0, curr + delta) };
+      })
     );
   }
 
@@ -177,6 +193,16 @@ function MatchScoreEditor({
                   {bestOf > 1 ? `G${gIdx + 1}` : `to ${pointsTo}`}
                 </span>
                 <div className="flex items-center gap-1.5">
+                  {isAdmin && match.inProgress && !match.saved && (
+                    <button
+                      type="button"
+                      onClick={() => stepScore(gIdx, 'A', -1)}
+                      className="w-6 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-center active:scale-90 transition"
+                      aria-label="Decrease Side A score"
+                    >
+                      <Minus size={11} />
+                    </button>
+                  )}
                   <input
                     type="text"
                     inputMode="numeric"
@@ -186,7 +212,27 @@ function MatchScoreEditor({
                     placeholder="0"
                     className="w-11 bg-slate-800 border border-slate-700 rounded-lg py-1 text-center text-white font-mono font-bold text-xs focus:outline-none focus:ring-1 focus:ring-[#d7f24c] disabled:opacity-70"
                   />
+                  {isAdmin && match.inProgress && !match.saved && (
+                    <button
+                      type="button"
+                      onClick={() => stepScore(gIdx, 'A', 1)}
+                      className="w-6 h-7 rounded-lg bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 border border-[#d7f24c]/40 text-[#d7f24c] flex items-center justify-center active:scale-90 transition"
+                      aria-label="Increase Side A score"
+                    >
+                      <Plus size={11} />
+                    </button>
+                  )}
                   <span className="text-slate-500 font-bold text-xs">-</span>
+                  {isAdmin && match.inProgress && !match.saved && (
+                    <button
+                      type="button"
+                      onClick={() => stepScore(gIdx, 'B', -1)}
+                      className="w-6 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-center active:scale-90 transition"
+                      aria-label="Decrease Side B score"
+                    >
+                      <Minus size={11} />
+                    </button>
+                  )}
                   <input
                     type="text"
                     inputMode="numeric"
@@ -196,6 +242,16 @@ function MatchScoreEditor({
                     placeholder="0"
                     className="w-11 bg-slate-800 border border-slate-700 rounded-lg py-1 text-center text-white font-mono font-bold text-xs focus:outline-none focus:ring-1 focus:ring-[#d7f24c] disabled:opacity-70"
                   />
+                  {isAdmin && match.inProgress && !match.saved && (
+                    <button
+                      type="button"
+                      onClick={() => stepScore(gIdx, 'B', 1)}
+                      className="w-6 h-7 rounded-lg bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 border border-[#d7f24c]/40 text-[#d7f24c] flex items-center justify-center active:scale-90 transition"
+                      aria-label="Increase Side B score"
+                    >
+                      <Plus size={11} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -240,6 +296,7 @@ export function PoolPlayView({
   const [activeTab, setActiveTab] = useState(!hasPools || tournament?.knockout ? 'knockout' : 'pools');
   const [selectedPoolId, setSelectedPoolId] = useState('all');
   const [editingMatchCtx, setEditingMatchCtx] = useState(null);
+  const [leaderboardMode, setLeaderboardMode] = useState('entries');
 
   useEffect(() => {
     if (!hasPools) {
@@ -273,7 +330,10 @@ export function PoolPlayView({
   const visiblePools =
     selectedPoolId === 'all' ? pools : pools.filter((p) => p.id === selectedPoolId);
 
-  const effectiveTab = isKnockoutOnly ? 'knockout' : activeTab;
+  const effectiveTab = isKnockoutOnly && activeTab === 'pools' ? 'knockout' : activeTab;
+  const { entryStats, playerStats } = computeTournamentPlayerStats(tournament);
+  const activeLeaderboardRows =
+    discipline === 'doubles' && leaderboardMode === 'players' ? playerStats : entryStats;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 pb-24 animate-in fade-in duration-200">
@@ -350,10 +410,10 @@ export function PoolPlayView({
         </div>
       </div>
 
-      {/* Main Stage Tabs: Pools vs Knockout */}
+      {/* Main Stage Tabs: Pools vs Knockout vs Leaderboard */}
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
         {!isKnockoutOnly ? (
-          <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 w-full max-w-sm shadow-lg">
+          <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 w-full max-w-lg shadow-lg">
             <button
               type="button"
               onClick={() => setActiveTab('pools')}
@@ -376,10 +436,42 @@ export function PoolPlayView({
             >
               <Trophy size={14} /> Knockout Bracket
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('leaderboard')}
+              className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                effectiveTab === 'leaderboard'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <BarChart3 size={14} /> Leaderboard
+            </button>
           </div>
         ) : (
-          <div className="inline-flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2 text-xs font-bold text-amber-400">
-            <Trophy size={14} /> Single-Elimination Knockout Bracket
+          <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 w-full max-w-sm shadow-lg">
+            <button
+              type="button"
+              onClick={() => setActiveTab('knockout')}
+              className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                effectiveTab === 'knockout'
+                  ? 'bg-amber-400 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Trophy size={14} /> Knockout Bracket
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('leaderboard')}
+              className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                effectiveTab === 'leaderboard'
+                  ? 'bg-emerald-400 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <BarChart3 size={14} /> Leaderboard
+            </button>
           </div>
         )}
 
@@ -787,6 +879,148 @@ export function PoolPlayView({
                 );
               })()}
             </>
+          )}
+        </div>
+      )}
+
+      {/* Leaderboard Tab */}
+      {effectiveTab === 'leaderboard' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-extrabold text-white flex items-center gap-2">
+                <BarChart3 size={18} className="text-emerald-400" />
+                Tournament Leaderboard
+              </h2>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Combined stats across all saved Pool Play &amp; Knockout matches.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {discipline === 'doubles' && (
+                <div className="flex bg-slate-950 border border-slate-800 rounded-xl p-1">
+                  <button
+                    type="button"
+                    onClick={() => setLeaderboardMode('entries')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      leaderboardMode === 'entries'
+                        ? 'bg-[#d7f24c] text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Teams / Pairs
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLeaderboardMode('players')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      leaderboardMode === 'players'
+                        ? 'bg-[#d7f24c] text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Individual Players
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  const label =
+                    discipline === 'doubles' && leaderboardMode === 'players'
+                      ? 'Player'
+                      : discipline === 'doubles'
+                      ? 'Team'
+                      : 'Player';
+                  const csv = generateTournamentLeaderboardCSV(
+                    activeLeaderboardRows,
+                    roomId,
+                    label
+                  );
+                  triggerCsvDownload(
+                    `${roomId || 'room'}-${label.toLowerCase()}-leaderboard.csv`,
+                    csv
+                  );
+                }}
+                className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-emerald-400 text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+              >
+                <Download size={13} /> Leaderboard CSV
+              </button>
+            </div>
+          </div>
+
+          {activeLeaderboardRows.length === 0 ? (
+            <div className="text-center py-10 text-slate-500 text-sm">
+              No entries or match stats recorded yet.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400">
+                    <th className="py-2.5 px-3 font-bold">#</th>
+                    <th className="py-2.5 px-3 font-bold">
+                      {discipline === 'doubles' && leaderboardMode === 'entries'
+                        ? 'Team / Pair'
+                        : 'Player'}
+                    </th>
+                    <th className="py-2.5 px-3 font-bold text-center">Matches</th>
+                    <th className="py-2.5 px-3 font-bold text-center">W - L</th>
+                    <th className="py-2.5 px-3 font-bold text-center">Win %</th>
+                    <th className="py-2.5 px-3 font-bold text-center">Games</th>
+                    <th className="py-2.5 px-3 font-bold text-center">PF / PA</th>
+                    <th className="py-2.5 px-3 font-bold text-right">Diff</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/70 text-xs">
+                  {activeLeaderboardRows.map((row, idx) => (
+                    <tr
+                      key={row.name || idx}
+                      className="hover:bg-slate-950/60 transition"
+                    >
+                      <td className="py-2.5 px-3 font-mono font-bold text-slate-400">
+                        {idx === 0 ? (
+                          <span className="text-amber-400">1</span>
+                        ) : (
+                          idx + 1
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 font-bold text-white">{row.name}</td>
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-300">
+                        {row.matchesPlayed}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono font-bold">
+                        <span className="text-emerald-400">{row.wins}</span>
+                        <span className="text-slate-500"> - </span>
+                        <span className="text-rose-400">{row.losses}</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-200">
+                        {row.winPct}%
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-300">
+                        {row.gamesWon}-{row.gamesLost}
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-mono text-slate-400">
+                        {row.pointsFor}/{row.pointsAgainst}
+                      </td>
+                      <td
+                        className={`py-2.5 px-3 text-right font-mono font-bold ${
+                          row.pointDiff > 0
+                            ? 'text-emerald-400'
+                            : row.pointDiff < 0
+                            ? 'text-rose-400'
+                            : 'text-slate-400'
+                        }`}
+                      >
+                        {row.pointDiff > 0 ? `+${row.pointDiff}` : row.pointDiff}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

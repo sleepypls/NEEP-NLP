@@ -813,3 +813,151 @@ export function generatePoolAndKnockoutMatchesCSV(tournament, roomId = '') {
   return lines.join('\r\n');
 }
 
+/**
+ * Computes combined Pool Play + Knockout player & entry statistics for Leaderboard tab.
+ */
+export function computeTournamentPlayerStats(tournament) {
+  if (!tournament) return { entryStats: [], playerStats: [] };
+  const entries = tournament.entries || [];
+  const entryMap = new Map(entries.map((e) => [e.id, e]));
+  const entryStatsMap = new Map();
+  const playerStatsMap = new Map();
+
+  const ensureEntry = (entryId) => {
+    const entry = entryMap.get(entryId);
+    if (!entry) return null;
+    if (!entryStatsMap.has(entryId)) {
+      entryStatsMap.set(entryId, {
+        id: entryId,
+        name: getEntryDisplayName(entry),
+        matchesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        gamesWon: 0,
+        gamesLost: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        pointDiff: 0,
+      });
+    }
+    return entryStatsMap.get(entryId);
+  };
+
+  const ensurePlayer = (playerName) => {
+    const clean = String(playerName || '').trim();
+    if (!clean) return null;
+    const key = clean.toLowerCase();
+    if (!playerStatsMap.has(key)) {
+      playerStatsMap.set(key, {
+        name: clean,
+        matchesPlayed: 0,
+        wins: 0,
+        losses: 0,
+        gamesWon: 0,
+        gamesLost: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        pointDiff: 0,
+      });
+    }
+    return playerStatsMap.get(key);
+  };
+
+  const recordMatch = (m, bestOf) => {
+    if (!m || m.isBye || !m.saved || !m.winnerId || !m.entryAId || !m.entryBId) return;
+    const evalRes = evaluatePoolOrKnockoutMatch(m.games, m.customFormat?.bestOf || bestOf);
+    const aWon = m.winnerId === m.entryAId;
+
+    const applyTo = (stat, isSideA) => {
+      if (!stat) return;
+      const won = isSideA ? aWon : !aWon;
+      stat.matchesPlayed += 1;
+      if (won) stat.wins += 1;
+      else stat.losses += 1;
+      stat.gamesWon += isSideA ? evalRes.gamesWonA : evalRes.gamesWonB;
+      stat.gamesLost += isSideA ? evalRes.gamesWonB : evalRes.gamesWonA;
+      stat.pointsFor += isSideA ? evalRes.pointsA : evalRes.pointsB;
+      stat.pointsAgainst += isSideA ? evalRes.pointsB : evalRes.pointsA;
+      stat.pointDiff = stat.pointsFor - stat.pointsAgainst;
+    };
+
+    applyTo(ensureEntry(m.entryAId), true);
+    applyTo(ensureEntry(m.entryBId), false);
+
+    (entryMap.get(m.entryAId)?.players || []).forEach((p) => applyTo(ensurePlayer(p), true));
+    (entryMap.get(m.entryBId)?.players || []).forEach((p) => applyTo(ensurePlayer(p), false));
+  };
+
+  const poolBestOf = tournament.poolFormat?.bestOf || 1;
+  (tournament.pools || []).forEach((pool) => {
+    (pool.matches || []).forEach((m) => recordMatch(m, poolBestOf));
+  });
+
+  if (tournament.knockout) {
+    const totalRounds = tournament.knockout.rounds?.length || 1;
+    (tournament.knockout.rounds || []).forEach((round, rIdx) => {
+      const fmt = getEffectiveMatchFormat(tournament, null, {
+        isKnockout: true,
+        totalRounds,
+        roundIdx: rIdx,
+      });
+      round.forEach((m) => recordMatch(m, fmt.bestOf));
+    });
+    if (tournament.knockout.bronzeMatch) {
+      const bFmt = getEffectiveMatchFormat(tournament, tournament.knockout.bronzeMatch, {
+        isKnockout: true,
+        totalRounds,
+        roundIdx: totalRounds - 1,
+        isBronze: true,
+      });
+      recordMatch(tournament.knockout.bronzeMatch, bFmt.bestOf);
+    }
+  }
+
+  const sortStats = (list) =>
+    list
+      .map((s) => ({
+        ...s,
+        winPct: s.matchesPlayed > 0 ? Math.round((s.wins / s.matchesPlayed) * 100) : 0,
+      }))
+      .sort((a, b) => {
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.winPct !== a.winPct) return b.winPct - a.winPct;
+        if (b.gamesWon - b.gamesLost !== a.gamesWon - a.gamesLost) {
+          return b.gamesWon - b.gamesLost - (a.gamesWon - a.gamesLost);
+        }
+        return b.pointDiff - a.pointDiff;
+      });
+
+  return {
+    entryStats: sortStats(Array.from(entryStatsMap.values())),
+    playerStats: sortStats(Array.from(playerStatsMap.values())),
+  };
+}
+
+export function generateTournamentLeaderboardCSV(statsList = [], roomId = '', label = 'Player / Team') {
+  const lines = [
+    ['Room ID', 'Rank', label, 'Matches', 'Wins', 'Losses', 'Win %', 'Games W-L', 'PF', 'PA', 'Point Diff'].join(','),
+  ];
+  statsList.forEach((row, idx) => {
+    lines.push(
+      [
+        roomId,
+        idx + 1,
+        row.name,
+        row.matchesPlayed,
+        row.wins,
+        row.losses,
+        `${row.winPct}%`,
+        `${row.gamesWon}-${row.gamesLost}`,
+        row.pointsFor,
+        row.pointsAgainst,
+        row.pointDiff,
+      ]
+        .map(escapeCsvCell)
+        .join(',')
+    );
+  });
+  return lines.join('\r\n');
+}
+

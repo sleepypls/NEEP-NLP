@@ -1749,6 +1749,29 @@ export default function App() {
     broadcastTournamentChange({ poolEntries: updated });
   }
 
+  function handleClearPoolEntries() {
+    if (poolEntries.length === 0) return;
+    setPoolEntries([]);
+    broadcastTournamentChange({ poolEntries: [] });
+  }
+
+  function handleMovePoolEntry(fromIdx, toIdx) {
+    if (
+      fromIdx < 0 ||
+      toIdx < 0 ||
+      fromIdx >= poolEntries.length ||
+      toIdx >= poolEntries.length ||
+      fromIdx === toIdx
+    ) {
+      return;
+    }
+    const updated = [...poolEntries];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+    setPoolEntries(updated);
+    broadcastTournamentChange({ poolEntries: updated });
+  }
+
   function handleStartPoolTournament() {
     if (poolEntries.length < 2) return;
     const built = generatePoolsAndSchedule({
@@ -2530,8 +2553,10 @@ export default function App() {
           <PoolSetupView
             discipline={poolDiscipline}
             onChangeDiscipline={(val) => {
+              if (val === poolDiscipline) return;
               setPoolDiscipline(val);
-              broadcastTournamentChange({ poolDiscipline: val });
+              setPoolEntries([]);
+              broadcastTournamentChange({ poolDiscipline: val, poolEntries: [] });
             }}
             structure={poolStructure}
             setStructure={(val) => {
@@ -2542,6 +2567,8 @@ export default function App() {
             onAddEntry={handleAddPoolEntry}
             onAddMultipleEntries={handleAddMultiplePoolEntries}
             onRemoveEntry={handleRemovePoolEntry}
+            onClearEntries={handleClearPoolEntries}
+            onMoveEntry={handleMovePoolEntry}
             savedPlayers={savedPlayers}
             onAddAllSavedPlayers={() => handleAddAllDirectoryToPool(poolDiscipline)}
             onRemoveSavedPlayer={handleRemoveSavedPlayer}
