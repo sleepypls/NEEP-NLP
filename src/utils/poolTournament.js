@@ -124,6 +124,7 @@ export function generatePoolsAndSchedule({
   targetBracketSize = 'auto',
   includeBronze = true,
   seedingMode = 'snake',
+  tiebreakerRules = null,
 }) {
   const cleanEntries = entries.map((e, idx) => ({
     ...e,
@@ -246,6 +247,7 @@ export function generatePoolsAndSchedule({
     targetBracketSize,
     includeBronze,
     seedingMode,
+    tiebreakerRules: tiebreakerRules || DEFAULT_TIEBREAKER_RULES,
     knockout: null,
     stage: 'pools', // 'pools' | 'knockout' | 'complete'
   };
@@ -311,15 +313,62 @@ export function evaluatePoolOrKnockoutMatch(games = [], bestOf = 1) {
   };
 }
 
+export const POOL_TIEBREAKER_PRESETS = {
+  standard: {
+    label: 'Pickleball Standard (H2H → Game Diff → Point Diff → Points For)',
+    order: ['h2h', 'gameDiff', 'pointDiff', 'pointsFor'],
+    rankByWinPct: false,
+  },
+  usap: {
+    label: 'USA Pickleball (H2H → Point Diff → Points For → Fewest Pts Allowed)',
+    order: ['h2h', 'pointDiff', 'pointsFor', 'pointsAgainst'],
+    rankByWinPct: false,
+  },
+  point_diff_first: {
+    label: 'Point Differential First (Point Diff → H2H → Points For → Game Diff)',
+    order: ['pointDiff', 'h2h', 'pointsFor', 'gameDiff'],
+    rankByWinPct: false,
+  },
+  game_diff_first: {
+    label: 'Game Differential First (Game Diff → H2H → Point Diff → Points For)',
+    order: ['gameDiff', 'h2h', 'pointDiff', 'pointsFor'],
+    rankByWinPct: false,
+  },
+  points_for: {
+    label: 'Highest Points Scored (Points For → Point Diff → H2H → Fewest Pts Allowed)',
+    order: ['pointsFor', 'pointDiff', 'h2h', 'pointsAgainst'],
+    rankByWinPct: false,
+  },
+  uneven_win_pct: {
+    label: 'Uneven Pools — Win % First (Win % → H2H → Pt Diff/Match → Pts/Match)',
+    order: ['h2h', 'pointDiffPerMatch', 'pointsForPerMatch', 'gameDiffPerMatch'],
+    rankByWinPct: true,
+  },
+};
+
+export const TIEBREAKER_CRITERIA_LABELS = {
+  h2h: 'Head-to-Head',
+  gameDiff: 'Game Differential (GW − GL)',
+  pointDiff: 'Point Differential (PF − PA)',
+  pointsFor: 'Points Scored (PF)',
+  pointsAgainst: 'Fewest Points Allowed (PA)',
+  gamesWon: 'Games Won (GW)',
+  pointDiffPerMatch: 'Point Diff / Match',
+  pointsForPerMatch: 'Points For / Match',
+  gameDiffPerMatch: 'Game Diff / Match',
+};
+
+export const DEFAULT_TIEBREAKER_RULES = {
+  preset: 'standard',
+  order: ['h2h', 'gameDiff', 'pointDiff', 'pointsFor'],
+  rankByWinPct: false,
+};
+
 /**
- * Computes pool standings using PickleballTournaments.com tiebreaker hierarchy:
- * 1. Match Wins (W)
- * 2. Head-to-Head (for 2-way ties)
- * 3. Game Differential (GW - GL)
- * 4. Point Differential (PF - PA)
- * 5. Points For (PF)
+ * Computes pool standings using the configured tiebreaker hierarchy
+ * (defaults to Pickleball Standard: Wins -> H2H -> Game Diff -> Point Diff -> Points For).
  */
-export function computePoolStandings(pool, entries = [], bestOf = 1) {
+export function computePoolStandings(pool, entries = [], bestOf = 1, tiebreakerRules = null) {
   const entryMap = new Map(entries.map((e) => [e.id, e]));
   const statsMap = new Map();
 
@@ -393,19 +442,48 @@ export function computePoolStandings(pool, entries = [], bestOf = 1) {
       pointsForPerMatch: mp > 0 ? r.pointsFor / mp : 0,
     };
   });
+  const rules = tiebreakerRules || DEFAULT_TIEBREAKER_RULES;
+  const order = Array.isArray(rules.order) && rules.order.length > 0
+    ? rules.order
+    : DEFAULT_TIEBREAKER_RULES.order;
+
   rows.sort((a, b) => {
+    if (rules.rankByWinPct) {
+      if (Math.abs(b.winPct - a.winPct) > 1e-9) return b.winPct - a.winPct;
+    }
     if (b.wins !== a.wins) return b.wins - a.wins;
-    // Head-to-head check
-    const pairKey = [String(a.entryId), String(b.entryId)].sort().join('|');
-    const h2hWinner = h2hWinners.get(pairKey);
-    if (h2hWinner === a.entryId) return -1;
-    if (h2hWinner === b.entryId) return 1;
-    // Game differential
-    if (b.gameDiff !== a.gameDiff) return b.gameDiff - a.gameDiff;
-    // Point differential
-    if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
-    // Points for
-    if (b.pointsFor !== a.pointsFor) return b.pointsFor - a.pointsFor;
+
+    for (const key of order) {
+      if (key === 'h2h') {
+        const pairKey = [String(a.entryId), String(b.entryId)].sort().join('|');
+        const h2hWinner = h2hWinners.get(pairKey);
+        if (h2hWinner === a.entryId) return -1;
+        if (h2hWinner === b.entryId) return 1;
+      } else if (key === 'gameDiff') {
+        if (b.gameDiff !== a.gameDiff) return b.gameDiff - a.gameDiff;
+      } else if (key === 'pointDiff') {
+        if (b.pointDiff !== a.pointDiff) return b.pointDiff - a.pointDiff;
+      } else if (key === 'pointsFor') {
+        if (b.pointsFor !== a.pointsFor) return b.pointsFor - a.pointsFor;
+      } else if (key === 'pointsAgainst') {
+        if (a.pointsAgainst !== b.pointsAgainst) return a.pointsAgainst - b.pointsAgainst;
+      } else if (key === 'gamesWon') {
+        if (b.gamesWon !== a.gamesWon) return b.gamesWon - a.gamesWon;
+      } else if (key === 'pointDiffPerMatch') {
+        if (Math.abs(b.pointDiffPerMatch - a.pointDiffPerMatch) > 1e-9) {
+          return b.pointDiffPerMatch - a.pointDiffPerMatch;
+        }
+      } else if (key === 'pointsForPerMatch') {
+        if (Math.abs(b.pointsForPerMatch - a.pointsForPerMatch) > 1e-9) {
+          return b.pointsForPerMatch - a.pointsForPerMatch;
+        }
+      } else if (key === 'gameDiffPerMatch') {
+        if (Math.abs(b.gameDiffPerMatch - a.gameDiffPerMatch) > 1e-9) {
+          return b.gameDiffPerMatch - a.gameDiffPerMatch;
+        }
+      }
+    }
+
     return (a.entry.seed || 999) - (b.entry.seed || 999);
   });
 
@@ -547,6 +625,7 @@ export function generateDirectKnockoutTournament({
   knockoutFormat,
   includeBronze = true,
   seedingMode = 'snake',
+  tiebreakerRules = null,
 }) {
   const ordered =
     seedingMode === 'random'
@@ -610,7 +689,8 @@ export function generateKnockoutBracket(tournament) {
     rows: computePoolStandings(
       pool,
       entries,
-      getEffectiveMatchFormat(tournament, null, { isKnockout: false }).bestOf
+      getEffectiveMatchFormat(tournament, null, { isKnockout: false }).bestOf,
+      tournament?.tiebreakerRules
     ),
   }));
 
@@ -753,7 +833,7 @@ export function generatePoolStandingsCSV(tournament, roomId = '') {
   );
 
   (tournament.pools || []).forEach((pool) => {
-    const standings = computePoolStandings(pool, entries, bestOf);
+    const standings = computePoolStandings(pool, entries, bestOf, tournament?.tiebreakerRules);
     standings.forEach((row, idx) => {
       const qualifies = idx < (tournament.advancePerPool || 2) ? 'Yes' : 'No';
       lines.push(

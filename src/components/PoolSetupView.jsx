@@ -25,7 +25,13 @@ import {
 } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
 import { generateDirectoryCSV, generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
-import { getEntryDisplayName, KNOCKOUT_ROUND_KEYS } from '../utils/poolTournament';
+import {
+  getEntryDisplayName,
+  KNOCKOUT_ROUND_KEYS,
+  POOL_TIEBREAKER_PRESETS,
+  TIEBREAKER_CRITERIA_LABELS,
+  DEFAULT_TIEBREAKER_RULES,
+} from '../utils/poolTournament';
 import { APP_VERSION } from '../version';
 import { DirectoryModal } from './DirectoryModal';
 
@@ -93,6 +99,8 @@ export function PoolSetupView({
   setTargetBracketSize,
   seedingMode = 'snake',
   setSeedingMode,
+  tiebreakerRules = DEFAULT_TIEBREAKER_RULES,
+  setTiebreakerRules,
   poolFormat = { bestOf: 1, pointsTo: 15, winByTwo: true },
   setPoolFormat,
   knockoutFormat = { bestOf: 3, pointsTo: 11, winByTwo: true },
@@ -935,6 +943,127 @@ export function PoolSetupView({
                   <option value={16}>16 Teams (Round of 16)</option>
                   <option value={32}>32 Teams (Round of 32)</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Pool Tiebreaker Rules */}
+            <div className="bg-slate-950/60 border border-slate-800/90 rounded-2xl p-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-200 uppercase tracking-wider">
+                  Pool Tiebreaker Rules
+                </span>
+                <span className="text-[10px] font-mono text-slate-400">
+                  After Match {tiebreakerRules?.rankByWinPct ? 'Win %' : 'Wins'}
+                </span>
+              </div>
+
+              <select
+                disabled={!isAdmin}
+                value={tiebreakerRules?.preset || 'standard'}
+                onChange={(e) => {
+                  const key = e.target.value;
+                  if (key === 'custom') {
+                    setTiebreakerRules &&
+                      setTiebreakerRules({
+                        ...(tiebreakerRules || DEFAULT_TIEBREAKER_RULES),
+                        preset: 'custom',
+                      });
+                  } else if (POOL_TIEBREAKER_PRESETS[key]) {
+                    const p = POOL_TIEBREAKER_PRESETS[key];
+                    setTiebreakerRules &&
+                      setTiebreakerRules({
+                        preset: key,
+                        order: [...p.order],
+                        rankByWinPct: Boolean(p.rankByWinPct),
+                      });
+                  }
+                }}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
+              >
+                {Object.entries(POOL_TIEBREAKER_PRESETS).map(([key, p]) => (
+                  <option key={key} value={key}>
+                    {p.label}
+                  </option>
+                ))}
+                <option value="custom">Custom Tiebreaker Order</option>
+              </select>
+
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  disabled={!isAdmin}
+                  checked={Boolean(tiebreakerRules?.rankByWinPct)}
+                  onChange={(e) =>
+                    setTiebreakerRules &&
+                    setTiebreakerRules({
+                      ...(tiebreakerRules || DEFAULT_TIEBREAKER_RULES),
+                      preset: 'custom',
+                      rankByWinPct: e.target.checked,
+                    })
+                  }
+                  className="accent-[#d7f24c] rounded"
+                />
+                <span>
+                  Rank by <strong className="text-white">Win %</strong> first (recommended for uneven pool sizes)
+                </span>
+              </label>
+
+              <div className="space-y-1">
+                {(tiebreakerRules?.order || DEFAULT_TIEBREAKER_RULES.order).map((critKey, idx, arr) => (
+                  <div
+                    key={critKey}
+                    className="flex items-center justify-between gap-2 bg-slate-900 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[10px] font-mono font-bold text-[#d7f24c] w-4 shrink-0">
+                        {idx + 1}.
+                      </span>
+                      <span className="text-slate-200 font-semibold truncate">
+                        {TIEBREAKER_CRITERIA_LABELS[critKey] || critKey}
+                      </span>
+                    </div>
+                    {isAdmin && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          disabled={idx === 0}
+                          onClick={() => {
+                            if (idx === 0 || !setTiebreakerRules) return;
+                            const next = [...arr];
+                            [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                            setTiebreakerRules({
+                              ...(tiebreakerRules || DEFAULT_TIEBREAKER_RULES),
+                              preset: 'custom',
+                              order: next,
+                            });
+                          }}
+                          className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition"
+                          title="Move up"
+                        >
+                          <ChevronUp size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          disabled={idx === arr.length - 1}
+                          onClick={() => {
+                            if (idx === arr.length - 1 || !setTiebreakerRules) return;
+                            const next = [...arr];
+                            [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                            setTiebreakerRules({
+                              ...(tiebreakerRules || DEFAULT_TIEBREAKER_RULES),
+                              preset: 'custom',
+                              order: next,
+                            });
+                          }}
+                          className="p-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-30 transition"
+                          title="Move down"
+                        >
+                          <ChevronDown size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>

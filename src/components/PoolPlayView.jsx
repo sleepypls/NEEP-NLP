@@ -26,6 +26,8 @@ import {
   generatePoolAndKnockoutMatchesCSV,
   computeTournamentPlayerStats,
   generateTournamentLeaderboardCSV,
+  TIEBREAKER_CRITERIA_LABELS,
+  DEFAULT_TIEBREAKER_RULES,
 } from '../utils/poolTournament';
 import { triggerCsvDownload } from '../utils/tournament';
 import { EditPoolMatchModal } from './EditPoolMatchModal';
@@ -453,6 +455,95 @@ export function PoolPlayView({
         </div>
       </div>
 
+      {/* Live On Court Banner (with Live Timer) */}
+      {(() => {
+        const liveNow = [];
+        (pools || []).forEach((pool) => {
+          (pool.matches || []).forEach((m) => {
+            if (m.inProgress && !m.saved) {
+              liveNow.push({
+                key: `pool-${pool.id}-${m.id}`,
+                court: m.court,
+                stage: `${pool.name} • R${m.round || 1}`,
+                nameA: getEntryDisplayName(entryMap.get(m.entryAId)),
+                nameB: getEntryDisplayName(entryMap.get(m.entryBId)),
+                liveStartedAt: m.liveStartedAt,
+              });
+            }
+          });
+        });
+        if (knockout?.rounds) {
+          const totalR = knockout.rounds.length;
+          knockout.rounds.forEach((round, rIdx) => {
+            const rLabel = getKnockoutRoundLabel(totalR, rIdx);
+            round.forEach((m, mIdx) => {
+              if (!m.isBye && m.inProgress && !m.saved) {
+                liveNow.push({
+                  key: `ko-${rIdx}-${mIdx}`,
+                  court: m.court,
+                  stage: rLabel,
+                  nameA: getEntryDisplayName(entryMap.get(m.entryAId)),
+                  nameB: getEntryDisplayName(entryMap.get(m.entryBId)),
+                  liveStartedAt: m.liveStartedAt,
+                });
+              }
+            });
+          });
+        }
+        if (knockout?.bronzeMatch && knockout.bronzeMatch.inProgress && !knockout.bronzeMatch.saved) {
+          const bm = knockout.bronzeMatch;
+          liveNow.push({
+            key: 'ko-bronze',
+            court: bm.court,
+            stage: 'Bronze Medal',
+            nameA: getEntryDisplayName(entryMap.get(bm.entryAId)),
+            nameB: getEntryDisplayName(entryMap.get(bm.entryBId)),
+            liveStartedAt: bm.liveStartedAt,
+          });
+        }
+        if (liveNow.length === 0) return null;
+        liveNow.sort((a, b) => (a.court || 999) - (b.court || 999));
+        return (
+          <div className="mb-5 bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1.5">
+                <Flame size={13} className="animate-pulse" /> Live On Court ({liveNow.length})
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {liveNow.map((item) => (
+                <div
+                  key={item.key}
+                  className="bg-slate-950/70 border border-amber-500/25 rounded-xl px-3 py-2 flex items-center justify-between gap-2 text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      {item.court && (
+                        <span className="text-[10px] font-mono font-black bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded">
+                          Ct {item.court}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-slate-400 font-semibold truncate">
+                        {item.stage}
+                      </span>
+                    </div>
+                    <div className="text-white font-semibold truncate">
+                      {item.nameA} <span className="text-slate-500">vs</span> {item.nameB}
+                    </div>
+                  </div>
+                  {item.liveStartedAt && (
+                    <LiveTimer
+                      startedAt={item.liveStartedAt}
+                      className="text-[11px] font-black text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full shrink-0"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Main Stage Tabs: Pools vs Knockout vs Leaderboard */}
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
         {!isKnockoutOnly ? (
@@ -578,7 +669,12 @@ export function PoolPlayView({
           )}
 
           {visiblePools.map((pool) => {
-            const standings = computePoolStandings(pool, entries, poolFormat.bestOf);
+            const standings = computePoolStandings(
+              pool,
+              entries,
+              poolFormat.bestOf,
+              tournament?.tiebreakerRules
+            );
             return (
               <div
                 key={pool.id}
@@ -673,6 +769,15 @@ export function PoolPlayView({
                       })}
                     </tbody>
                   </table>
+                  <div className="px-3 py-1.5 border-t border-slate-800/80 text-[10px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold uppercase tracking-wider text-slate-400">Tiebreakers:</span>
+                    <span>
+                      {(tournament?.tiebreakerRules?.rankByWinPct ? 'Win % → ' : 'Wins → ') +
+                        (tournament?.tiebreakerRules?.order || DEFAULT_TIEBREAKER_RULES.order)
+                          .map((k) => TIEBREAKER_CRITERIA_LABELS[k] || k)
+                          .join(' → ')}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Pool Matches Grid */}
