@@ -384,35 +384,6 @@ export default function App() {
   const [showRotateBanner, setShowRotateBanner] = useState(false);
   const rotateTimeoutRef = useRef(null);
 
-  // One-time database reset migration for v0.27 Beta to clear legacy tournaments & names
-  useEffect(() => {
-    const RESET_FLAG_KEY = 'neep_db_reset_v027_done';
-    try {
-      if (!localStorage.getItem(RESET_FLAG_KEY)) {
-        localStorage.setItem(RESET_FLAG_KEY, 'true');
-        wipeAllDatabaseData(roomId ? [roomId] : []).then(() => {
-          localStorage.setItem(RESET_FLAG_KEY, 'true');
-          setSavedPlayers([]);
-          setPlayerPool([]);
-          setTeams([]);
-          setPlayersById({});
-          setRemainingPool([]);
-          setPickSequence([]);
-          setPickPointer(0);
-          setSittingOut([]);
-          setBracket(null);
-          setActivePath(null);
-          setGlobalStats({});
-          setPartnershipStats({});
-          setPriorStats({});
-          setPriorPartnershipStats({});
-          setSavedRoomsHistory([]);
-          setRoomId(null);
-          setView('landing');
-        });
-      }
-    } catch (e) {}
-  }, []);
   useEffect(() => {
     try {
       if (view === 'adminPortal') {
@@ -462,8 +433,9 @@ export default function App() {
   }, [roomId, isAdmin, view]);
 
   // 2. Load Stats & Setup Cloud Listeners for Active Room
+  const isActiveRoomView = Boolean(roomId) && view !== 'landing' && view !== 'adminPortal';
   useEffect(() => {
-    if (!roomId || view === 'landing' || view === 'adminPortal') return;
+    if (!isActiveRoomView) return;
 
     try {
       localStorage.setItem('neep_current_room', roomId);
@@ -541,10 +513,12 @@ export default function App() {
           if (cloudTourn.pickSequence) setPickSequence(cloudTourn.pickSequence);
           if (cloudTourn.pickPointer !== undefined) setPickPointer(cloudTourn.pickPointer);
           if (cloudTourn.sittingOut) setSittingOut(cloudTourn.sittingOut);
-          if (cloudTourn.bracket) {
+          if (cloudTourn.bracket !== undefined) {
             setBracket(cloudTourn.bracket);
-            // Spectator smart routing: if spectator arrives and bracket exists while still on setup, route to bracket!
-            setView((curr) => (curr === 'setup' ? 'bracket' : curr));
+            if (cloudTourn.bracket) {
+              // Spectator smart routing: if spectator arrives and bracket exists while still on setup, route to bracket!
+              setView((curr) => (curr === 'setup' ? 'bracket' : curr));
+            }
           }
           if (cloudTourn.adminPin) setAdminPin(cloudTourn.adminPin);
 
@@ -606,7 +580,7 @@ export default function App() {
       unsubConfigs();
       if (rotateTimeoutRef.current) clearTimeout(rotateTimeoutRef.current);
     };
-  }, [roomId, isAdmin, view]);
+  }, [roomId, isAdmin, isActiveRoomView]);
 
   // Automatically ensure any newly added tournament players are saved to the active room directory
   const prevPoolRef = useRef(playerPool);
