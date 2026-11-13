@@ -167,47 +167,52 @@ export function Header({
 
         {/* Action Controls */}
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          {/* Cloud Status Pill */}
-          <button
-            onClick={onOpenCloudConfig}
-            title={cloudActive ? 'Connected to Firebase Firestore' : 'Running in Local Mode. Click to connect cloud!'}
-            className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-900 hover:bg-slate-850 border border-slate-800 text-xs font-medium transition"
-          >
-            <span className={`w-2 h-2 rounded-full ${cloudActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-            <span className="hidden md:inline text-slate-300 text-[11px] font-mono">
-              {cloudActive ? 'Cloud Live' : 'Local'}
-            </span>
-          </button>
+          {/* Cloud Status Pill (Hidden in Player View) */}
+          {!isPlayerOnly && (
+            <button
+              onClick={onOpenCloudConfig}
+              title={cloudActive ? 'Connected to Firebase Firestore' : 'Running in Local Mode. Click to connect cloud!'}
+              className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1 rounded-full bg-slate-900 hover:bg-slate-850 border border-slate-800 text-xs font-medium transition"
+            >
+              <span className={`w-2 h-2 rounded-full ${cloudActive ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <span className="hidden md:inline text-slate-300 text-[11px] font-mono">
+                {cloudActive ? 'Cloud Live' : 'Local'}
+              </span>
+            </button>
+          )}
 
-          {/* Room Pill */}
-          <button
-            onClick={onOpenRoomModal}
-            title="Tournament Room Sessions. Click to switch or create rooms!"
-            className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900 hover:bg-slate-850 border border-slate-800 text-xs font-medium transition active:scale-95"
-          >
-            <Lock size={11} className="text-amber-400 shrink-0" />
-            <span className="text-slate-300 font-mono text-[10px] sm:text-[11px] font-bold max-w-[48px] xs:max-w-[70px] sm:max-w-none truncate">
-              {roomId || 'Room'}
-            </span>
-          </button>
+          {/* Room Pill (Hidden in Player View) */}
+          {!isPlayerOnly && (
+            <button
+              onClick={onOpenRoomModal}
+              title="Tournament Room Sessions. Click to switch or create rooms!"
+              className="flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900 hover:bg-slate-850 border border-slate-800 text-xs font-medium transition active:scale-95"
+            >
+              <Lock size={11} className="text-amber-400 shrink-0" />
+              <span className="text-slate-300 font-mono text-[10px] sm:text-[11px] font-bold max-w-[48px] xs:max-w-[70px] sm:max-w-none truncate">
+                {roomId || 'Room'}
+              </span>
+            </button>
+          )}
 
           {/* Player Login Pill */}
           {!isAdmin && onOpenPlayerLogin && (
-            <button
-              type="button"
-              onClick={onOpenPlayerLogin}
-              title={loggedInPlayerName ? `Signed in as ${loggedInPlayerName}. Click to switch.` : 'Player Login for match alerts & self-scoring'}
-              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] sm:text-[11px] font-bold transition whitespace-nowrap max-w-[110px] ${
-                loggedInPlayerName
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                  : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-emerald-300'
-              }`}
-            >
-              <UserCheck size={12} className="shrink-0" />
-              <span className="truncate">
-                {loggedInPlayerName ? loggedInPlayerName : 'Player'}
+            isPlayerOnly ? (
+              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] sm:text-[11px] font-bold whitespace-nowrap max-w-[110px] bg-emerald-500/15 border-emerald-500/40 text-emerald-300">
+                <UserCheck size={12} className="shrink-0" />
+                <span className="truncate">{loggedInPlayerName}</span>
               </span>
-            </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onOpenPlayerLogin}
+                title="Player Login for match alerts & self-scoring"
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] sm:text-[11px] font-bold transition whitespace-nowrap max-w-[110px] bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-emerald-300"
+              >
+                <UserCheck size={12} className="shrink-0" />
+                <span className="truncate">Player</span>
+              </button>
+            )
           )}
 
           {/* Admin vs Spectator Role */}
@@ -260,8 +265,8 @@ export function Header({
             </button>
           )}
 
-          {/* Leave Room / Return to Landing Page */}
-          {onExitToLanding && (
+          {/* Leave Room / Return to Landing Page (Hidden in Player View) */}
+          {!isPlayerOnly && onExitToLanding && (
             <button
               onClick={onExitToLanding}
               title="Exit Room & Return to Landing Page"

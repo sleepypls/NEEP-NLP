@@ -800,13 +800,6 @@ export function PlayerPortalBanner({
             )}
             <button
               type="button"
-              onClick={onOpenPlayerLogin}
-              className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 text-[11px] font-bold border border-slate-700 transition"
-            >
-              Switch Player
-            </button>
-            <button
-              type="button"
               onClick={() => setCollapsed((v) => !v)}
               className="p-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 border border-slate-700 transition"
               title={collapsed ? 'Expand My Matches' : 'Collapse My Matches'}

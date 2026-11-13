@@ -430,7 +430,7 @@ export function PoolPlayView({
               <Settings size={13} className="text-[#d7f24c]" /> Edit Settings
             </button>
           )}
-          {!isKnockoutOnly && (
+          {isAdmin && !isKnockoutOnly && (
             <button
               type="button"
               onClick={() => {
@@ -442,16 +442,18 @@ export function PoolPlayView({
               <Download size={13} /> Standings CSV
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => {
-              const csv = generatePoolAndKnockoutMatchesCSV(tournament, roomId);
-              triggerCsvDownload(`${roomId || 'room'}-tournament-matches.csv`, csv);
-            }}
-            className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
-          >
-            <Download size={13} className="text-[#d7f24c]" /> Matches CSV
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                const csv = generatePoolAndKnockoutMatchesCSV(tournament, roomId);
+                triggerCsvDownload(`${roomId || 'room'}-tournament-matches.csv`, csv);
+              }}
+              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+            >
+              <Download size={13} className="text-[#d7f24c]" /> Matches CSV
+            </button>
+          )}
         </div>
       </div>
 
@@ -1178,29 +1180,31 @@ export function PoolPlayView({
                 </div>
               )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  const label =
-                    discipline === 'doubles' && leaderboardMode === 'players'
-                      ? 'Player'
-                      : discipline === 'doubles'
-                      ? 'Team'
-                      : 'Player';
-                  const csv = generateTournamentLeaderboardCSV(
-                    activeLeaderboardRows,
-                    roomId,
-                    label
-                  );
-                  triggerCsvDownload(
-                    `${roomId || 'room'}-${label.toLowerCase()}-leaderboard.csv`,
-                    csv
-                  );
-                }}
-                className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-emerald-400 text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
-              >
-                <Download size={13} /> Leaderboard CSV
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const label =
+                      discipline === 'doubles' && leaderboardMode === 'players'
+                        ? 'Player'
+                        : discipline === 'doubles'
+                        ? 'Team'
+                        : 'Player';
+                    const csv = generateTournamentLeaderboardCSV(
+                      activeLeaderboardRows,
+                      roomId,
+                      label
+                    );
+                    triggerCsvDownload(
+                      `${roomId || 'room'}-${label.toLowerCase()}-leaderboard.csv`,
+                      csv
+                    );
+                  }}
+                  className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-emerald-400 text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+                >
+                  <Download size={13} /> Leaderboard CSV
+                </button>
+              )}
             </div>
           </div>
 

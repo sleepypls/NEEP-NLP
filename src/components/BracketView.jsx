@@ -212,7 +212,7 @@ export function BracketView({
               <Play size={12} className="fill-current" /> Assign Courts &amp; Live
             </button>
           )}
-          {hasAnyGames && (
+          {isAdmin && hasAnyGames && (
             <button
               type="button"
               onClick={handleExportScoresCsv}
@@ -222,7 +222,7 @@ export function BracketView({
               <Download size={13} /> Export Scores CSV
             </button>
           )}
-          {onOpenRosterModal && (
+          {isAdmin && onOpenRosterModal && (
             <button
               onClick={onOpenRosterModal}
               className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
