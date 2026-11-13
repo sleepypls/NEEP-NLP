@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { Trophy, User, Users, Download } from 'lucide-react';
-import { generateLeaderboardCSV, generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
+import {
+  generateLeaderboardCSV,
+  generateIndividualStatsCSV,
+  generatePartnershipStatsCSV,
+  generateMatchScoresCSV,
+  triggerCsvDownload,
+} from '../utils/tournament';
 
 export function LeaderboardView({
   globalStats = {},
@@ -27,6 +33,16 @@ export function LeaderboardView({
     triggerCsvDownload(`${roomId || 'room'}-leaderboard-stats.csv`, csv);
   }
 
+  function handleExportIndividualCsv() {
+    const csv = generateIndividualStatsCSV({ globalStats, roomId });
+    triggerCsvDownload(`${roomId || 'room'}-individual-stats.csv`, csv);
+  }
+
+  function handleExportPartnershipCsv() {
+    const csv = generatePartnershipStatsCSV({ partnershipStats, roomId });
+    triggerCsvDownload(`${roomId || 'room'}-partnership-stats.csv`, csv);
+  }
+
   function handleExportMatchScoresCsv() {
     const csv = generateMatchScoresCSV({ bracket, teams, playersById, roomId });
     triggerCsvDownload(`${roomId || 'room'}-match-scores.csv`, csv);
@@ -49,52 +65,70 @@ export function LeaderboardView({
           </p>
         </div>
 
-        {(hasStats || hasMatchGames) && (
-          <div className="flex items-center gap-2 flex-wrap">
-            {hasStats && (
-              <button
-                type="button"
-                onClick={handleExportLeaderboardCsv}
-                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[#d7f24c] text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-sm"
-                title="Export individual & partnership leaderboard stats as CSV"
-              >
-                <Download size={14} />
-                <span>Export Leaderboard CSV</span>
-              </button>
-            )}
-            {hasMatchGames && (
-              <button
-                type="button"
-                onClick={handleExportMatchScoresCsv}
-                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-sm"
-                title="Export all regulation & Dreambreaker game scores as CSV"
-              >
-                <Download size={14} className="text-[#d7f24c]" />
-                <span>Export Match Scores CSV</span>
-              </button>
-            )}
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            disabled={!hasStats}
+            onClick={handleExportLeaderboardCsv}
+            className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[#d7f24c] text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-sm disabled:opacity-40 disabled:pointer-events-none"
+            title="Download full individual & partnership stat tracking CSV"
+          >
+            <Download size={14} />
+            <span>Download Stats CSV</span>
+          </button>
+          {hasMatchGames && (
+            <button
+              type="button"
+              onClick={handleExportMatchScoresCsv}
+              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+              title="Export all regulation & Dreambreaker game scores as CSV"
+            >
+              <Download size={14} className="text-[#d7f24c]" />
+              <span>Match Scores CSV</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Segmented Tab Switcher */}
-      <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-6 max-w-xs shadow-lg">
-        <button
-          onClick={() => setTab('players')}
-          className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-            tab === 'players' ? 'bg-[#d7f24c] text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <User size={14} /> Individual
-        </button>
-        <button
-          onClick={() => setTab('partnerships')}
-          className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-            tab === 'partnerships' ? 'bg-[#d7f24c] text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Users size={14} /> Partnerships
-        </button>
+      {/* Segmented Tab Switcher + Active Tab CSV Download */}
+      <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+        <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 w-full max-w-xs shadow-lg">
+          <button
+            onClick={() => setTab('players')}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+              tab === 'players' ? 'bg-[#d7f24c] text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <User size={14} /> Individual
+          </button>
+          <button
+            onClick={() => setTab('partnerships')}
+            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+              tab === 'partnerships' ? 'bg-[#d7f24c] text-slate-950 shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Users size={14} /> Partnerships
+          </button>
+        </div>
+
+        {tab === 'players' && playerRows.length > 0 && (
+          <button
+            type="button"
+            onClick={handleExportIndividualCsv}
+            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-[#d7f24c] text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+          >
+            <Download size={13} className="text-[#d7f24c]" /> Individual Stats CSV
+          </button>
+        )}
+        {tab === 'partnerships' && pairRows.length > 0 && (
+          <button
+            type="button"
+            onClick={handleExportPartnershipCsv}
+            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-[#d7f24c] text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+          >
+            <Download size={13} className="text-[#d7f24c]" /> Partnership Stats CSV
+          </button>
+        )}
       </div>
 
       {tab === 'players' && (

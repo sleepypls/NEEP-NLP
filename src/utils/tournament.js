@@ -723,6 +723,89 @@ export function generateMatchScoresCSV({ bracket, teams = [], playersById = {}, 
   return [header.join(','), ...rows].join('\r\n');
 }
 
+export function generateIndividualStatsCSV({ globalStats = {}, roomId = '' }) {
+  const header = [
+    'Rank',
+    'Room ID',
+    'Player',
+    'Matches Played',
+    'Wins',
+    'Losses',
+    'Win %',
+    'Points Won',
+    'Points Lost',
+    'Point Diff',
+    'Dreambreaker +/-',
+  ];
+
+  const playerRows = Object.values(globalStats || {}).sort((a, b) => {
+    const wrA = a.matchesPlayed ? a.wins / a.matchesPlayed : 0;
+    const wrB = b.matchesPlayed ? b.wins / b.matchesPlayed : 0;
+    return wrB - wrA || b.wins - a.wins;
+  });
+
+  const rows = playerRows.map((r, idx) => {
+    const winPct = r.matchesPlayed ? `${Math.round((r.wins / r.matchesPlayed) * 100)}%` : '0%';
+    const ptDiff = (r.pointsWon || 0) - (r.pointsLost || 0);
+    return [
+      idx + 1,
+      roomId,
+      r.name,
+      r.matchesPlayed || 0,
+      r.wins || 0,
+      r.losses || 0,
+      winPct,
+      r.pointsWon || 0,
+      r.pointsLost || 0,
+      ptDiff,
+      r.dreambreakerDiff || 0,
+    ]
+      .map(escapeCsvCell)
+      .join(',');
+  });
+
+  return [header.join(','), ...rows].join('\r\n');
+}
+
+export function generatePartnershipStatsCSV({ partnershipStats = {}, roomId = '' }) {
+  const header = [
+    'Rank',
+    'Room ID',
+    'Partnership',
+    'Games Played',
+    'Wins',
+    'Losses',
+    'Win %',
+    'Points Won',
+    'Points Lost',
+    'Point Diff',
+  ];
+
+  const pairRows = Object.values(partnershipStats || {}).sort((a, b) => {
+    return b.pointDiff - a.pointDiff || b.wins - a.wins || b.gamesPlayed - a.gamesPlayed;
+  });
+
+  const rows = pairRows.map((r, idx) => {
+    const winPct = r.gamesPlayed ? `${Math.round((r.wins / r.gamesPlayed) * 100)}%` : '0%';
+    return [
+      idx + 1,
+      roomId,
+      r.name,
+      r.gamesPlayed || 0,
+      r.wins || 0,
+      r.losses || 0,
+      winPct,
+      r.pointsWon || 0,
+      r.pointsLost || 0,
+      r.pointDiff || 0,
+    ]
+      .map(escapeCsvCell)
+      .join(',');
+  });
+
+  return [header.join(','), ...rows].join('\r\n');
+}
+
 export function generateLeaderboardCSV({ globalStats = {}, partnershipStats = {}, roomId = '' }) {
   const lines = [];
 

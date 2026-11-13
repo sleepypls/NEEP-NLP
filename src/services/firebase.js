@@ -684,6 +684,39 @@ export async function fetchSingleRoomForAdmin(roomId) {
   return found;
 }
 
+export async function fetchRoomStatsForAdmin(roomId) {
+  const cleanId = String(roomId || '').trim().toUpperCase();
+  if (!cleanId) return { playerStats: {}, partnershipStats: {} };
+
+  let playerStats = {};
+  let partnershipStats = {};
+
+  try {
+    const rawStats = localStorage.getItem(`neep_stats_${cleanId}_v1`);
+    const rawPairs = localStorage.getItem(`neep_pairs_${cleanId}_v1`);
+    if (rawStats) playerStats = JSON.parse(rawStats) || {};
+    if (rawPairs) partnershipStats = JSON.parse(rawPairs) || {};
+  } catch (e) {}
+
+  const db = getDb();
+  if (db) {
+    try {
+      const snap = await getDoc(doc(db, 'clubs', cleanId, 'data', 'stats'));
+      if (snap.exists()) {
+        const d = snap.data() || {};
+        if (d.playerStats && Object.keys(d.playerStats).length > 0) {
+          playerStats = d.playerStats;
+        }
+        if (d.partnershipStats && Object.keys(d.partnershipStats).length > 0) {
+          partnershipStats = d.partnershipStats;
+        }
+      }
+    } catch (e) {}
+  }
+
+  return { playerStats, partnershipStats };
+}
+
 export async function adminResetRoomPin(roomId, newPin) {
   const cleanId = String(roomId || '').trim().toUpperCase();
   const cleanPin = String(newPin || '').replace(/\D/g, '').slice(0, 8);

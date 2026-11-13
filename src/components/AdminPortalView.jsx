@@ -26,13 +26,14 @@ import {
 import {
   fetchAllRoomsForAdmin,
   fetchSingleRoomForAdmin,
+  fetchRoomStatsForAdmin,
   adminResetRoomPin,
   adminResetRoomBracket,
   adminDeleteRoom,
 } from '../services/firebase';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
 import { renderQrCardPngDataUrl } from '../utils/qrcode';
-import { triggerCsvDownload } from '../utils/tournament';
+import { generateLeaderboardCSV, triggerCsvDownload } from '../utils/tournament';
 import { APP_VERSION } from '../version';
 
 const MASTER_PASSCODE_KEY = 'neep_master_admin_passcode_v1';
@@ -295,6 +296,28 @@ export function AdminPortalView({
     ].join('\n');
     triggerCsvDownload('neep-nlp-all-rooms-admin.csv', csv);
     showToast('Exported all rooms summary CSV');
+  }
+
+  async function handleDownloadRoomStatsCsv(targetRoomId) {
+    try {
+      const { playerStats, partnershipStats } = await fetchRoomStatsForAdmin(targetRoomId);
+      const hasAny =
+        Object.keys(playerStats || {}).length > 0 ||
+        Object.keys(partnershipStats || {}).length > 0;
+      if (!hasAny) {
+        showToast(`No recorded stats found yet for ${targetRoomId}`, 'error');
+        return;
+      }
+      const csv = generateLeaderboardCSV({
+        globalStats: playerStats,
+        partnershipStats,
+        roomId: targetRoomId,
+      });
+      triggerCsvDownload(`${targetRoomId.toLowerCase()}-stats.csv`, csv);
+      showToast(`Downloaded stat tracking CSV for ${targetRoomId}`);
+    } catch (e) {
+      showToast(`Failed to download stats for ${targetRoomId}`, 'error');
+    }
   }
 
   function handleCopyText(key, text, label) {
@@ -860,6 +883,15 @@ export function AdminPortalView({
                           className="px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 text-xs font-bold flex items-center gap-1 transition"
                         >
                           <Eye size={13} /> Spectate
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadRoomStatsCsv(room.roomId)}
+                          title="Download stat tracking CSV for this room"
+                          className="px-2.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-[#d7f24c] border border-slate-800 text-xs font-bold flex items-center gap-1 transition"
+                        >
+                          <Download size={13} /> Stats CSV
                         </button>
 
                         <button
