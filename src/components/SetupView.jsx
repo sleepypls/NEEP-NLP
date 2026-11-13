@@ -361,42 +361,51 @@ export function SetupView({
             No players yet. Add at least {numTeams * 2} to start a draft.
           </p>
         ) : (
-          <div className="max-h-[380px] lg:max-h-[440px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl p-2.5">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {playerPool.map((p, idx) => {
-                const isCaptain = captainMode === 'manual' && selectedCaptainIds.includes(p.id);
-                return (
-                  <div
-                    key={p.id}
-                    className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border text-xs transition ${
-                      isCaptain
-                        ? 'bg-amber-500/10 border-amber-500/40'
-                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="font-mono text-[11px] text-slate-400 shrink-0">{idx + 1}.</span>
-                      <span className="font-semibold text-white truncate" title={p.name}>
-                        {p.name}
-                      </span>
-                      {isCaptain && (
-                        <Crown size={11} className="text-amber-300 fill-current shrink-0" title="Captain" />
+          <div className="max-h-[380px] lg:max-h-[440px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="py-1.5 px-3 font-bold w-12">#</th>
+                  <th className="py-1.5 px-3 font-bold">Player</th>
+                  {captainMode === 'manual' && <th className="py-1.5 px-3 font-bold w-24 text-center">Role</th>}
+                  {isAdmin && <th className="py-1.5 px-3 font-bold text-right w-16">Action</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/70">
+                {playerPool.map((p, idx) => {
+                  const isCaptain = captainMode === 'manual' && selectedCaptainIds.includes(p.id);
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-900/60 transition">
+                      <td className="py-1.5 px-3 font-mono text-slate-400">{idx + 1}</td>
+                      <td className="py-1.5 px-3 font-semibold text-white">{p.name}</td>
+                      {captainMode === 'manual' && (
+                        <td className="py-1.5 px-3 text-center">
+                          {isCaptain ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                              <Crown size={10} className="fill-current" /> Captain
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-500">Player</span>
+                          )}
+                        </td>
                       )}
-                    </div>
-                    {isAdmin && (
-                      <button
-                        type="button"
-                        onClick={() => removePlayer(p.id)}
-                        className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition shrink-0"
-                        title="Remove player"
-                      >
-                        <X size={13} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      {isAdmin && (
+                        <td className="py-1.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => removePlayer(p.id)}
+                            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition"
+                            title="Remove player"
+                          >
+                            <X size={14} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -695,6 +704,52 @@ export function SetupView({
           <option value={7}>7 Teams (Quarters, Semis, Final, with Byes)</option>
           <option value={8}>8 Teams (Quarters, Semis, Final)</option>
         </select>
+
+        {/* Number of Courts */}
+        {setNumCourts && (
+          <div className="pt-3 mt-3 border-t border-slate-800 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-slate-200 text-xs font-bold">Number of Courts</label>
+              <span className="text-[11px] font-mono text-slate-400">
+                Assign Court 1–{Math.max(1, Number(numCourts) || 2)} to matchups
+              </span>
+            </div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {[1, 2, 3, 4, 6, 8].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={!isAdmin}
+                  onClick={() => setNumCourts(n)}
+                  className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                    Number(numCourts) === n
+                      ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              disabled={!isAdmin}
+              value={numCourts === '' ? '' : numCourts}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                setNumCourts(val === '' ? '' : Math.min(50, Number(val)));
+              }}
+              onBlur={() => {
+                if (!numCourts || Number(numCourts) < 1) setNumCourts(2);
+              }}
+              placeholder="Custom number of courts (e.g. 4)"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
+            />
+          </div>
+        )}
       </div>
 
       {/* Captain Selection Card */}
@@ -854,56 +909,13 @@ export function SetupView({
         />
       </div>
 
-      {/* Number of Courts */}
-      {setNumCourts && (
+      {/* Pre-assign courts per Round 1 matchup */}
+      {setMatchupCourtsConfig && Math.floor(numTeams / 2) >= 1 && (
         <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
-          <label className="text-slate-300 text-sm font-semibold mb-1 block">
-            Number of Courts
-          </label>
-          <p className="text-slate-500 text-xs mb-2.5">
-            Set how many courts are available so scorekeepers can assign court numbers to each game.
-          </p>
-          <div className="grid grid-cols-6 gap-1.5 mb-2">
-            {[1, 2, 3, 4, 6, 8].map((n) => (
-              <button
-                key={n}
-                type="button"
-                disabled={!isAdmin}
-                onClick={() => setNumCourts(n)}
-                className={`py-2 rounded-xl text-xs font-bold transition ${
-                  Number(numCourts) === n
-                    ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
-                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-          <input
-            type="text"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            disabled={!isAdmin}
-            value={numCourts === '' ? '' : numCourts}
-            onFocus={(e) => e.target.select()}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, '');
-              setNumCourts(val === '' ? '' : Math.min(50, Number(val)));
-            }}
-            onBlur={() => {
-              if (!numCourts || Number(numCourts) < 1) setNumCourts(2);
-            }}
-            placeholder="Custom number of courts (e.g. 4)"
-            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
-          />
-
-          {/* Pre-assign courts per Round 1 matchup */}
-          {setMatchupCourtsConfig && Math.floor(numTeams / 2) >= 1 && (
-            <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-bold text-slate-300">
-                  Pre-Assign Courts by Matchup (Round 1)
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-300">
+                Pre-Assign Courts by Matchup (Round 1)
                 </span>
                 {isAdmin && (
                   <button
@@ -983,7 +995,6 @@ export function SetupView({
                 })}
               </div>
             </div>
-          )}
         </div>
       )}
 

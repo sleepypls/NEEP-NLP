@@ -1539,8 +1539,6 @@ export function PoolSetupView({
           </div>
         </label>
 
-        {/* Number of Courts */}
-        {activeTab === 'structure' && numberOfCourtsControl}
       </div>
 
       {/* Saved Configuration Presets Card (from MLP Style App) */}
