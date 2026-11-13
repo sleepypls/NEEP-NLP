@@ -2466,6 +2466,7 @@ export default function App() {
 
   function updatePoolMatchPendingScore(item, pendingScore) {
     if (!poolTournament) return;
+    if (pendingScore && (!item?.match?.inProgress || item?.match?.saved)) return;
     let updated = poolTournament;
     if (item.type === 'pool') {
       updated = {
@@ -2509,6 +2510,7 @@ export default function App() {
 
   function updateMlpGamePendingScore(item, pendingScore) {
     if (!bracket) return;
+    if (pendingScore && (!item?.game?.inProgress || item?.game?.saved)) return;
     const nb = JSON.parse(JSON.stringify(bracket));
     const match = nb.rounds[item.round]?.[item.idx];
     if (!match?.games) return;

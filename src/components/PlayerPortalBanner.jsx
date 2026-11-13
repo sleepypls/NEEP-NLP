@@ -216,6 +216,42 @@ function PoolMatchSelfScoreRow({
             </div>
           )}
         </div>
+      ) : !isLive ? (
+        <div className="space-y-2">
+          <div className="space-y-1.5">
+            {[
+              { side: 'A', name: nameA },
+              { side: 'B', name: nameB },
+            ].map((team) => {
+              const isMe = mySide === team.side;
+              return (
+                <div
+                  key={team.side}
+                  className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border ${
+                    isMe
+                      ? 'bg-[#d7f24c]/10 border-[#d7f24c]/30'
+                      : 'bg-slate-900/60 border-slate-800/80'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-xs font-bold truncate ${isMe ? 'text-[#d7f24c]' : 'text-slate-200'}`}>
+                      {team.name}
+                    </span>
+                    {isMe && (
+                      <span className="text-[9px] font-black uppercase bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded shrink-0">
+                        You
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <Clock size={12} className="text-slate-500 shrink-0" />
+            Upcoming &mdash; score entry opens when this match goes LIVE.
+          </p>
+        </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-2.5">
           {bestOf > 1 && (
@@ -459,6 +495,42 @@ function MlpGameSelfScoreRow({
               </div>
             </div>
           )}
+        </div>
+      ) : !isLive ? (
+        <div className="space-y-2">
+          <div className="space-y-1.5">
+            {[
+              { side: 'A', name: namesA },
+              { side: 'B', name: namesB },
+            ].map((team) => {
+              const isMe = mySide === team.side;
+              return (
+                <div
+                  key={team.side}
+                  className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border ${
+                    isMe
+                      ? 'bg-[#d7f24c]/10 border-[#d7f24c]/30'
+                      : 'bg-slate-900/60 border-slate-800/80'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-xs font-bold truncate ${isMe ? 'text-[#d7f24c]' : 'text-slate-200'}`}>
+                      {team.name}
+                    </span>
+                    {isMe && (
+                      <span className="text-[9px] font-black uppercase bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded shrink-0">
+                        You
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-slate-400 flex items-center gap-1.5">
+            <Clock size={12} className="text-slate-500 shrink-0" />
+            Upcoming &mdash; score entry opens when this match goes LIVE.
+          </p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-2.5">
