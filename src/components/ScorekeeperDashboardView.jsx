@@ -19,7 +19,7 @@ import {
   evaluatePoolOrKnockoutMatch,
   resizeGamesForBestOf,
 } from '../utils/poolTournament';
-import { getBusyMlpPlayerIds, getMlpGamePlayerIds } from '../utils/tournament';
+import { getBusyMlpPlayerIds, getMlpGamePlayerIds, roundName } from '../utils/tournament';
 
 function PoolLiveCourtCard({
   courtNum,
@@ -207,7 +207,7 @@ function MlpLiveCourtCard({
   onSaveGameAt,
   onToggleGameLiveAt,
 }) {
-  const { round, idx, game, gameIndex, matchLabel } = liveItem;
+  const { round, idx, game, gameIndex, matchLabel, teamAName, teamBName, roundLabel } = liveItem;
   const [scoreA, setScoreA] = useState(game.scoreA ? String(game.scoreA) : '');
   const [scoreB, setScoreB] = useState(game.scoreB ? String(game.scoreB) : '');
 
@@ -253,8 +253,8 @@ function MlpLiveCourtCard({
               <LiveTimer startedAt={game.liveStartedAt} className="text-[10px] text-cyan-200" />
             )}
           </span>
-          <span className="text-[11px] font-bold text-slate-400">
-            G{gameIndex + 1} &bull; {matchLabel}
+          <span className="text-[11px] font-bold text-slate-300">
+            {roundLabel ? `${roundLabel} • ` : ''}G{gameIndex + 1} &bull; {matchLabel}
           </span>
         </div>
         <button
@@ -266,10 +266,24 @@ function MlpLiveCourtCard({
         </button>
       </div>
 
-      <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3 space-y-1">
-        <div className="text-sm font-bold text-white truncate">{pairALabel}</div>
+      <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3 space-y-1.5">
+        <div>
+          {teamAName && (
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-cyan-300 block">
+              {teamAName}
+            </span>
+          )}
+          <div className="text-sm font-bold text-white truncate">{pairALabel}</div>
+        </div>
         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">vs</div>
-        <div className="text-sm font-bold text-white truncate">{pairBLabel}</div>
+        <div>
+          {teamBName && (
+            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-300 block">
+              {teamBName}
+            </span>
+          )}
+          <div className="text-sm font-bold text-white truncate">{pairBLabel}</div>
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-2 bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2">
@@ -430,10 +444,12 @@ export function ScorekeeperDashboardView({
   // --- MLP data ---
   const mlpLiveByCourt = new Map();
   const mlpEligible = [];
+  const mlpMatchupGroups = [];
   const mlpSuggestions = {};
   const mlpBusyPlayerIds = !isPoolsMode && bracket ? getBusyMlpPlayerIds(bracket) : new Set();
   if (!isPoolsMode && bracket && Array.isArray(bracket.rounds)) {
     const teamMap = new Map((teams || []).map((t) => [t.id, t.name]));
+    const totalRounds = bracket.rounds.length;
     const getPlayerName = (id) => {
       const val = playersById[id];
       if (typeof val === 'string' && val.trim()) return val;
@@ -442,22 +458,38 @@ export function ScorekeeperDashboardView({
     };
 
     bracket.rounds.forEach((round, rIdx) => {
+      const rLabel = roundName(totalRounds, rIdx);
       round.forEach((m, mIdx) => {
         if (m.isBye || !m.games) return;
-        const matchLabel = `${m.matchNumber ? `#${m.matchNumber} ` : ''}${teamMap.get(m.teamAId) || 'Team A'} vs ${teamMap.get(m.teamBId) || 'Team B'}`;
+        const teamAName = teamMap.get(m.teamAId) || 'Team A';
+        const teamBName = teamMap.get(m.teamBId) || 'Team B';
+        const matchLabel = `${m.matchNumber ? `#${m.matchNumber} ` : ''}${teamAName} vs ${teamBName}`;
+        const upcomingGames = [];
+        let winsA = 0;
+        let winsB = 0;
+        let liveCount = 0;
+
         m.games.forEach((g, gIdx) => {
+          if (g.saved) {
+            if (g.scoreA > g.scoreB) winsA += 1;
+            else if (g.scoreB > g.scoreA) winsB += 1;
+          }
           if (g.inProgress && !g.saved && g.court) {
+            liveCount += 1;
             mlpLiveByCourt.set(Number(g.court), {
               round: rIdx,
               idx: mIdx,
               game: g,
               gameIndex: gIdx,
               matchLabel,
+              teamAName,
+              teamBName,
+              roundLabel: rLabel,
             });
           } else if (!g.saved && !g.inProgress && m.status !== 'complete') {
             const nA = (g.pairA || []).map(getPlayerName).join(' & ');
             const nB = (g.pairB || []).map(getPlayerName).join(' & ');
-            mlpEligible.push({
+            const itemObj = {
               key: `${rIdx}:${mIdx}:${g.id}`,
               round: rIdx,
               idx: mIdx,
@@ -466,10 +498,29 @@ export function ScorekeeperDashboardView({
               preCourt: g.court ? Number(g.court) : null,
               assignedCourts: m.assignedCourts || [],
               players: getMlpGamePlayerIds(g),
+              pairALabel: nA,
+              pairBLabel: nB,
               label: `G${gIdx + 1} (${matchLabel}): ${nA} vs ${nB}`,
-            });
+            };
+            mlpEligible.push(itemObj);
+            upcomingGames.push(itemObj);
           }
         });
+
+        if (m.status !== 'complete' && (upcomingGames.length > 0 || liveCount > 0)) {
+          mlpMatchupGroups.push({
+            key: `${rIdx}:${mIdx}`,
+            roundLabel: rLabel,
+            matchNumber: m.matchNumber,
+            teamAName,
+            teamBName,
+            winsA,
+            winsB,
+            liveCount,
+            assignedCourts: m.assignedCourts || [],
+            upcomingGames,
+          });
+        }
       });
     });
 
@@ -710,47 +761,143 @@ export function ScorekeeperDashboardView({
       </div>
 
       {/* Upcoming / Ready Queue */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
-            Ready / Upcoming Queue ({activeEligible.length})
-          </h3>
-          <span className="text-xs text-slate-400">
-            Select a free court above to dispatch
-          </span>
-        </div>
-
-        {activeEligible.length === 0 ? (
-          <p className="text-xs text-slate-500 italic py-4 text-center">
-            All available matchups are either live on court or completed.
-          </p>
-        ) : (
-          <div className="overflow-x-auto max-h-72 overflow-y-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
-                <tr>
-                  <th className="py-2 px-3 font-bold">#</th>
-                  <th className="py-2 px-3 font-bold">Matchup</th>
-                  <th className="py-2 px-3 font-bold text-right">Pre-Assigned</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/70">
-                {activeEligible.map((item, idx) => (
-                  <tr key={item.key} className="hover:bg-slate-950/60 transition">
-                    <td className="py-2 px-3 font-mono text-slate-400">{idx + 1}</td>
-                    <td className="py-2 px-3 font-semibold text-white">{item.label}</td>
-                    <td className="py-2 px-3 text-right font-mono text-[#d7f24c]">
-                      {(item.preAssignedCourt || item.preCourt)
-                        ? `Court ${item.preAssignedCourt || item.preCourt}`
-                        : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {!isPoolsMode ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
+              Team Matchups &amp; Upcoming Games ({activeEligible.length} ready)
+            </h3>
+            <span className="text-xs text-slate-400">
+              Select a free court above to dispatch
+            </span>
           </div>
-        )}
-      </div>
+
+          {mlpMatchupGroups.length === 0 ? (
+            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl">
+              <p className="text-xs text-slate-500 italic py-4 text-center">
+                All available matchups are either live on court or completed.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {mlpMatchupGroups.map((grp) => (
+                <div
+                  key={grp.key}
+                  className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-3"
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap border-b border-slate-800 pb-2.5">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                        {grp.matchNumber && (
+                          <span className="text-[10px] font-mono font-black bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                            Matchup #{grp.matchNumber}
+                          </span>
+                        )}
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          {grp.roundLabel}
+                        </span>
+                        {grp.assignedCourts.length > 0 && (
+                          <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
+                            Ct {grp.assignedCourts.join(', ')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm font-extrabold text-white flex items-center gap-2 flex-wrap">
+                        <span className="text-cyan-300">{grp.teamAName}</span>
+                        <span className="text-slate-500 text-xs font-bold">vs</span>
+                        <span className="text-amber-300">{grp.teamBName}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] uppercase tracking-wider text-slate-500 block">
+                        Series
+                      </span>
+                      <span className="text-sm font-mono font-black text-white">
+                        {grp.winsA} - {grp.winsB}
+                      </span>
+                    </div>
+                  </div>
+
+                  {grp.upcomingGames.length === 0 ? (
+                    <p className="text-xs text-slate-500 italic py-2 text-center">
+                      All games in this matchup are currently live or completed.
+                    </p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                          <tr>
+                            <th className="py-1.5 px-2 font-bold">Game</th>
+                            <th className="py-1.5 px-2 font-bold text-cyan-300">{grp.teamAName}</th>
+                            <th className="py-1.5 px-2 font-bold text-amber-300">{grp.teamBName}</th>
+                            <th className="py-1.5 px-2 font-bold text-right">Court</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/70">
+                          {grp.upcomingGames.map((gItem) => (
+                            <tr key={gItem.key} className="hover:bg-slate-950/60 transition">
+                              <td className="py-2 px-2 font-mono font-bold text-slate-300">
+                                G{gItem.gameIndex + 1}
+                              </td>
+                              <td className="py-2 px-2 font-semibold text-white">{gItem.pairALabel}</td>
+                              <td className="py-2 px-2 font-semibold text-white">{gItem.pairBLabel}</td>
+                              <td className="py-2 px-2 text-right font-mono text-[#d7f24c]">
+                                {gItem.preCourt ? `Ct ${gItem.preCourt}` : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
+              Ready / Upcoming Queue ({activeEligible.length})
+            </h3>
+            <span className="text-xs text-slate-400">
+              Select a free court above to dispatch
+            </span>
+          </div>
+
+          {activeEligible.length === 0 ? (
+            <p className="text-xs text-slate-500 italic py-4 text-center">
+              All available matchups are either live on court or completed.
+            </p>
+          ) : (
+            <div className="overflow-x-auto max-h-72 overflow-y-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="py-2 px-3 font-bold">#</th>
+                    <th className="py-2 px-3 font-bold">Matchup</th>
+                    <th className="py-2 px-3 font-bold text-right">Pre-Assigned</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/70">
+                  {activeEligible.map((item, idx) => (
+                    <tr key={item.key} className="hover:bg-slate-950/60 transition">
+                      <td className="py-2 px-3 font-mono text-slate-400">{idx + 1}</td>
+                      <td className="py-2 px-3 font-semibold text-white">{item.label}</td>
+                      <td className="py-2 px-3 text-right font-mono text-[#d7f24c]">
+                        {(item.preAssignedCourt || item.preCourt)
+                          ? `Court ${item.preAssignedCourt || item.preCourt}`
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
