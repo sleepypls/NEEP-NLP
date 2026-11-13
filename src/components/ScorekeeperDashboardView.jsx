@@ -11,7 +11,7 @@ import {
   ArrowLeft,
   LayoutGrid,
 } from 'lucide-react';
-import { LiveTimer } from './LiveTimer';
+import { LiveTimer, formatDuration, formatClockTime } from './LiveTimer';
 import {
   buildPoolCourtSuggestions,
   getEntryDisplayName,
@@ -377,6 +377,7 @@ export function ScorekeeperDashboardView({
   onBack,
 }) {
   const [freeCourtChoices, setFreeCourtChoices] = useState({});
+  const [queueFilter, setQueueFilter] = useState('upcoming'); // 'upcoming' | 'ongoing' | 'completed' | 'all'
 
   if (!isAdmin) {
     return (
@@ -396,15 +397,50 @@ export function ScorekeeperDashboardView({
   // --- Pools + Knockout data ---
   let poolInfo = null;
   const poolLiveByCourt = new Map();
+  const poolOngoingMatches = [];
+  const poolCompletedMatches = [];
   if (isPoolsMode && poolTournament) {
     poolInfo = buildPoolCourtSuggestions(poolTournament, totalCourts);
+    const entryMap = new Map((poolTournament.entries || []).map((e) => [e.id, e]));
+    const formatPoolScore = (m) =>
+      (m.games || [])
+        .filter((g) => g.scoreA !== '' && g.scoreB !== '')
+        .map((g) => `${g.scoreA}-${g.scoreB}`)
+        .join(', ');
+    const recordPoolMatch = (m, stage, keyPrefix) => {
+      if (m.isBye || !m.entryAId || !m.entryBId) return;
+      const nA = getEntryDisplayName(entryMap.get(m.entryAId));
+      const nB = getEntryDisplayName(entryMap.get(m.entryBId));
+      if (m.inProgress && !m.saved) {
+        poolOngoingMatches.push({
+          key: `${keyPrefix}:live`,
+          status: 'ongoing',
+          label: `${stage}: ${nA} vs ${nB}`,
+          court: m.court ? Number(m.court) : null,
+          liveStartedAt: m.liveStartedAt,
+        });
+      } else if (m.saved) {
+        poolCompletedMatches.push({
+          key: `${keyPrefix}:done`,
+          status: 'completed',
+          label: `${stage}: ${nA} vs ${nB}`,
+          scoreSummary: formatPoolScore(m),
+          court: m.court ? Number(m.court) : null,
+          durationMs: m.durationMs || null,
+          completedAt: m.completedAt || null,
+        });
+      }
+    };
+
     (poolTournament.pools || []).forEach((pool) => {
       (pool.matches || []).forEach((m) => {
+        const stage = `${pool.name} • R${m.round || 1}`;
+        recordPoolMatch(m, stage, `pool:${pool.id}:${m.id}`);
         if (m.inProgress && !m.saved && m.court) {
           poolLiveByCourt.set(Number(m.court), {
             type: 'pool',
             poolId: pool.id,
-            stage: `${pool.name} • R${m.round || 1}`,
+            stage,
             match: m,
           });
         }
@@ -413,13 +449,15 @@ export function ScorekeeperDashboardView({
     if (poolTournament.knockout?.rounds) {
       poolTournament.knockout.rounds.forEach((round, rIdx) => {
         round.forEach((m) => {
+          const stage = `KO R${rIdx + 1}`;
+          recordPoolMatch(m, stage, `ko:${rIdx}:${m.matchIdx}`);
           if (m.inProgress && !m.saved && m.court) {
             poolLiveByCourt.set(Number(m.court), {
               type: 'knockout',
               roundIdx: rIdx,
               matchIdx: m.matchIdx,
               isBronze: false,
-              stage: `KO R${rIdx + 1}`,
+              stage,
               match: m,
             });
           }
@@ -428,6 +466,7 @@ export function ScorekeeperDashboardView({
     }
     if (poolTournament.knockout?.bronzeMatch) {
       const bm = poolTournament.knockout.bronzeMatch;
+      recordPoolMatch(bm, 'Bronze Medal', 'ko:bronze');
       if (bm.inProgress && !bm.saved && bm.court) {
         poolLiveByCourt.set(Number(bm.court), {
           type: 'knockout',
@@ -465,32 +504,57 @@ export function ScorekeeperDashboardView({
         const teamBName = teamMap.get(m.teamBId) || 'Team B';
         const matchLabel = `${m.matchNumber ? `#${m.matchNumber} ` : ''}${teamAName} vs ${teamBName}`;
         const upcomingGames = [];
+        const ongoingGames = [];
+        const completedGames = [];
         let winsA = 0;
         let winsB = 0;
         let liveCount = 0;
 
         m.games.forEach((g, gIdx) => {
+          const nA = (g.pairA || []).map(getPlayerName).join(' & ');
+          const nB = (g.pairB || []).map(getPlayerName).join(' & ');
           if (g.saved) {
             if (g.scoreA > g.scoreB) winsA += 1;
             else if (g.scoreB > g.scoreA) winsB += 1;
-          }
-          if (g.inProgress && !g.saved && g.court) {
-            liveCount += 1;
-            mlpLiveByCourt.set(Number(g.court), {
-              round: rIdx,
-              idx: mIdx,
-              game: g,
+            completedGames.push({
+              key: `${rIdx}:${mIdx}:${g.id}:done`,
+              status: 'completed',
               gameIndex: gIdx,
-              matchLabel,
-              teamAName,
-              teamBName,
-              roundLabel: rLabel,
+              pairALabel: nA,
+              pairBLabel: nB,
+              scoreA: g.scoreA,
+              scoreB: g.scoreB,
+              court: g.court ? Number(g.court) : null,
+              durationMs: g.durationMs || null,
+              completedAt: g.completedAt || null,
             });
+          } else if (g.inProgress && !g.saved) {
+            liveCount += 1;
+            ongoingGames.push({
+              key: `${rIdx}:${mIdx}:${g.id}:live`,
+              status: 'ongoing',
+              gameIndex: gIdx,
+              pairALabel: nA,
+              pairBLabel: nB,
+              court: g.court ? Number(g.court) : null,
+              liveStartedAt: g.liveStartedAt || null,
+            });
+            if (g.court) {
+              mlpLiveByCourt.set(Number(g.court), {
+                round: rIdx,
+                idx: mIdx,
+                game: g,
+                gameIndex: gIdx,
+                matchLabel,
+                teamAName,
+                teamBName,
+                roundLabel: rLabel,
+              });
+            }
           } else if (!g.saved && !g.inProgress && m.status !== 'complete') {
-            const nA = (g.pairA || []).map(getPlayerName).join(' & ');
-            const nB = (g.pairB || []).map(getPlayerName).join(' & ');
             const itemObj = {
               key: `${rIdx}:${mIdx}:${g.id}`,
+              status: 'upcoming',
               round: rIdx,
               idx: mIdx,
               gameId: g.id,
@@ -507,7 +571,7 @@ export function ScorekeeperDashboardView({
           }
         });
 
-        if (m.status !== 'complete' && (upcomingGames.length > 0 || liveCount > 0)) {
+        if (upcomingGames.length > 0 || ongoingGames.length > 0 || completedGames.length > 0) {
           mlpMatchupGroups.push({
             key: `${rIdx}:${mIdx}`,
             roundLabel: rLabel,
@@ -517,8 +581,11 @@ export function ScorekeeperDashboardView({
             winsA,
             winsB,
             liveCount,
+            isComplete: m.status === 'complete',
             assignedCourts: m.assignedCourts || [],
             upcomingGames,
+            ongoingGames,
+            completedGames,
           });
         }
       });
@@ -760,144 +827,256 @@ export function ScorekeeperDashboardView({
         })}
       </div>
 
-      {/* Upcoming / Ready Queue */}
-      {!isPoolsMode ? (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
-              Team Matchups &amp; Upcoming Games ({activeEligible.length} ready)
-            </h3>
-            <span className="text-xs text-slate-400">
-              Select a free court above to dispatch
-            </span>
+      {/* Upcoming / Ongoing / Completed Queue */}
+      {(() => {
+        const mlpOngoingCount = mlpMatchupGroups.reduce((s, g) => s + g.ongoingGames.length, 0);
+        const mlpCompletedCount = mlpMatchupGroups.reduce((s, g) => s + g.completedGames.length, 0);
+        const upcomingCount = activeEligible.length;
+        const ongoingCount = isPoolsMode ? poolOngoingMatches.length : mlpOngoingCount;
+        const completedCount = isPoolsMode ? poolCompletedMatches.length : mlpCompletedCount;
+        const allCount = upcomingCount + ongoingCount + completedCount;
+
+        const filterPills = (
+          <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl p-1 flex-wrap">
+            {[
+              { id: 'upcoming', label: `Ready / Upcoming (${upcomingCount})` },
+              { id: 'ongoing', label: `Ongoing (${ongoingCount})` },
+              { id: 'completed', label: `Completed (${completedCount})` },
+              { id: 'all', label: `All (${allCount})` },
+            ].map((pill) => (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => setQueueFilter(pill.id)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                  queueFilter === pill.id
+                    ? 'bg-[#d7f24c] text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {pill.label}
+              </button>
+            ))}
           </div>
+        );
 
-          {mlpMatchupGroups.length === 0 ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl">
-              <p className="text-xs text-slate-500 italic py-4 text-center">
-                All available matchups are either live on court or completed.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {mlpMatchupGroups.map((grp) => (
-                <div
-                  key={grp.key}
-                  className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-3"
-                >
-                  <div className="flex items-center justify-between gap-2 flex-wrap border-b border-slate-800 pb-2.5">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                        {grp.matchNumber && (
-                          <span className="text-[10px] font-mono font-black bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                            Matchup #{grp.matchNumber}
-                          </span>
-                        )}
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          {grp.roundLabel}
-                        </span>
-                        {grp.assignedCourts.length > 0 && (
-                          <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
-                            Ct {grp.assignedCourts.join(', ')}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm font-extrabold text-white flex items-center gap-2 flex-wrap">
-                        <span className="text-cyan-300">{grp.teamAName}</span>
-                        <span className="text-slate-500 text-xs font-bold">vs</span>
-                        <span className="text-amber-300">{grp.teamBName}</span>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-[10px] uppercase tracking-wider text-slate-500 block">
-                        Series
-                      </span>
-                      <span className="text-sm font-mono font-black text-white">
-                        {grp.winsA} - {grp.winsB}
-                      </span>
-                    </div>
-                  </div>
+        if (!isPoolsMode) {
+          const visibleGroups = mlpMatchupGroups
+            .map((grp) => {
+              const rows =
+                queueFilter === 'upcoming'
+                  ? grp.upcomingGames
+                  : queueFilter === 'ongoing'
+                    ? grp.ongoingGames
+                    : queueFilter === 'completed'
+                      ? grp.completedGames
+                      : [...grp.ongoingGames, ...grp.upcomingGames, ...grp.completedGames].sort(
+                          (a, b) => a.gameIndex - b.gameIndex
+                        );
+              return { ...grp, visibleRows: rows };
+            })
+            .filter((grp) => grp.visibleRows.length > 0);
 
-                  {grp.upcomingGames.length === 0 ? (
-                    <p className="text-xs text-slate-500 italic py-2 text-center">
-                      All games in this matchup are currently live or completed.
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs">
-                        <thead className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
-                          <tr>
-                            <th className="py-1.5 px-2 font-bold">Game</th>
-                            <th className="py-1.5 px-2 font-bold text-cyan-300">{grp.teamAName}</th>
-                            <th className="py-1.5 px-2 font-bold text-amber-300">{grp.teamBName}</th>
-                            <th className="py-1.5 px-2 font-bold text-right">Court</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800/70">
-                          {grp.upcomingGames.map((gItem) => (
-                            <tr key={gItem.key} className="hover:bg-slate-950/60 transition">
-                              <td className="py-2 px-2 font-mono font-bold text-slate-300">
-                                G{gItem.gameIndex + 1}
-                              </td>
-                              <td className="py-2 px-2 font-semibold text-white">{gItem.pairALabel}</td>
-                              <td className="py-2 px-2 font-semibold text-white">{gItem.pairBLabel}</td>
-                              <td className="py-2 px-2 text-right font-mono text-[#d7f24c]">
-                                {gItem.preCourt ? `Ct ${gItem.preCourt}` : '—'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+          return (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
+                  Team Matchups &amp; Match Queue
+                </h3>
+                {filterPills}
+              </div>
+
+              {visibleGroups.length === 0 ? (
+                <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl">
+                  <p className="text-xs text-slate-500 italic py-4 text-center">
+                    No {queueFilter === 'all' ? '' : queueFilter} games right now.
+                  </p>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
-              Ready / Upcoming Queue ({activeEligible.length})
-            </h3>
-            <span className="text-xs text-slate-400">
-              Select a free court above to dispatch
-            </span>
-          </div>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {visibleGroups.map((grp) => (
+                    <div
+                      key={grp.key}
+                      className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-2 flex-wrap border-b border-slate-800 pb-2.5">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                            {grp.matchNumber && (
+                              <span className="text-[10px] font-mono font-black bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                                Matchup #{grp.matchNumber}
+                              </span>
+                            )}
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                              {grp.roundLabel}
+                            </span>
+                            {grp.assignedCourts.length > 0 && (
+                              <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-full">
+                                Ct {grp.assignedCourts.join(', ')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm font-extrabold text-white flex items-center gap-2 flex-wrap">
+                            <span className="text-cyan-300">{grp.teamAName}</span>
+                            <span className="text-slate-500 text-xs font-bold">vs</span>
+                            <span className="text-amber-300">{grp.teamBName}</span>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-[10px] uppercase tracking-wider text-slate-500 block">
+                            Series
+                          </span>
+                          <span className="text-sm font-mono font-black text-white">
+                            {grp.winsA} - {grp.winsB}
+                          </span>
+                        </div>
+                      </div>
 
-          {activeEligible.length === 0 ? (
-            <p className="text-xs text-slate-500 italic py-4 text-center">
-              All available matchups are either live on court or completed.
-            </p>
-          ) : (
-            <div className="overflow-x-auto max-h-72 overflow-y-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
-                  <tr>
-                    <th className="py-2 px-3 font-bold">#</th>
-                    <th className="py-2 px-3 font-bold">Matchup</th>
-                    <th className="py-2 px-3 font-bold text-right">Pre-Assigned</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/70">
-                  {activeEligible.map((item, idx) => (
-                    <tr key={item.key} className="hover:bg-slate-950/60 transition">
-                      <td className="py-2 px-3 font-mono text-slate-400">{idx + 1}</td>
-                      <td className="py-2 px-3 font-semibold text-white">{item.label}</td>
-                      <td className="py-2 px-3 text-right font-mono text-[#d7f24c]">
-                        {(item.preAssignedCourt || item.preCourt)
-                          ? `Court ${item.preAssignedCourt || item.preCourt}`
-                          : '—'}
-                      </td>
-                    </tr>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse text-xs">
+                          <thead className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                            <tr>
+                              <th className="py-1.5 px-2 font-bold">Game</th>
+                              <th className="py-1.5 px-2 font-bold text-cyan-300">{grp.teamAName}</th>
+                              <th className="py-1.5 px-2 font-bold text-amber-300">{grp.teamBName}</th>
+                              <th className="py-1.5 px-2 font-bold">Timer / Status</th>
+                              <th className="py-1.5 px-2 font-bold text-right">Court</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/70">
+                            {grp.visibleRows.map((gItem) => {
+                              const ct = gItem.status === 'upcoming' ? gItem.preCourt : gItem.court;
+                              const dur = formatDuration(gItem.durationMs);
+                              const endedAt = formatClockTime(gItem.completedAt);
+                              return (
+                                <tr key={gItem.key} className="hover:bg-slate-950/60 transition">
+                                  <td className="py-2 px-2 font-mono font-bold text-slate-300">
+                                    G{gItem.gameIndex + 1}
+                                  </td>
+                                  <td className="py-2 px-2 font-semibold text-white">{gItem.pairALabel}</td>
+                                  <td className="py-2 px-2 font-semibold text-white">{gItem.pairBLabel}</td>
+                                  <td className="py-2 px-2">
+                                    {gItem.status === 'ongoing' ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full">
+                                        LIVE
+                                        {gItem.liveStartedAt && (
+                                          <LiveTimer startedAt={gItem.liveStartedAt} className="text-[10px] text-cyan-200" />
+                                        )}
+                                      </span>
+                                    ) : gItem.status === 'completed' ? (
+                                      <div className="space-y-0.5">
+                                        <span className="inline-block text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                                          {gItem.scoreA}-{gItem.scoreB}
+                                        </span>
+                                        {(dur || endedAt) && (
+                                          <span className="block text-[10px] font-mono text-slate-400">
+                                            {dur ? `${dur}` : ''}{dur && endedAt ? ' • ' : ''}{endedAt ? `End ${endedAt}` : ''}
+                                          </span>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-500 font-semibold">Ready</span>
+                                    )}
+                                  </td>
+                                  <td className="py-2 px-2 text-right font-mono text-[#d7f24c]">
+                                    {ct ? `Ct ${ct}` : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          );
+        }
+
+        const poolUpcomingRows = activeEligible.map((m) => ({
+          ...m,
+          status: 'upcoming',
+          court: m.preAssignedCourt || null,
+        }));
+        const visiblePoolRows =
+          queueFilter === 'upcoming'
+            ? poolUpcomingRows
+            : queueFilter === 'ongoing'
+              ? poolOngoingMatches
+              : queueFilter === 'completed'
+                ? poolCompletedMatches
+                : [...poolOngoingMatches, ...poolUpcomingRows, ...poolCompletedMatches];
+
+        return (
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl">
+            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+              <h3 className="text-sm font-extrabold text-white uppercase tracking-wider">
+                Match Queue
+              </h3>
+              {filterPills}
+            </div>
+
+            {visiblePoolRows.length === 0 ? (
+              <p className="text-xs text-slate-500 italic py-4 text-center">
+                No {queueFilter === 'all' ? '' : queueFilter} matches right now.
+              </p>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                    <tr>
+                      <th className="py-2 px-3 font-bold">#</th>
+                      <th className="py-2 px-3 font-bold">Matchup</th>
+                      <th className="py-2 px-3 font-bold">Status &amp; Timer</th>
+                      <th className="py-2 px-3 font-bold text-right">Court</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/70">
+                    {visiblePoolRows.map((item, idx) => {
+                      const dur = formatDuration(item.durationMs);
+                      const endedAt = formatClockTime(item.completedAt);
+                      return (
+                        <tr key={item.key} className="hover:bg-slate-950/60 transition">
+                          <td className="py-2 px-3 font-mono text-slate-400">{idx + 1}</td>
+                          <td className="py-2 px-3 font-semibold text-white">{item.label}</td>
+                          <td className="py-2 px-3">
+                            {item.status === 'ongoing' ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full">
+                                LIVE
+                                {item.liveStartedAt && (
+                                  <LiveTimer startedAt={item.liveStartedAt} className="text-[10px] text-amber-200" />
+                                )}
+                              </span>
+                            ) : item.status === 'completed' ? (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded">
+                                  Final{item.scoreSummary ? `: ${item.scoreSummary}` : ''}
+                                </span>
+                                {(dur || endedAt) && (
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    {dur ? `${dur}` : ''}{dur && endedAt ? ' • ' : ''}{endedAt ? `Ended ${endedAt}` : ''}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-500 font-semibold">Ready</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono text-[#d7f24c]">
+                            {item.court ? `Court ${item.court}` : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings, Upload, Download, Bookmark, Save, RotateCcw } from 'lucide-react';
+import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings, Upload, Download, Bookmark, Save, RotateCcw, QrCode } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
 import { getDefaultSlotPairs, parsePlayersFromCSV, generateDirectoryCSV, generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
 import { APP_VERSION } from '../version';
@@ -58,6 +58,7 @@ export function SetupView({
   const [nameInput, setNameInput] = useState('');
   const [directoryNameInput, setDirectoryNameInput] = useState('');
   const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
+  const [directoryOpenWithQr, setDirectoryOpenWithQr] = useState(false);
   const [csvFeedback, setCsvFeedback] = useState(null);
   const [presetNameInput, setPresetNameInput] = useState('');
   const [configFeedback, setConfigFeedback] = useState(null);
@@ -438,7 +439,21 @@ export function SetupView({
                 )}
                 <button
                   type="button"
-                  onClick={() => setIsDirectoryModalOpen(true)}
+                  onClick={() => {
+                    setDirectoryOpenWithQr(true);
+                    setIsDirectoryModalOpen(true);
+                  }}
+                  className="text-xs font-bold text-emerald-300 hover:text-emerald-200 bg-slate-800 hover:bg-slate-750 border border-emerald-500/30 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                  title="View Player Login URL & QR Code"
+                >
+                  <QrCode size={12} /> Player QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDirectoryOpenWithQr(false);
+                    setIsDirectoryModalOpen(true);
+                  }}
                   className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
                   title="Manage room directory players (rename, delete, search, export)"
                 >
@@ -1450,6 +1465,7 @@ export function SetupView({
       <DirectoryModal
         isOpen={isDirectoryModalOpen}
         onClose={() => setIsDirectoryModalOpen(false)}
+        initialShowQr={directoryOpenWithQr}
         roomId={roomId}
         savedPlayers={savedPlayers}
         playerPool={playerPool}

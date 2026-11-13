@@ -22,6 +22,7 @@ import {
   Trash2,
   Bookmark,
   Save,
+  QrCode,
 } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
 import { generateDirectoryCSV, generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
@@ -124,6 +125,7 @@ export function PoolSetupView({
   const [partner2, setPartner2] = useState('');
   const [directoryNameInput, setDirectoryNameInput] = useState('');
   const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
+  const [directoryOpenWithQr, setDirectoryOpenWithQr] = useState(false);
   const [csvFeedback, setCsvFeedback] = useState(null);
   const [presetNameInput, setPresetNameInput] = useState('');
   const [configFeedback, setConfigFeedback] = useState(null);
@@ -740,7 +742,21 @@ export function PoolSetupView({
                 )}
                 <button
                   type="button"
-                  onClick={() => setIsDirectoryModalOpen(true)}
+                  onClick={() => {
+                    setDirectoryOpenWithQr(true);
+                    setIsDirectoryModalOpen(true);
+                  }}
+                  className="text-xs font-bold text-[#d7f24c] hover:text-white bg-[#d7f24c]/10 hover:bg-[#d7f24c]/20 border border-[#d7f24c]/30 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                  title="Show Player Login URL & QR Code"
+                >
+                  <QrCode size={12} className="text-[#d7f24c]" /> Player QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDirectoryOpenWithQr(false);
+                    setIsDirectoryModalOpen(true);
+                  }}
                   className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
                   title="Manage room directory players (rename, delete, search, export)"
                 >
@@ -1681,6 +1697,7 @@ export function PoolSetupView({
       <DirectoryModal
         isOpen={isDirectoryModalOpen}
         onClose={() => setIsDirectoryModalOpen(false)}
+        initialShowQr={directoryOpenWithQr}
         roomId={roomId}
         savedPlayers={savedPlayers}
         playerPool={activePlayerPool}

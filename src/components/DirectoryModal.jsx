@@ -1,6 +1,32 @@
-import React, { useState, useRef } from 'react';
-import { X, Users, Pencil, Trash2, Check, Search, UserPlus, ShieldAlert, AlertCircle, Upload, Download } from 'lucide-react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { X, Users, Pencil, Trash2, Check, Search, UserPlus, ShieldAlert, AlertCircle, Upload, Download, QrCode, Copy } from 'lucide-react';
 import { parsePlayersFromCSV, generateDirectoryCSV, generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
+import { generateQrMatrix } from '../utils/qrcode';
+
+function DirQrSvg({ url, size = 128 }) {
+  const matrix = useMemo(() => generateQrMatrix(url), [url]);
+  const count = matrix.length;
+  const quiet = 3;
+  const total = count + quiet * 2;
+  return (
+    <svg
+      viewBox={`0 0 ${total} ${total}`}
+      width={size}
+      height={size}
+      className="rounded-xl bg-white p-1.5 shadow-inner mx-auto block"
+      shapeRendering="crispEdges"
+    >
+      <rect width={total} height={total} fill="#ffffff" />
+      {matrix.map((row, r) =>
+        row.map((dark, c) =>
+          dark ? (
+            <rect key={`${r}-${c}`} x={c + quiet} y={r + quiet} width={1} height={1} fill="#020617" />
+          ) : null
+        )
+      )}
+    </svg>
+  );
+}
 
 export function DirectoryModal({
   isOpen,
@@ -13,6 +39,7 @@ export function DirectoryModal({
   onRenameDirectoryPlayer,
   onRemoveSavedPlayer,
   isAdmin,
+  initialShowQr = false,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -20,7 +47,17 @@ export function DirectoryModal({
   const [editValue, setEditValue] = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState(null);
   const [csvNotice, setCsvNotice] = useState(null);
+  const [qrTargetPlayer, setQrTargetPlayer] = useState(null); // null | '' (room) | string (specific player)
+  const [copiedQrUrl, setCopiedQrUrl] = useState(false);
   const csvInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen && initialShowQr) {
+      setQrTargetPlayer('');
+    } else if (!isOpen) {
+      setQrTargetPlayer(null);
+    }
+  }, [isOpen, initialShowQr]);
 
   function handleDirectoryCsvUpload(e, addToTournament = false) {
     const file = e.target.files?.[0];
@@ -116,14 +153,76 @@ export function DirectoryModal({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition shrink-0 ml-2"
-            title="Close"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+            <button
+              type="button"
+              onClick={() => setQrTargetPlayer((prev) => (prev === '' ? null : ''))}
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition ${
+                qrTargetPlayer !== null
+                  ? 'bg-emerald-500 text-slate-950 border-emerald-400'
+                  : 'bg-slate-800 hover:bg-slate-750 text-emerald-300 border-emerald-500/30'
+              }`}
+              title="Show Player Login URL & QR Code"
+            >
+              <QrCode size={14} />
+              <span className="hidden xs:inline">Player QR</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition shrink-0"
+              title="Close"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
+
+        {/* Player Login URL & QR Code Panel */}
+        {qrTargetPlayer !== null && (() => {
+          const baseUrl = window.location.origin + window.location.pathname;
+          const activeUrl = qrTargetPlayer
+            ? `${baseUrl}?room=${encodeURIComponent(roomId || 'neep-main')}&mode=player&player=${encodeURIComponent(qrTargetPlayer)}`
+            : `${baseUrl}?room=${encodeURIComponent(roomId || 'neep-main')}&mode=player`;
+          return (
+            <div className="p-4 border-b border-slate-800 bg-slate-950/90 space-y-2.5 shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
+                  <QrCode size={14} />
+                  {qrTargetPlayer
+                    ? `Direct Player Login: ${qrTargetPlayer}`
+                    : `Room Player Login (${roomId || 'neep-main'})`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQrTargetPlayer(null)}
+                  className="text-[11px] text-slate-400 hover:text-white font-semibold"
+                >
+                  Hide
+                </button>
+              </div>
+              <DirQrSvg url={activeUrl} size={132} />
+              <div className="flex gap-2">
+                <input
+                  readOnly
+                  value={activeUrl}
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-[11px] font-mono text-slate-300 select-all focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(activeUrl);
+                    setCopiedQrUrl(true);
+                    setTimeout(() => setCopiedQrUrl(false), 2000);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition shrink-0"
+                >
+                  {copiedQrUrl ? <Check size={13} /> : <Copy size={13} />}
+                  {copiedQrUrl ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Quick Add Form & Search */}
         <div className="p-4 border-b border-slate-800/80 bg-slate-925 space-y-2.5 shrink-0">
@@ -316,26 +415,36 @@ export function DirectoryModal({
                     )}
                   </div>
 
-                  {isAdmin && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleStartRename(name)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-[#d7f24c] hover:bg-slate-800 transition"
-                        title={`Rename ${name}`}
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPendingDeleteName(name)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
-                        title={`Remove ${name} from directory`}
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setQrTargetPlayer(name)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-300 hover:bg-slate-800 transition"
+                      title={`Player Login QR & URL for ${name}`}
+                    >
+                      <QrCode size={13} />
+                    </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleStartRename(name)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#d7f24c] hover:bg-slate-800 transition"
+                          title={`Rename ${name}`}
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingDeleteName(name)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
+                          title={`Remove ${name} from directory`}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })

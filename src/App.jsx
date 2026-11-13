@@ -1051,9 +1051,20 @@ export default function App() {
     const match = bracket.rounds[round][idx];
     const teamA = teams.find((t) => t.id === match.teamAId);
     const teamB = teams.find((t) => t.id === match.teamBId);
+    const now = Date.now();
     const updatedGames = match.games.map((g) =>
       g.id === gameId
-        ? { ...g, scoreA: Number(scoreA), scoreB: Number(scoreB), saved: true, inProgress: false, liveStartedAt: null, pendingScore: null }
+        ? {
+            ...g,
+            scoreA: Number(scoreA),
+            scoreB: Number(scoreB),
+            saved: true,
+            inProgress: false,
+            durationMs: g.liveStartedAt ? Math.max(0, now - Number(g.liveStartedAt)) : g.durationMs || null,
+            completedAt: now,
+            liveStartedAt: null,
+            pendingScore: null,
+          }
         : g
     );
     const gamesWonA = updatedGames.filter((g) => g.saved && g.scoreA > g.scoreB).length;
@@ -2075,6 +2086,7 @@ export default function App() {
 
   function handleSavePoolMatch(poolId, matchId, games, winnerId) {
     if (!poolTournament) return;
+    const now = Date.now();
     const updated = {
       ...poolTournament,
       pools: poolTournament.pools.map((pool) => {
@@ -2089,6 +2101,11 @@ export default function App() {
                   winnerId: winnerId || null,
                   saved: Boolean(winnerId),
                   inProgress: false,
+                  durationMs:
+                    winnerId && m.liveStartedAt
+                      ? Math.max(0, now - Number(m.liveStartedAt))
+                      : m.durationMs || null,
+                  completedAt: winnerId ? now : null,
                   liveStartedAt: null,
                   pendingScore: null,
                 }
@@ -2200,16 +2217,23 @@ export default function App() {
 
   function handleSaveKnockoutMatch(roundIdx, matchIdx, games, winnerId, isBronze = false) {
     if (!poolTournament || !poolTournament.knockout) return;
+    const now = Date.now();
     let updatedKnockout = { ...poolTournament.knockout };
     if (isBronze) {
+      const bm = updatedKnockout.bronzeMatch;
       updatedKnockout = {
         ...updatedKnockout,
         bronzeMatch: {
-          ...updatedKnockout.bronzeMatch,
+          ...bm,
           games,
           winnerId: winnerId || null,
           saved: Boolean(winnerId),
           inProgress: false,
+          durationMs:
+            winnerId && bm?.liveStartedAt
+              ? Math.max(0, now - Number(bm.liveStartedAt))
+              : bm?.durationMs || null,
+          completedAt: winnerId ? now : null,
           liveStartedAt: null,
           pendingScore: null,
         },
@@ -2230,6 +2254,11 @@ export default function App() {
                       winnerId: winnerId || null,
                       saved: Boolean(winnerId),
                       inProgress: false,
+                      durationMs:
+                        winnerId && m.liveStartedAt
+                          ? Math.max(0, now - Number(m.liveStartedAt))
+                          : m.durationMs || null,
+                      completedAt: winnerId ? now : null,
                       liveStartedAt: null,
                       pendingScore: null,
                     }
