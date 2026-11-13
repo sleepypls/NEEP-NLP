@@ -39,7 +39,9 @@ export function DirectoryModal({
   onRenameDirectoryPlayer,
   onRemoveSavedPlayer,
   isAdmin,
+  adminPin,
   initialShowQr = false,
+  initialQrPlayer = null,
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [newPlayerName, setNewPlayerName] = useState('');
@@ -47,17 +49,19 @@ export function DirectoryModal({
   const [editValue, setEditValue] = useState('');
   const [pendingDeleteName, setPendingDeleteName] = useState(null);
   const [csvNotice, setCsvNotice] = useState(null);
-  const [qrTargetPlayer, setQrTargetPlayer] = useState(null); // null | '' (room) | string (specific player)
+  const [qrTarget, setQrTarget] = useState(null); // null | 'spectator' | 'admin' | { player: string }
   const [copiedQrUrl, setCopiedQrUrl] = useState(false);
   const csvInputRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen && initialShowQr) {
-      setQrTargetPlayer('');
+    if (isOpen && initialQrPlayer) {
+      setQrTarget({ player: initialQrPlayer });
+    } else if (isOpen && initialShowQr) {
+      setQrTarget('spectator');
     } else if (!isOpen) {
-      setQrTargetPlayer(null);
+      setQrTarget(null);
     }
-  }, [isOpen, initialShowQr]);
+  }, [isOpen, initialShowQr, initialQrPlayer]);
 
   function handleDirectoryCsvUpload(e, addToTournament = false) {
     const file = e.target.files?.[0];
@@ -156,16 +160,20 @@ export function DirectoryModal({
           <div className="flex items-center gap-1.5 shrink-0 ml-2">
             <button
               type="button"
-              onClick={() => setQrTargetPlayer((prev) => (prev === '' ? null : ''))}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition ${
-                qrTargetPlayer !== null
+              onClick={() =>
+                setQrTarget((prev) =>
+                  prev === 'spectator' || prev === 'admin' ? null : 'spectator'
+                )
+              }
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition whitespace-nowrap ${
+                qrTarget === 'spectator' || qrTarget === 'admin'
                   ? 'bg-emerald-500 text-slate-950 border-emerald-400'
                   : 'bg-slate-800 hover:bg-slate-750 text-emerald-300 border-emerald-500/30'
               }`}
-              title="Show Player Login URL & QR Code"
+              title="Show Admin or Spectator URL & QR Code"
             >
               <QrCode size={14} />
-              <span className="hidden xs:inline">Player QR</span>
+              <span className="hidden xs:inline">Admin / Spectator QR</span>
             </button>
             <button
               onClick={onClose}
@@ -177,28 +185,65 @@ export function DirectoryModal({
           </div>
         </div>
 
-        {/* Player Login URL & QR Code Panel */}
-        {qrTargetPlayer !== null && (() => {
+        {/* Admin / Spectator / Player Login URL & QR Code Panel */}
+        {qrTarget !== null && (() => {
           const baseUrl = window.location.origin + window.location.pathname;
-          const activeUrl = qrTargetPlayer
-            ? `${baseUrl}?room=${encodeURIComponent(roomId || 'neep-main')}&mode=player&player=${encodeURIComponent(qrTargetPlayer)}`
-            : `${baseUrl}?room=${encodeURIComponent(roomId || 'neep-main')}&mode=player`;
+          const roomParam = encodeURIComponent(roomId || 'neep-main');
+          const isPlayerTarget = typeof qrTarget === 'object' && qrTarget?.player;
+          const isAdminTarget = qrTarget === 'admin';
+          const activeUrl = isPlayerTarget
+            ? `${baseUrl}?room=${roomParam}&mode=player&player=${encodeURIComponent(qrTarget.player)}`
+            : isAdminTarget
+              ? `${baseUrl}?room=${roomParam}&mode=admin&pin=${encodeURIComponent(adminPin || '1234')}`
+              : `${baseUrl}?room=${roomParam}&mode=spectator`;
           return (
             <div className="p-4 border-b border-slate-800 bg-slate-950/90 space-y-2.5 shrink-0">
-              <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
                 <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
                   <QrCode size={14} />
-                  {qrTargetPlayer
-                    ? `Direct Player Login: ${qrTargetPlayer}`
-                    : `Room Player Login (${roomId || 'neep-main'})`}
+                  {isPlayerTarget
+                    ? `Player Login: ${qrTarget.player}`
+                    : isAdminTarget
+                      ? `Admin Login (${roomId || 'neep-main'})`
+                      : `Spectator View (${roomId || 'neep-main'})`}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setQrTargetPlayer(null)}
-                  className="text-[11px] text-slate-400 hover:text-white font-semibold"
-                >
-                  Hide
-                </button>
+                <div className="flex items-center gap-2">
+                  {!isPlayerTarget && (
+                    <div className="flex bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-[11px] font-bold">
+                      <button
+                        type="button"
+                        onClick={() => setQrTarget('spectator')}
+                        className={`px-2 py-0.5 rounded-md transition ${
+                          qrTarget === 'spectator'
+                            ? 'bg-emerald-500 text-slate-950'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Spectator
+                      </button>
+                      {isAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => setQrTarget('admin')}
+                          className={`px-2 py-0.5 rounded-md transition ${
+                            qrTarget === 'admin'
+                              ? 'bg-[#d7f24c] text-slate-950'
+                              : 'text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          Admin
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setQrTarget(null)}
+                    className="text-[11px] text-slate-400 hover:text-white font-semibold"
+                  >
+                    Hide
+                  </button>
+                </div>
               </div>
               <DirQrSvg url={activeUrl} size={132} />
               <div className="flex gap-2">
@@ -399,7 +444,7 @@ export function DirectoryModal({
                   key={name}
                   className="pt-2 flex items-center justify-between gap-3 group hover:bg-slate-850/40 rounded-xl px-2 py-1.5 transition"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 text-xs font-bold shrink-0">
                       {name.charAt(0).toUpperCase()}
                     </div>
@@ -415,14 +460,14 @@ export function DirectoryModal({
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
-                      onClick={() => setQrTargetPlayer(name)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-300 hover:bg-slate-800 transition"
+                      onClick={() => setQrTarget({ player: name })}
+                      className="px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 transition"
                       title={`Player Login QR & URL for ${name}`}
                     >
-                      <QrCode size={13} />
+                      <QrCode size={12} /> QR
                     </button>
                     {isAdmin && (
                       <>

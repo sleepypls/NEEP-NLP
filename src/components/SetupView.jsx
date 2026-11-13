@@ -60,6 +60,7 @@ export function SetupView({
   const [directorySearch, setDirectorySearch] = useState('');
   const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
   const [directoryOpenWithQr, setDirectoryOpenWithQr] = useState(false);
+  const [directoryQrPlayer, setDirectoryQrPlayer] = useState(null);
   const [csvFeedback, setCsvFeedback] = useState(null);
   const [presetNameInput, setPresetNameInput] = useState('');
   const [configFeedback, setConfigFeedback] = useState(null);
@@ -446,17 +447,19 @@ export function SetupView({
                 <button
                   type="button"
                   onClick={() => {
+                    setDirectoryQrPlayer(null);
                     setDirectoryOpenWithQr(true);
                     setIsDirectoryModalOpen(true);
                   }}
                   className="text-xs font-bold text-emerald-300 hover:text-emerald-200 bg-slate-800 hover:bg-slate-750 border border-emerald-500/30 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
-                  title="View Player Login URL & QR Code"
+                  title="View Admin or Spectator URL & QR Code"
                 >
-                  <QrCode size={12} /> Player QR
+                  <QrCode size={12} /> Admin / Spectator QR
                 </button>
                 <button
                   type="button"
                   onClick={() => {
+                    setDirectoryQrPlayer(null);
                     setDirectoryOpenWithQr(false);
                     setIsDirectoryModalOpen(true);
                   }}
@@ -535,6 +538,7 @@ export function SetupView({
                         <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
                           <tr>
                             <th className="py-1.5 px-3 font-bold">Player</th>
+                            <th className="py-1.5 px-2 font-bold text-center w-20">Player QR</th>
                             <th className="py-1.5 px-3 font-bold text-center w-24">Status</th>
                             <th className="py-1.5 px-3 font-bold text-right w-24">Action</th>
                           </tr>
@@ -542,7 +546,7 @@ export function SetupView({
                         <tbody className="divide-y divide-slate-800/70">
                           {filteredSaved.length === 0 ? (
                             <tr>
-                              <td colSpan={3} className="py-4 px-3 text-center text-xs text-slate-500 italic">
+                              <td colSpan={4} className="py-4 px-3 text-center text-xs text-slate-500 italic">
                                 No directory players match &ldquo;{directorySearch}&rdquo;.
                               </td>
                             </tr>
@@ -555,6 +559,20 @@ export function SetupView({
                               return (
                                 <tr key={name} className="hover:bg-slate-900/60 transition">
                                   <td className="py-1.5 px-3 font-semibold text-white">{name}</td>
+                                  <td className="py-1.5 px-2 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setDirectoryQrPlayer(name);
+                                        setDirectoryOpenWithQr(false);
+                                        setIsDirectoryModalOpen(true);
+                                      }}
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition active:scale-95"
+                                      title={`Player Login QR for ${name}`}
+                                    >
+                                      <QrCode size={11} /> QR
+                                    </button>
+                                  </td>
                                   <td className="py-1.5 px-3 text-center">
                                     {isInPool ? (
                                       <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
@@ -1506,6 +1524,7 @@ export function SetupView({
         isOpen={isDirectoryModalOpen}
         onClose={() => setIsDirectoryModalOpen(false)}
         initialShowQr={directoryOpenWithQr}
+        initialQrPlayer={directoryQrPlayer}
         roomId={roomId}
         savedPlayers={savedPlayers}
         playerPool={playerPool}
@@ -1514,6 +1533,7 @@ export function SetupView({
         onRenameDirectoryPlayer={onRenameDirectoryPlayer}
         onRemoveSavedPlayer={onRemoveSavedPlayer}
         isAdmin={isAdmin}
+        adminPin={adminPin}
       />
     </div>
   );
