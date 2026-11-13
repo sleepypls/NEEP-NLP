@@ -910,3 +910,65 @@ export async function adminDeleteRoom(roomId) {
 
   return true;
 }
+
+const COMPLETED_TOURNAMENTS_COLLECTION = 'completed_tournaments';
+
+export async function saveCompletedTournamentToCloud(archiveRecord) {
+  const db = getDb();
+  if (!db || !archiveRecord?.id) return false;
+  try {
+    const payload = encodeStateForFirestore({
+      ...archiveRecord,
+      updatedAt: new Date().toISOString(),
+    });
+    await setDoc(doc(db, COMPLETED_TOURNAMENTS_COLLECTION, archiveRecord.id), payload);
+    return true;
+  } catch (err) {
+    console.warn('saveCompletedTournamentToCloud failed:', err);
+    return false;
+  }
+}
+
+export async function fetchCompletedTournamentsFromCloud() {
+  const db = getDb();
+  if (!db) return [];
+  try {
+    const snap = await getDocs(collection(db, COMPLETED_TOURNAMENTS_COLLECTION));
+    const list = [];
+    snap.forEach((docSnap) => {
+      const decoded = decodeStateFromFirestore(docSnap.data());
+      if (decoded && decoded.id) {
+        list.push(decoded);
+      }
+    });
+    return list.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  } catch (err) {
+    console.warn('fetchCompletedTournamentsFromCloud failed:', err);
+    return [];
+  }
+}
+
+export async function fetchCompletedTournamentByIdFromCloud(archiveId) {
+  const db = getDb();
+  if (!db || !archiveId) return null;
+  try {
+    const snap = await getDoc(doc(db, COMPLETED_TOURNAMENTS_COLLECTION, String(archiveId).trim()));
+    if (!snap.exists()) return null;
+    return decodeStateFromFirestore(snap.data());
+  } catch (err) {
+    console.warn('fetchCompletedTournamentByIdFromCloud failed:', err);
+    return null;
+  }
+}
+
+export async function deleteCompletedTournamentFromCloud(archiveId) {
+  const db = getDb();
+  if (!db || !archiveId) return false;
+  try {
+    await deleteDoc(doc(db, COMPLETED_TOURNAMENTS_COLLECTION, String(archiveId).trim()));
+    return true;
+  } catch (err) {
+    console.warn('deleteCompletedTournamentFromCloud failed:', err);
+    return false;
+  }
+}

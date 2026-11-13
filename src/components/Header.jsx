@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Unlock, Users, LogOut, LayoutGrid, UserCheck } from 'lucide-react';
+import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Unlock, Users, LogOut, LayoutGrid, UserCheck, Archive } from 'lucide-react';
 import { isCloudEnabled } from '../services/firebase';
 import { APP_VERSION } from '../version';
 
@@ -23,6 +23,7 @@ export function Header({
   loggedInPlayerName,
   onOpenPlayerLogin,
   onOpenRosterModal,
+  onOpenCompletedArchive,
   onExitToLanding,
   hideNavTabs = false,
 }) {
@@ -273,6 +274,23 @@ export function Header({
               <span className="hidden xs:inline">Scorekeeper</span>
               <span className="xs:hidden">Admin</span>
             </span>
+          )}
+
+          {/* Completed Tournaments Archive (Admin / Scorekeeper only) */}
+          {isAdmin && onOpenCompletedArchive && (
+            <button
+              type="button"
+              onClick={onOpenCompletedArchive}
+              title="View & Save Completed Tournaments"
+              className={`px-2 py-1.5 rounded-xl border text-[10px] sm:text-[11px] font-bold transition active:scale-95 shrink-0 flex items-center gap-1 ${
+                view === 'archive' || view === 'archiveDetail'
+                  ? 'bg-[#d7f24c] text-slate-950 border-[#d7f24c]'
+                  : 'bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-[#d7f24c] border-slate-800'
+              }`}
+            >
+              <Archive size={13} />
+              <span className="hidden sm:inline">Completed</span>
+            </button>
           )}
 
           {/* Share Tournament */}

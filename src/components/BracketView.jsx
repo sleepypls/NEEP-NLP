@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trophy, Swords, Zap, Download, Play } from 'lucide-react';
+import { Trophy, Swords, Zap, Download, Play, Archive } from 'lucide-react';
 import { roundName, generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
 import { MlpCourtAssignModal } from './CourtAssignModal';
 import { LiveTimer } from './LiveTimer';
@@ -177,6 +177,7 @@ export function BracketView({
   onOpenRosterModal,
   onBatchAssignCourtsLive,
   onSetMatchAssignedCourts,
+  onSaveToArchive,
 }) {
   const [isCourtAssignOpen, setIsCourtAssignOpen] = useState(false);
 
@@ -223,6 +224,16 @@ export function BracketView({
               title="Export all match & game scores as CSV"
             >
               <Download size={13} /> Export Scores CSV
+            </button>
+          )}
+          {isAdmin && onSaveToArchive && (
+            <button
+              type="button"
+              onClick={onSaveToArchive}
+              className="px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+              title="Save this tournament to Completed Archive & get a read-only link"
+            >
+              <Archive size={13} /> Save Tournament
             </button>
           )}
           {isAdmin && onOpenRosterModal && (

@@ -21,11 +21,13 @@ import { ScorekeeperDashboardView } from './components/ScorekeeperDashboardView'
 import { PlayerLoginModal } from './components/PlayerLoginModal';
 import { PlayerPortalBanner } from './components/PlayerPortalBanner';
 import { SpectatorPortalBanner } from './components/SpectatorPortalBanner';
+import { CompletedTournamentsView, buildArchiveReadOnlyUrl } from './components/CompletedTournamentsView';
 import {
   generatePoolsAndSchedule,
   generateKnockoutBracket,
   advanceKnockoutWinner,
   getEffectiveMatchFormat,
+  getEntryDisplayName,
   resizeGamesForBestOf,
   distributeCourtsToPools,
   getBusyPoolEntryIds,
@@ -64,6 +66,10 @@ import {
   saveConfigsToCloud,
   checkRoomExistsInCloud,
   wipeAllDatabaseData,
+  saveCompletedTournamentToCloud,
+  fetchCompletedTournamentsFromCloud,
+  fetchCompletedTournamentByIdFromCloud,
+  deleteCompletedTournamentFromCloud,
 } from './services/firebase';
 import { RoomModal } from './components/RoomModal';
 import {
@@ -76,6 +82,26 @@ import {
   upsertSavedRoomHistory,
   removeSavedRoomHistory,
 } from './utils/room';
+
+const COMPLETED_ARCHIVES_KEY = 'neep_completed_tournaments_v1';
+
+function loadLocalCompletedArchives() {
+  try {
+    const raw = localStorage.getItem(COMPLETED_ARCHIVES_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0)) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveLocalCompletedArchives(list) {
+  try {
+    localStorage.setItem(COMPLETED_ARCHIVES_KEY, JSON.stringify(list));
+  } catch (e) {
+    // ignore storage quota errors
+  }
+}
 
 function getTournStorageKey(rid) {
   return `neep_tourn_${rid}_v1`;
@@ -286,6 +312,55 @@ export default function App() {
   );
   const [playerViewTab, setPlayerViewTab] = useState('current');
   const [spectatorViewTab, setSpectatorViewTab] = useState('current');
+  const [urlArchiveId] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('archive') || '';
+    } catch (e) {
+      return '';
+    }
+  });
+  const [completedArchives, setCompletedArchives] = useState(() => loadLocalCompletedArchives());
+  const [archivesLoading, setArchivesLoading] = useState(false);
+  const [activeReadOnlyArchive, setActiveReadOnlyArchive] = useState(() => {
+    try {
+      const aid = new URLSearchParams(window.location.search).get('archive');
+      if (!aid) return null;
+      return loadLocalCompletedArchives().find((a) => a.id === aid) || null;
+    } catch (e) {
+      return null;
+    }
+  });
+  const [archiveNotFound, setArchiveNotFound] = useState(false);
+  const [archiveMatchLoc, setArchiveMatchLoc] = useState(null);
+
+  useEffect(() => {
+    if (!urlArchiveId) return;
+    let cancelled = false;
+    setArchivesLoading(true);
+    setArchiveNotFound(false);
+    (async () => {
+      const localMatch = loadLocalCompletedArchives().find((a) => a.id === urlArchiveId) || null;
+      if (localMatch && !cancelled) {
+        setActiveReadOnlyArchive(localMatch);
+      }
+      if (isCloudEnabled()) {
+        const cloudMatch = await fetchCompletedTournamentByIdFromCloud(urlArchiveId);
+        if (!cancelled) {
+          if (cloudMatch) {
+            setActiveReadOnlyArchive(cloudMatch);
+          } else if (!localMatch) {
+            setArchiveNotFound(true);
+          }
+        }
+      } else if (!localMatch && !cancelled) {
+        setArchiveNotFound(true);
+      }
+      if (!cancelled) setArchivesLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [urlArchiveId]);
 
   const [view, setView] = useState(() => {
     try {
@@ -2882,9 +2957,210 @@ export default function App() {
     });
   }
 
+  async function refreshCompletedArchives() {
+    setArchivesLoading(true);
+    const localList = loadLocalCompletedArchives();
+    let merged = localList;
+    if (isCloudEnabled()) {
+      const cloudList = await fetchCompletedTournamentsFromCloud();
+      const map = new Map();
+      localList.forEach((item) => map.set(item.id, item));
+      cloudList.forEach((item) => map.set(item.id, item));
+      merged = Array.from(map.values()).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+      saveLocalCompletedArchives(merged);
+    }
+    setCompletedArchives(merged);
+    setArchivesLoading(false);
+  }
+
+  async function handleSaveCurrentTournamentToArchive(customTitle = '') {
+    const isPoolMode = tournamentStyle === 'tournament';
+    if (isPoolMode && !poolTournament) return null;
+    if (!isPoolMode && !bracket) return null;
+
+    let championName = '';
+    let summary = '';
+    if (isPoolMode && poolTournament) {
+      const entryMap = new Map((poolTournament.entries || []).map((e) => [e.id, e]));
+      const koRounds = poolTournament.knockout?.rounds || [];
+      const finalMatch = koRounds.length > 0 ? koRounds[koRounds.length - 1]?.[0] : null;
+      if (finalMatch?.winnerId) {
+        championName = getEntryDisplayName(entryMap.get(finalMatch.winnerId));
+      }
+      const pCount = (poolTournament.pools || []).length;
+      const eCount = (poolTournament.entries || []).length;
+      summary = pCount > 0 ? `${pCount} Pools • ${eCount} Entries` : `${eCount} Entries`;
+    } else if (bracket) {
+      if (bracket.championId !== null && bracket.championId !== undefined) {
+        const champTeam = teams.find((t) => t.id === bracket.championId);
+        if (champTeam) championName = champTeam.name;
+      }
+      summary = `${teams.length} Teams`;
+    }
+
+    const defaultLabel = `${isPoolMode ? 'Pools + Knockout' : 'MLP Style'} • ${new Date().toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })}`;
+    const archiveId = `arc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const record = {
+      id: archiveId,
+      roomId: roomId || '',
+      title: (customTitle || '').trim() || defaultLabel,
+      tournamentStyle,
+      savedAt: Date.now(),
+      championName,
+      summary,
+      poolTournament: isPoolMode ? poolTournament : null,
+      poolCourtNames: isPoolMode ? (poolTournament?.courtNames || poolCourtNames) : {},
+      bracket: !isPoolMode ? bracket : null,
+      teams: !isPoolMode ? teams : [],
+      playersById: !isPoolMode ? playersById : {},
+      customCourtNames: !isPoolMode ? customCourtNames : {},
+    };
+
+    const nextLocal = [record, ...loadLocalCompletedArchives().filter((x) => x.id !== record.id)];
+    saveLocalCompletedArchives(nextLocal);
+    setCompletedArchives(nextLocal);
+    if (isCloudEnabled()) {
+      await saveCompletedTournamentToCloud(record);
+    }
+    return record;
+  }
+
+  async function handleDeleteArchive(archiveId) {
+    const nextLocal = loadLocalCompletedArchives().filter((x) => x.id !== archiveId);
+    saveLocalCompletedArchives(nextLocal);
+    setCompletedArchives(nextLocal);
+    if (isCloudEnabled()) {
+      await deleteCompletedTournamentFromCloud(archiveId);
+    }
+  }
+
+  function handleOpenCompletedArchiveView() {
+    setView('archive');
+    refreshCompletedArchives();
+  }
+
   const activeMatch = getActiveMatch();
   const activeTeamA = activeMatch ? teams.find((t) => t.id === activeMatch.teamAId) : null;
   const activeTeamB = activeMatch ? teams.find((t) => t.id === activeMatch.teamBId) : null;
+
+  if (urlArchiveId || activeReadOnlyArchive) {
+    const arc = activeReadOnlyArchive;
+    const isPoolArc = arc?.tournamentStyle === 'tournament';
+    const arcMatch =
+      !isPoolArc && arc?.bracket?.rounds && archiveMatchLoc
+        ? arc.bracket.rounds[archiveMatchLoc.round]?.[archiveMatchLoc.idx]
+        : null;
+    const arcTeamA = arcMatch ? (arc.teams || []).find((t) => t.id === arcMatch.teamAId) : null;
+    const arcTeamB = arcMatch ? (arc.teams || []).find((t) => t.id === arcMatch.teamBId) : null;
+
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+        <div className="border-b border-slate-800 bg-slate-900/95 px-4 py-3 sticky top-0 z-40">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 min-w-0">
+              {!urlArchiveId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveReadOnlyArchive(null);
+                    setArchiveMatchLoc(null);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition shrink-0"
+                >
+                  &larr; Back
+                </button>
+              )}
+              <span className="text-[10px] font-black uppercase tracking-wider bg-slate-800 text-[#d7f24c] border border-[#d7f24c]/30 px-2.5 py-1 rounded-full shrink-0">
+                Completed &bull; Read-Only
+              </span>
+              {arc && (
+                <div className="min-w-0">
+                  <div className="text-sm sm:text-base font-black text-white truncate">
+                    {arc.title}
+                  </div>
+                  <div className="text-[11px] text-slate-400">
+                    {arc.savedAt ? new Date(arc.savedAt).toLocaleString() : ''}
+                    {arc.championName ? ` • Champion: ${arc.championName}` : ''}
+                  </div>
+                </div>
+              )}
+            </div>
+            {arc && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const link = buildArchiveReadOnlyUrl(arc.id);
+                  try {
+                    await navigator.clipboard.writeText(link);
+                    alert('Read-only link copied to clipboard!');
+                  } catch (e) {
+                    window.prompt('Copy read-only tournament link:', link);
+                  }
+                }}
+                className="px-3 py-1.5 rounded-xl bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 text-[#d7f24c] border border-[#d7f24c]/35 text-xs font-bold transition shrink-0"
+              >
+                Copy Read-Only Link
+              </button>
+            )}
+          </div>
+        </div>
+
+        <main className="flex-1">
+          {archivesLoading && !arc ? (
+            <div className="max-w-lg mx-auto px-4 py-16 text-center text-sm text-slate-400">
+              Loading archived tournament...
+            </div>
+          ) : archiveNotFound || !arc ? (
+            <div className="max-w-lg mx-auto px-4 py-16 text-center space-y-3">
+              <p className="text-base font-bold text-white">Completed tournament not found</p>
+              <p className="text-xs text-slate-400">
+                This archive link may have been deleted or saved only on another device without cloud sync.
+              </p>
+            </div>
+          ) : isPoolArc && arc.poolTournament ? (
+            <PoolPlayView
+              tournament={arc.poolTournament}
+              numCourts={arc.poolTournament?.numCourts || 2}
+              courtNames={arc.poolTournament?.courtNames || arc.poolCourtNames || {}}
+              roomId={arc.roomId || ''}
+              isAdmin={false}
+            />
+          ) : arcMatch ? (
+            <MatchDashboard
+              key={arcMatch.id}
+              match={arcMatch}
+              teamA={arcTeamA}
+              teamB={arcTeamB}
+              playersById={arc.playersById || {}}
+              bracket={arc.bracket}
+              teams={arc.teams || []}
+              roomId={arc.roomId || ''}
+              numCourts={2}
+              courtNames={arc.customCourtNames || {}}
+              onBack={() => setArchiveMatchLoc(null)}
+              onGoToBracket={() => setArchiveMatchLoc(null)}
+              isAdmin={false}
+            />
+          ) : arc.bracket ? (
+            <BracketView
+              bracket={arc.bracket}
+              teams={arc.teams || []}
+              playersById={arc.playersById || {}}
+              roomId={arc.roomId || ''}
+              numCourts={2}
+              courtNames={arc.customCourtNames || {}}
+              isAdmin={false}
+              onOpenMatch={(rIdx, mIdx) => setArchiveMatchLoc({ round: rIdx, idx: mIdx })}
+            />
+          ) : null}
+        </main>
+      </div>
+    );
+  }
 
   if (view === 'adminPortal') {
     return (
@@ -3017,6 +3293,7 @@ export default function App() {
           setRosterModalTeamId(null);
           setIsRosterModalOpen(true);
         }}
+        onOpenCompletedArchive={handleOpenCompletedArchiveView}
         onExitToLanding={isSpectatorPortalActive ? null : handleExitToLanding}
         hideNavTabs={isViewerPortalActive}
       />
@@ -3192,6 +3469,7 @@ export default function App() {
               setRosterModalTeamId(null);
               setIsRosterModalOpen(true);
             }}
+            onSaveToArchive={handleOpenCompletedArchiveView}
           />
         )}
 
@@ -3413,9 +3691,45 @@ export default function App() {
             onEditKnockoutMatch={handleEditKnockoutMatch}
             onBatchAssignCourtsLive={handleBatchAssignPoolCourtsAndLive}
             onOpenSetup={() => setView('poolSetup')}
+            onSaveToArchive={handleOpenCompletedArchiveView}
             isAdmin={isAdmin}
             forcedTab={isViewerPortalActive ? activeViewerTab : null}
             hideStageTabs={isViewerPortalActive}
+          />
+        )}
+
+        {view === 'archive' && isAdmin && (
+          <CompletedTournamentsView
+            archives={completedArchives}
+            isLoading={archivesLoading}
+            onRefresh={refreshCompletedArchives}
+            canSaveCurrent={
+              tournamentStyle === 'tournament' ? Boolean(poolTournament) : Boolean(bracket)
+            }
+            defaultSaveTitle={`${
+              tournamentStyle === 'tournament' ? 'Pools + Knockout' : 'MLP Style'
+            } • ${new Date().toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric',
+            })}`}
+            onSaveCurrent={handleSaveCurrentTournamentToArchive}
+            onOpenArchive={(item) => {
+              setArchiveMatchLoc(null);
+              setActiveReadOnlyArchive(item);
+            }}
+            onDeleteArchive={handleDeleteArchive}
+            onBack={() =>
+              setView(
+                tournamentStyle === 'tournament'
+                  ? poolTournament
+                    ? 'poolPlay'
+                    : 'poolSetup'
+                  : bracket
+                    ? 'bracket'
+                    : 'setup'
+              )
+            }
           />
         )}
 

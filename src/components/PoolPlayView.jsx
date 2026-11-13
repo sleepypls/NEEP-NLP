@@ -16,6 +16,7 @@ import {
   Minus,
   ChevronDown,
   ChevronUp,
+  Archive,
 } from 'lucide-react';
 import {
   getEntryDisplayName,
@@ -352,6 +353,7 @@ export function PoolPlayView({
   onEditKnockoutMatch,
   onBatchAssignCourtsLive,
   onOpenSetup,
+  onSaveToArchive,
   isAdmin,
   forcedTab = null,
   hideStageTabs = false,
@@ -459,6 +461,16 @@ export function PoolPlayView({
               title="Assign next matchups to available courts and mark them live"
             >
               <Flame size={13} /> Assign Courts &amp; Mark Live
+            </button>
+          )}
+          {isAdmin && onSaveToArchive && (
+            <button
+              type="button"
+              onClick={onSaveToArchive}
+              className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+              title="Save this tournament to Completed Archive & get a read-only link"
+            >
+              <Archive size={13} /> Save Tournament
             </button>
           )}
           {isAdmin && onOpenSetup && (
