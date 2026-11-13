@@ -10,6 +10,7 @@ import {
   ArrowRight,
   RefreshCw,
   Pencil,
+  Settings,
 } from 'lucide-react';
 import {
   getEntryDisplayName,
@@ -232,6 +233,7 @@ export function PoolPlayView({
   onSaveKnockoutMatch,
   onToggleKnockoutMatchLive,
   onEditKnockoutMatch,
+  onOpenSetup,
   isAdmin,
 }) {
   const hasPools = Boolean(tournament?.pools && tournament.pools.length > 0 && tournament?.structure !== 'knockout_only');
@@ -255,6 +257,7 @@ export function PoolPlayView({
     poolFormat = { bestOf: 1, pointsTo: 15 },
     knockoutFormat = { bestOf: 3, pointsTo: 11 },
     advancePerPool = 2,
+    knockoutFillMode = 'byes',
     knockout = null,
   } = tournament;
 
@@ -301,11 +304,27 @@ export function PoolPlayView({
             {knockoutFormat.useRoundFormats
               ? 'Custom Per-Round Formats'
               : `${knockoutFormat.bestOf > 1 ? `Best of ${knockoutFormat.bestOf}` : '1 Game'} to ${knockoutFormat.pointsTo}`}
-            {!isKnockoutOnly && <> &bull; Top {advancePerPool}/pool advance</>}
+            {!isKnockoutOnly && (
+              <>
+                {' '}
+                &bull; Top {advancePerPool}/pool advance
+                {knockoutFillMode === 'wildcards' ? ' + Wildcards' : ' (Top Seeds BYE)'}
+              </>
+            )}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && onOpenSetup && (
+            <button
+              type="button"
+              onClick={onOpenSetup}
+              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 hover:text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+              title="Edit tournament rules, formats, or entries"
+            >
+              <Settings size={13} className="text-[#d7f24c]" /> Edit Settings
+            </button>
+          )}
           {!isKnockoutOnly && (
             <button
               type="button"

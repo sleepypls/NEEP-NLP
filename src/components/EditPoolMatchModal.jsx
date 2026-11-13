@@ -215,35 +215,51 @@ export function EditPoolMatchModal({
                     </button>
                   ))}
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {[11, 15, 21].map((pts) => (
-                    <button
-                      key={pts}
-                      type="button"
-                      onClick={() => setPointsTo(pts)}
-                      className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition ${
-                        Number(pointsTo) === pts
-                          ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
-                          : 'bg-slate-800 text-slate-400 border border-slate-700'
-                      }`}
-                    >
-                      to {pts}
-                    </button>
-                  ))}
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={pointsTo}
-                    onChange={(e) => {
-                      const clean = e.target.value.replace(/\D/g, '');
-                      setPointsTo(clean === '' ? '' : Number(clean));
-                    }}
-                    onBlur={() => {
-                      if (!pointsTo || Number(pointsTo) < 1) setPointsTo(11);
-                    }}
-                    placeholder="Pts"
-                    className="w-16 bg-slate-900 border border-slate-700 rounded-xl px-2 py-1.5 text-center text-white text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-400"
-                  />
+                <div className="space-y-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                    Points to Win (Preset or Custom)
+                  </span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[11, 15, 21].map((pts) => (
+                      <button
+                        key={pts}
+                        type="button"
+                        onClick={() => setPointsTo(pts)}
+                        className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                          Number(pointsTo) === pts
+                            ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}
+                      >
+                        to {pts} pts
+                      </button>
+                    ))}
+                  </div>
+                  <div
+                    className={`flex items-center gap-2 rounded-xl px-3 py-1.5 border ${
+                      ![11, 15, 21].includes(Number(pointsTo))
+                        ? 'bg-amber-400/10 border-amber-400/40'
+                        : 'bg-slate-900 border-slate-700'
+                    }`}
+                  >
+                    <span className="text-[11px] font-bold text-slate-300">Custom Score:</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={pointsTo}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => {
+                        const clean = e.target.value.replace(/\D/g, '');
+                        setPointsTo(clean === '' ? '' : Number(clean));
+                      }}
+                      onBlur={() => {
+                        if (!pointsTo || Number(pointsTo) < 1) setPointsTo(11);
+                      }}
+                      placeholder="e.g. 9"
+                      className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-center text-white text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-amber-400"
+                    />
+                    <span className="text-[11px] font-semibold text-slate-400">pts</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -271,3 +287,4 @@ export function EditPoolMatchModal({
     </div>
   );
 }
+

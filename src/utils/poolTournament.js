@@ -91,6 +91,8 @@ export function generatePoolsAndSchedule({
   poolFormat = { bestOf: 1, pointsTo: 15, winByTwo: true },
   knockoutFormat = { bestOf: 3, pointsTo: 11, winByTwo: true },
   advancePerPool = 2,
+  knockoutFillMode = 'byes',
+  targetBracketSize = 'auto',
   includeBronze = true,
   seedingMode = 'snake',
 }) {
@@ -114,6 +116,8 @@ export function generatePoolsAndSchedule({
       poolFormat,
       knockoutFormat,
       advancePerPool,
+      knockoutFillMode,
+      targetBracketSize,
       includeBronze,
       seedingMode,
       knockout,
@@ -185,6 +189,8 @@ export function generatePoolsAndSchedule({
     poolFormat,
     knockoutFormat,
     advancePerPool,
+    knockoutFillMode,
+    targetBracketSize,
     includeBronze,
     seedingMode,
     knockout: null,
@@ -324,7 +330,16 @@ export function computePoolStandings(pool, entries = [], bestOf = 1) {
     h2hWinners.set(pairKey, m.winnerId);
   });
 
-  const rows = Array.from(statsMap.values());
+  const rows = Array.from(statsMap.values()).map((r) => {
+    const mp = r.matchesPlayed || 0;
+    return {
+      ...r,
+      winPct: mp > 0 ? r.wins / mp : 0,
+      gameDiffPerMatch: mp > 0 ? r.gameDiff / mp : 0,
+      pointDiffPerMatch: mp > 0 ? r.pointDiff / mp : 0,
+      pointsForPerMatch: mp > 0 ? r.pointsFor / mp : 0,
+    };
+  });
   rows.sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     // Head-to-head check
@@ -344,11 +359,14 @@ export function computePoolStandings(pool, entries = [], bestOf = 1) {
   return rows;
 }
 
-function buildSeededBracket({ qualifiers, knockoutFormat, includeBronze = true }) {
+function buildSeededBracket({ qualifiers, knockoutFormat, includeBronze = true, forcedBracketSize = null }) {
   if (!qualifiers || qualifiers.length < 2) return null;
 
   let bracketSize = 2;
   while (bracketSize < qualifiers.length) bracketSize *= 2;
+  if (forcedBracketSize && Number(forcedBracketSize) >= bracketSize) {
+    bracketSize = Number(forcedBracketSize);
+  }
 
   const seededSlots = Array.from({ length: bracketSize }, (_, i) => qualifiers[i] || null);
   const seedOrder = getBracketSeedOrder(bracketSize);
@@ -356,21 +374,46 @@ function buildSeededBracket({ qualifiers, knockoutFormat, includeBronze = true }
   const rounds = [];
   const totalRounds = Math.log2(bracketSize);
 
+  // Pair Round 0 slots & avoid same-pool Round 1 rematches where possible
+  const round0Pairs = [];
+  for (let i = 0; i < bracketSize; i += 2) {
+    round0Pairs.push({
+      qA: seededSlots[seedOrder[i] - 1],
+      qB: seededSlots[seedOrder[i + 1] - 1],
+    });
+  }
+  for (let i = 0; i < round0Pairs.length; i++) {
+    const p = round0Pairs[i];
+    if (p.qA && p.qB && p.qA.poolId && p.qA.poolId === p.qB.poolId) {
+      // Look for another match whose qB is not from p.qA's pool and won't create a conflict if swapped
+      for (let j = 0; j < round0Pairs.length; j++) {
+        if (i === j) continue;
+        const other = round0Pairs[j];
+        if (!other.qB) continue;
+        const otherPoolA = other.qA?.poolId;
+        const otherPoolB = other.qB?.poolId;
+        if (otherPoolB !== p.qA.poolId && p.qB.poolId !== otherPoolA) {
+          const tmp = p.qB;
+          p.qB = other.qB;
+          other.qB = tmp;
+          break;
+        }
+      }
+    }
+  }
+
   // Round 0
   const r0Fmt = getEffectiveMatchFormat({ knockoutFormat }, null, {
     isKnockout: true,
     totalRounds,
     roundIdx: 0,
   });
-  const round0 = [];
-  for (let i = 0; i < bracketSize; i += 2) {
-    const qA = seededSlots[seedOrder[i] - 1];
-    const qB = seededSlots[seedOrder[i + 1] - 1];
+  const round0 = round0Pairs.map(({ qA, qB }, mIdx) => {
     const isBye = !qA || !qB;
-    round0.push({
-      id: `ko-r0-m${i / 2}`,
+    return {
+      id: `ko-r0-m${mIdx}`,
       roundIdx: 0,
-      matchIdx: i / 2,
+      matchIdx: mIdx,
       entryAId: qA ? qA.entryId : null,
       entryBId: qB ? qB.entryId : null,
       seedLabelA: qA ? qA.seedLabel : null,
@@ -380,8 +423,8 @@ function buildSeededBracket({ qualifiers, knockoutFormat, includeBronze = true }
       inProgress: false,
       saved: isBye,
       winnerId: isBye ? (qA ? qA.entryId : qB ? qB.entryId : null) : null,
-    });
-  }
+    };
+  });
   rounds.push(round0);
 
   // Subsequent rounds
@@ -465,9 +508,26 @@ export function generateDirectKnockoutTournament({
   return buildSeededBracket({ qualifiers, knockoutFormat, includeBronze });
 }
 
+function compareAcrossPools(a, b) {
+  if (a.poolRank !== b.poolRank) return a.poolRank - b.poolRank;
+  if (Math.abs(b.winPct - a.winPct) > 1e-6) return b.winPct - a.winPct;
+  if (Math.abs(b.gameDiffPerMatch - a.gameDiffPerMatch) > 1e-6) {
+    return b.gameDiffPerMatch - a.gameDiffPerMatch;
+  }
+  if (Math.abs(b.pointDiffPerMatch - a.pointDiffPerMatch) > 1e-6) {
+    return b.pointDiffPerMatch - a.pointDiffPerMatch;
+  }
+  if (Math.abs(b.pointsForPerMatch - a.pointsForPerMatch) > 1e-6) {
+    return b.pointsForPerMatch - a.pointsForPerMatch;
+  }
+  return (a.seed || 999) - (b.seed || 999);
+}
+
 /**
  * Generates standard cross-pool seeded Single-Elimination Knockout Bracket
- * (or re-seeds a direct knockout bracket if no pools exist)
+ * supporting odd pool counts via either:
+ * - `'byes'`: Top performance seeds receive Round 1 BYEs
+ * - `'wildcards'`: Best non-advancing finishers across pools fill the bracket
  * + optional Bronze Medal (3rd place) match.
  */
 export function generateKnockoutBracket(tournament) {
@@ -476,7 +536,8 @@ export function generateKnockoutBracket(tournament) {
     pools = [],
     entries = [],
     advancePerPool = 2,
-    poolFormat,
+    knockoutFillMode = 'byes',
+    targetBracketSize = 'auto',
     knockoutFormat,
     includeBronze = true,
     seedingMode = 'snake',
@@ -491,7 +552,6 @@ export function generateKnockoutBracket(tournament) {
     });
   }
 
-  // Collect qualifiers per pool, ordered by placement rank (1st place across pools, then 2nd place, etc.)
   const poolStandings = pools.map((pool) => ({
     pool,
     rows: computePoolStandings(
@@ -501,30 +561,67 @@ export function generateKnockoutBracket(tournament) {
     ),
   }));
 
-  const qualifiers = [];
-  for (let rank = 0; rank < advancePerPool; rank++) {
-    const rankSlice = [];
-    poolStandings.forEach(({ pool, rows }, poolIdx) => {
-      if (rows[rank]) {
-        rankSlice.push({
-          entryId: rows[rank].entryId,
-          seedLabel: `${pool.name.replace('Pool ', '')}${rank + 1}`,
-          poolName: pool.name,
-          poolIdx,
-          poolRank: rank + 1,
-          wins: rows[rank].wins,
-          pointDiff: rows[rank].pointDiff,
-        });
+  // 1. Collect automatic qualifiers from each pool & rank across pools by performance
+  const autoQualifiers = [];
+  const remainingPoolCandidates = [];
+
+  poolStandings.forEach(({ pool, rows }) => {
+    const shortPool = pool.name.replace('Pool ', '');
+    rows.forEach((row, rankIdx) => {
+      const candidate = {
+        entryId: row.entryId,
+        poolId: pool.id,
+        poolName: pool.name,
+        shortPool,
+        poolRank: rankIdx + 1,
+        seedLabel: `${shortPool}${rankIdx + 1}`,
+        wins: row.wins,
+        winPct: row.winPct,
+        gameDiffPerMatch: row.gameDiffPerMatch,
+        pointDiffPerMatch: row.pointDiffPerMatch,
+        pointsForPerMatch: row.pointsForPerMatch,
+        pointDiff: row.pointDiff,
+        seed: row.entry?.seed || 999,
+      };
+      if (rankIdx < advancePerPool) {
+        autoQualifiers.push(candidate);
+      } else {
+        remainingPoolCandidates.push(candidate);
       }
     });
-    // Cross-order lower tiers so same-pool teams land on opposite sides of the bracket
-    if (rank % 2 === 1) {
-      rankSlice.reverse();
-    }
-    qualifiers.push(...rankSlice);
+  });
+
+  // Sort automatic qualifiers fairly (1st place winners ranked #1..#P by win% & pt diff, then 2nd place, etc.)
+  // This guarantees top-performing pool winners earn Seed #1/#2 and Round 1 BYEs when pools are odd!
+  autoQualifiers.sort(compareAcrossPools);
+
+  let qualifiers = [...autoQualifiers];
+
+  // Determine desired power-of-2 bracket size
+  let desiredSize = 2;
+  while (desiredSize < Math.max(2, autoQualifiers.length)) desiredSize *= 2;
+  if (targetBracketSize !== 'auto' && Number(targetBracketSize) >= 2) {
+    desiredSize = Math.max(desiredSize, Number(targetBracketSize));
   }
 
-  return buildSeededBracket({ qualifiers, knockoutFormat, includeBronze });
+  // 2. If Wildcards mode is enabled and bracket has open slots, fill with best non-qualifiers
+  if (knockoutFillMode === 'wildcards' && qualifiers.length < desiredSize && remainingPoolCandidates.length > 0) {
+    remainingPoolCandidates.sort(compareAcrossPools);
+    const needed = Math.min(desiredSize - qualifiers.length, remainingPoolCandidates.length);
+    const wildcards = remainingPoolCandidates.slice(0, needed).map((wc) => ({
+      ...wc,
+      isWildcard: true,
+      seedLabel: `WC\u2022${wc.shortPool}${wc.poolRank}`,
+    }));
+    qualifiers = [...qualifiers, ...wildcards];
+  }
+
+  return buildSeededBracket({
+    qualifiers,
+    knockoutFormat,
+    includeBronze,
+    forcedBracketSize: targetBracketSize !== 'auto' ? Number(targetBracketSize) : null,
+  });
 }
 
 function getBracketSeedOrder(size) {

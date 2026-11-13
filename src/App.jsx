@@ -262,6 +262,8 @@ export default function App() {
   const [poolEntries, setPoolEntries] = useState(() => initialSaved?.poolEntries || []);
   const [poolNumPools, setPoolNumPools] = useState(() => initialSaved?.poolNumPools || 2);
   const [poolAdvancePerPool, setPoolAdvancePerPool] = useState(() => initialSaved?.poolAdvancePerPool || 2);
+  const [poolKnockoutFillMode, setPoolKnockoutFillMode] = useState(() => initialSaved?.poolKnockoutFillMode || 'byes');
+  const [poolTargetBracketSize, setPoolTargetBracketSize] = useState(() => initialSaved?.poolTargetBracketSize || 'auto');
   const [poolSeedingMode, setPoolSeedingMode] = useState(() => initialSaved?.poolSeedingMode || 'snake');
   const [poolMatchFormat, setPoolMatchFormat] = useState(() => initialSaved?.poolMatchFormat || { bestOf: 1, pointsTo: 11 });
   const [knockoutMatchFormat, setKnockoutMatchFormat] = useState(() => initialSaved?.knockoutMatchFormat || { bestOf: 3, pointsTo: 11 });
@@ -463,6 +465,8 @@ export default function App() {
           if (cloudTourn.poolEntries !== undefined) setPoolEntries(cloudTourn.poolEntries);
           if (cloudTourn.poolNumPools) setPoolNumPools(cloudTourn.poolNumPools);
           if (cloudTourn.poolAdvancePerPool) setPoolAdvancePerPool(cloudTourn.poolAdvancePerPool);
+          if (cloudTourn.poolKnockoutFillMode) setPoolKnockoutFillMode(cloudTourn.poolKnockoutFillMode);
+          if (cloudTourn.poolTargetBracketSize !== undefined) setPoolTargetBracketSize(cloudTourn.poolTargetBracketSize);
           if (cloudTourn.poolSeedingMode) setPoolSeedingMode(cloudTourn.poolSeedingMode);
           if (cloudTourn.poolMatchFormat) setPoolMatchFormat(cloudTourn.poolMatchFormat);
           if (cloudTourn.knockoutMatchFormat) setKnockoutMatchFormat(cloudTourn.knockoutMatchFormat);
@@ -611,6 +615,8 @@ export default function App() {
           poolEntries,
           poolNumPools,
           poolAdvancePerPool,
+          poolKnockoutFillMode,
+          poolTargetBracketSize,
           poolSeedingMode,
           poolMatchFormat,
           knockoutMatchFormat,
@@ -624,7 +630,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
-  }, [roomId, adminPin, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolSeedingMode, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolTournament, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+  }, [roomId, adminPin, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolTournament, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
 
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
@@ -655,6 +661,8 @@ export default function App() {
         poolEntries,
         poolNumPools,
         poolAdvancePerPool,
+        poolKnockoutFillMode,
+        poolTargetBracketSize,
         poolSeedingMode,
         poolMatchFormat,
         knockoutMatchFormat,
@@ -1461,6 +1469,8 @@ export default function App() {
       setPoolEntries(saved.poolEntries || []);
       setPoolNumPools(saved.poolNumPools || 2);
       setPoolAdvancePerPool(saved.poolAdvancePerPool || 2);
+      setPoolKnockoutFillMode(saved.poolKnockoutFillMode || 'byes');
+      setPoolTargetBracketSize(saved.poolTargetBracketSize || 'auto');
       setPoolSeedingMode(saved.poolSeedingMode || 'snake');
       setPoolMatchFormat(saved.poolMatchFormat || { bestOf: 1, pointsTo: 11 });
       setKnockoutMatchFormat(saved.knockoutMatchFormat || { bestOf: 3, pointsTo: 11 });
@@ -1494,6 +1504,8 @@ export default function App() {
       setPoolEntries([]);
       setPoolNumPools(2);
       setPoolAdvancePerPool(2);
+      setPoolKnockoutFillMode('byes');
+      setPoolTargetBracketSize('auto');
       setPoolSeedingMode('snake');
       setPoolMatchFormat({ bestOf: 1, pointsTo: 11 });
       setKnockoutMatchFormat({ bestOf: 3, pointsTo: 11 });
@@ -1558,6 +1570,8 @@ export default function App() {
     setPoolEntries([]);
     setPoolNumPools(2);
     setPoolAdvancePerPool(2);
+    setPoolKnockoutFillMode('byes');
+    setPoolTargetBracketSize('auto');
     setPoolSeedingMode('snake');
     setPoolMatchFormat({ bestOf: 1, pointsTo: 11 });
     setKnockoutMatchFormat({ bestOf: 3, pointsTo: 11 });
@@ -1599,6 +1613,8 @@ export default function App() {
         poolEntries: [],
         poolNumPools: 2,
         poolAdvancePerPool: 2,
+        poolKnockoutFillMode: 'byes',
+        poolTargetBracketSize: 'auto',
         poolSeedingMode: 'snake',
         poolMatchFormat: { bestOf: 1, pointsTo: 11 },
         knockoutMatchFormat: { bestOf: 3, pointsTo: 11 },
@@ -1743,6 +1759,8 @@ export default function App() {
       poolFormat: poolMatchFormat,
       knockoutFormat: knockoutMatchFormat,
       advancePerPool: poolAdvancePerPool,
+      knockoutFillMode: poolKnockoutFillMode,
+      targetBracketSize: poolTargetBracketSize,
       includeBronze: poolIncludeBronze,
       seedingMode: poolSeedingMode,
     });
@@ -1752,6 +1770,69 @@ export default function App() {
       tournamentStyle: 'tournament',
       poolStructure,
       poolTournament: built,
+      view: 'poolPlay',
+    });
+  }
+
+  function handleUpdatePoolTournamentSettings() {
+    if (!poolTournament) return;
+    const nextPools = (poolTournament.pools || []).map((pool) => ({
+      ...pool,
+      matches: (pool.matches || []).map((m) => {
+        const bestOf = m.customFormat?.bestOf || poolMatchFormat.bestOf || 1;
+        return {
+          ...m,
+          games: resizeGamesForBestOf(m.games, bestOf),
+        };
+      }),
+    }));
+
+    let nextKnockout = poolTournament.knockout ? JSON.parse(JSON.stringify(poolTournament.knockout)) : null;
+    if (nextKnockout && Array.isArray(nextKnockout.rounds)) {
+      const totalRounds = nextKnockout.rounds.length;
+      nextKnockout.rounds = nextKnockout.rounds.map((round, rIdx) =>
+        round.map((m) => {
+          const fmt = getEffectiveMatchFormat(
+            { knockoutFormat: knockoutMatchFormat },
+            m,
+            { isKnockout: true, totalRounds, roundIdx: rIdx, isBronze: false }
+          );
+          return {
+            ...m,
+            games: resizeGamesForBestOf(m.games, fmt.bestOf),
+          };
+        })
+      );
+      if (nextKnockout.bronzeMatch) {
+        const bFmt = getEffectiveMatchFormat(
+          { knockoutFormat: knockoutMatchFormat },
+          nextKnockout.bronzeMatch,
+          { isKnockout: true, totalRounds, roundIdx: totalRounds - 1, isBronze: true }
+        );
+        nextKnockout.bronzeMatch = {
+          ...nextKnockout.bronzeMatch,
+          games: resizeGamesForBestOf(nextKnockout.bronzeMatch.games, bFmt.bestOf),
+        };
+      }
+    }
+
+    const updated = {
+      ...poolTournament,
+      discipline: poolDiscipline,
+      poolFormat: poolMatchFormat,
+      knockoutFormat: knockoutMatchFormat,
+      advancePerPool: poolAdvancePerPool,
+      knockoutFillMode: poolKnockoutFillMode,
+      targetBracketSize: poolTargetBracketSize,
+      includeBronze: poolIncludeBronze,
+      seedingMode: poolSeedingMode,
+      pools: nextPools,
+      knockout: nextKnockout,
+    };
+    setPoolTournament(updated);
+    setView('poolPlay');
+    broadcastTournamentChange({
+      poolTournament: updated,
       view: 'poolPlay',
     });
   }
@@ -2497,6 +2578,16 @@ export default function App() {
               setPoolAdvancePerPool(v);
               broadcastTournamentChange({ poolAdvancePerPool: v });
             }}
+            knockoutFillMode={poolKnockoutFillMode}
+            setKnockoutFillMode={(v) => {
+              setPoolKnockoutFillMode(v);
+              broadcastTournamentChange({ poolKnockoutFillMode: v });
+            }}
+            targetBracketSize={poolTargetBracketSize}
+            setTargetBracketSize={(v) => {
+              setPoolTargetBracketSize(v);
+              broadcastTournamentChange({ poolTargetBracketSize: v });
+            }}
             seedingMode={poolSeedingMode}
             setSeedingMode={(v) => {
               setPoolSeedingMode(v);
@@ -2521,6 +2612,8 @@ export default function App() {
             setRoomId={(newId) => handleSwitchRoom(newId, adminPin)}
             adminPin={adminPin}
             setAdminPin={setAdminPin}
+            hasExistingTournament={Boolean(poolTournament)}
+            onUpdateTournamentSettings={handleUpdatePoolTournamentSettings}
             onStartPoolTournament={handleStartPoolTournament}
             isAdmin={isAdmin}
           />
@@ -2537,6 +2630,7 @@ export default function App() {
             onSaveKnockoutMatch={handleSaveKnockoutMatch}
             onToggleKnockoutMatchLive={handleToggleKnockoutMatchLive}
             onEditKnockoutMatch={handleEditKnockoutMatch}
+            onOpenSetup={() => setView('poolSetup')}
             isAdmin={isAdmin}
           />
         )}

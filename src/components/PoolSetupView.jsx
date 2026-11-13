@@ -80,6 +80,10 @@ export function PoolSetupView({
   setNumPools,
   advancePerPool = 2,
   setAdvancePerPool,
+  knockoutFillMode = 'byes',
+  setKnockoutFillMode,
+  targetBracketSize = 'auto',
+  setTargetBracketSize,
   seedingMode = 'snake',
   setSeedingMode,
   poolFormat = { bestOf: 1, pointsTo: 15, winByTwo: true },
@@ -92,6 +96,8 @@ export function PoolSetupView({
   setRoomId,
   adminPin,
   setAdminPin,
+  hasExistingTournament = false,
+  onUpdateTournamentSettings,
   onStartPoolTournament,
   isAdmin,
 }) {
@@ -609,41 +615,109 @@ export function PoolSetupView({
         </label>
 
         {!isKnockoutOnly && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Number of Pools
-              </span>
-              <select
-                disabled={!isAdmin}
-                value={numPools}
-                onChange={(e) => setNumPools(Number(e.target.value))}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
-              >
-                {[1, 2, 3, 4, 6, 8].map((n) => (
-                  <option key={n} value={n}>
-                    {n} Pool{n === 1 ? '' : 's'}
-                  </option>
-                ))}
-              </select>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Number of Pools
+                </span>
+                <select
+                  disabled={!isAdmin}
+                  value={numPools}
+                  onChange={(e) => setNumPools(Number(e.target.value))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
+                >
+                  {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                    <option key={n} value={n}>
+                      {n} Pool{n === 1 ? '' : 's'}
+                      {n % 2 === 1 && n > 1 ? ' (Odd)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Advance per Pool
+                </span>
+                <select
+                  disabled={!isAdmin}
+                  value={advancePerPool}
+                  onChange={(e) => setAdvancePerPool(Number(e.target.value))}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
+                >
+                  {[1, 2, 3, 4].map((n) => (
+                    <option key={n} value={n}>
+                      Top {n} per Pool
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Advance per Pool
-              </span>
-              <select
-                disabled={!isAdmin}
-                value={advancePerPool}
-                onChange={(e) => setAdvancePerPool(Number(e.target.value))}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
-              >
-                {[1, 2, 3, 4].map((n) => (
-                  <option key={n} value={n}>
-                    Top {n} per Pool
-                  </option>
-                ))}
-              </select>
+            {/* Odd Pools / Knockout Advancement Mode */}
+            <div className="bg-slate-950/60 border border-slate-800/90 rounded-2xl p-3 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-slate-200 uppercase tracking-wider">
+                  Knockout Advancement (Odd Pools / Bracket Fill)
+                </span>
+                <span className="text-[10px] font-mono text-emerald-300">
+                  {totalAdvancing} auto-qualifiers
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={!isAdmin}
+                  onClick={() => setKnockoutFillMode && setKnockoutFillMode('byes')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-bold transition text-left ${
+                    knockoutFillMode !== 'wildcards'
+                      ? 'bg-[#d7f24c] text-slate-950'
+                      : 'bg-slate-800 text-slate-300 border border-slate-700'
+                  }`}
+                >
+                  <span>Top Seeds Get BYEs</span>
+                  <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                    Best pool winners skip R1
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={!isAdmin}
+                  onClick={() => setKnockoutFillMode && setKnockoutFillMode('wildcards')}
+                  className={`py-2 px-2.5 rounded-xl text-xs font-bold transition text-left ${
+                    knockoutFillMode === 'wildcards'
+                      ? 'bg-emerald-400 text-slate-950'
+                      : 'bg-slate-800 text-slate-300 border border-slate-700'
+                  }`}
+                >
+                  <span>Fill with Wildcards</span>
+                  <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                    Best next-place finishers fill bracket
+                  </span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <span className="text-[11px] text-slate-400 font-semibold">
+                  Target Bracket Size
+                </span>
+                <select
+                  disabled={!isAdmin}
+                  value={targetBracketSize}
+                  onChange={(e) =>
+                    setTargetBracketSize &&
+                    setTargetBracketSize(e.target.value === 'auto' ? 'auto' : Number(e.target.value))
+                  }
+                  className="bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-white text-xs font-bold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
+                >
+                  <option value="auto">Auto (Next Power of 2)</option>
+                  <option value={4}>4 Teams (Semis)</option>
+                  <option value={8}>8 Teams (Quarters)</option>
+                  <option value={16}>16 Teams (Round of 16)</option>
+                  <option value={32}>32 Teams (Round of 32)</option>
+                </select>
+              </div>
             </div>
           </div>
         )}
@@ -702,40 +776,55 @@ export function PoolSetupView({
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-2">
-              {[11, 15, 21].map((pts) => (
-                <button
-                  key={pts}
-                  type="button"
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                Points to Win (Preset or Custom)
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {[11, 15, 21].map((pts) => (
+                  <button
+                    key={pts}
+                    type="button"
+                    disabled={!isAdmin}
+                    onClick={() => setPoolFormat({ ...poolFormat, pointsTo: pts })}
+                    className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                      Number(poolFormat.pointsTo) === pts
+                        ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/40'
+                        : 'bg-slate-800 text-slate-400 border border-slate-700'
+                    }`}
+                  >
+                    to {pts} pts
+                  </button>
+                ))}
+              </div>
+              <div
+                className={`flex items-center gap-2 rounded-xl px-3 py-1.5 border ${
+                  ![11, 15, 21].includes(Number(poolFormat.pointsTo))
+                    ? 'bg-emerald-400/10 border-emerald-400/40'
+                    : 'bg-slate-950/60 border-slate-800'
+                }`}
+              >
+                <span className="text-xs font-bold text-slate-300">Custom Score:</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
                   disabled={!isAdmin}
-                  onClick={() => setPoolFormat({ ...poolFormat, pointsTo: pts })}
-                  className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition ${
-                    Number(poolFormat.pointsTo) === pts
-                      ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/40'
-                      : 'bg-slate-800 text-slate-400 border border-slate-700'
-                  }`}
-                >
-                  to {pts}
-                </button>
-              ))}
-              <input
-                type="text"
-                inputMode="numeric"
-                disabled={!isAdmin}
-                value={poolFormat.pointsTo ?? ''}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  setPoolFormat({ ...poolFormat, pointsTo: val === '' ? '' : Number(val) });
-                }}
-                onBlur={() => {
-                  if (!poolFormat.pointsTo || Number(poolFormat.pointsTo) < 1) {
-                    setPoolFormat({ ...poolFormat, pointsTo: 11 });
-                  }
-                }}
-                placeholder="Custom"
-                title="Custom points to win"
-                className="w-20 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-center text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-60"
-              />
+                  value={poolFormat.pointsTo ?? ''}
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    setPoolFormat({ ...poolFormat, pointsTo: val === '' ? '' : Number(val) });
+                  }}
+                  onBlur={() => {
+                    if (!poolFormat.pointsTo || Number(poolFormat.pointsTo) < 1) {
+                      setPoolFormat({ ...poolFormat, pointsTo: 11 });
+                    }
+                  }}
+                  placeholder="e.g. 15"
+                  className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-center text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 disabled:opacity-60"
+                />
+                <span className="text-xs font-semibold text-slate-400">pts</span>
+              </div>
             </div>
           </div>
         )}
@@ -767,40 +856,55 @@ export function PoolSetupView({
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2">
-            {[11, 15, 21].map((pts) => (
-              <button
-                key={pts}
-                type="button"
+          <div className="space-y-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+              Points to Win (Preset or Custom)
+            </span>
+            <div className="grid grid-cols-3 gap-2">
+              {[11, 15, 21].map((pts) => (
+                <button
+                  key={pts}
+                  type="button"
+                  disabled={!isAdmin}
+                  onClick={() => setKnockoutFormat({ ...knockoutFormat, pointsTo: pts })}
+                  className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                    Number(knockoutFormat.pointsTo) === pts
+                      ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  }`}
+                >
+                  to {pts} pts
+                </button>
+              ))}
+            </div>
+            <div
+              className={`flex items-center gap-2 rounded-xl px-3 py-1.5 border ${
+                ![11, 15, 21].includes(Number(knockoutFormat.pointsTo))
+                  ? 'bg-amber-400/10 border-amber-400/40'
+                  : 'bg-slate-950/60 border-slate-800'
+              }`}
+            >
+              <span className="text-xs font-bold text-slate-300">Custom Score:</span>
+              <input
+                type="text"
+                inputMode="numeric"
                 disabled={!isAdmin}
-                onClick={() => setKnockoutFormat({ ...knockoutFormat, pointsTo: pts })}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition ${
-                  Number(knockoutFormat.pointsTo) === pts
-                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
-                    : 'bg-slate-800 text-slate-400 border border-slate-700'
-                }`}
-              >
-                to {pts}
-              </button>
-            ))}
-            <input
-              type="text"
-              inputMode="numeric"
-              disabled={!isAdmin}
-              value={knockoutFormat.pointsTo ?? ''}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, '');
-                setKnockoutFormat({ ...knockoutFormat, pointsTo: val === '' ? '' : Number(val) });
-              }}
-              onBlur={() => {
-                if (!knockoutFormat.pointsTo || Number(knockoutFormat.pointsTo) < 1) {
-                  setKnockoutFormat({ ...knockoutFormat, pointsTo: 11 });
-                }
-              }}
-              placeholder="Custom"
-              title="Custom points to win"
-              className="w-20 bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-center text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-60"
-            />
+                value={knockoutFormat.pointsTo ?? ''}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  setKnockoutFormat({ ...knockoutFormat, pointsTo: val === '' ? '' : Number(val) });
+                }}
+                onBlur={() => {
+                  if (!knockoutFormat.pointsTo || Number(knockoutFormat.pointsTo) < 1) {
+                    setKnockoutFormat({ ...knockoutFormat, pointsTo: 11 });
+                  }
+                }}
+                placeholder="e.g. 11"
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-center text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-60"
+              />
+              <span className="text-xs font-semibold text-slate-400">pts</span>
+            </div>
           </div>
 
           {/* Per-Round Knockout Formats Toggle & Editor */}
@@ -1011,18 +1115,38 @@ export function PoolSetupView({
       </div>
 
       {isAdmin && (
-        <button
-          type="button"
-          onClick={onStartPoolTournament}
-          disabled={!canStart}
-          className={`w-full py-4 rounded-2xl font-extrabold text-lg flex items-center justify-center gap-2 transition active:scale-95 ${
-            canStart
-              ? 'bg-[#d7f24c] text-slate-950 shadow-xl shadow-[#d7f24c]/20 hover:bg-[#c6e140]'
-              : 'bg-slate-800 text-slate-600 cursor-not-allowed'
-          }`}
-        >
-          <Play size={20} /> {isKnockoutOnly ? 'Generate Knockout Bracket' : 'Generate Pools & Schedule'}
-        </button>
+        <div className="space-y-2.5">
+          {hasExistingTournament && onUpdateTournamentSettings && (
+            <button
+              type="button"
+              onClick={onUpdateTournamentSettings}
+              className="w-full py-3.5 rounded-2xl font-extrabold text-sm flex items-center justify-center gap-2 transition active:scale-95 bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/20"
+            >
+              <Settings size={16} /> Apply Rule &amp; Format Changes (Keep Played Scores)
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onStartPoolTournament}
+            disabled={!canStart}
+            className={`w-full py-4 rounded-2xl font-extrabold text-lg flex items-center justify-center gap-2 transition active:scale-95 ${
+              canStart
+                ? hasExistingTournament
+                  ? 'bg-slate-800 hover:bg-slate-750 text-[#d7f24c] border border-[#d7f24c]/40'
+                  : 'bg-[#d7f24c] text-slate-950 shadow-xl shadow-[#d7f24c]/20 hover:bg-[#c6e140]'
+                : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+            }`}
+          >
+            <Play size={20} />{' '}
+            {hasExistingTournament
+              ? isKnockoutOnly
+                ? 'Regenerate Knockout Bracket'
+                : 'Regenerate Pools & Schedule'
+              : isKnockoutOnly
+                ? 'Generate Knockout Bracket'
+                : 'Generate Pools & Schedule'}
+          </button>
+        </div>
       )}
 
       {/* Dedicated Directory Management Modal */}
