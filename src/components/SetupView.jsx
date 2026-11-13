@@ -278,7 +278,7 @@ export function SetupView({
       </div>
 
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
-        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'hidden' : activeTab === 'players' ? 'lg:col-span-7' : 'lg:col-span-6'}>
+        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'hidden' : activeTab === 'players' ? 'lg:col-span-12' : 'lg:col-span-6'}>
           {/* Player Pool Card */}
       <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
@@ -362,51 +362,42 @@ export function SetupView({
             No players yet. Add at least {numTeams * 2} to start a draft.
           </p>
         ) : (
-          <div className="max-h-[380px] lg:max-h-[440px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
-                <tr>
-                  <th className="py-1.5 px-3 font-bold w-12">#</th>
-                  <th className="py-1.5 px-3 font-bold">Player</th>
-                  {captainMode === 'manual' && <th className="py-1.5 px-3 font-bold w-24 text-center">Role</th>}
-                  {isAdmin && <th className="py-1.5 px-3 font-bold text-right w-16">Action</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/70">
-                {playerPool.map((p, idx) => {
-                  const isCaptain = captainMode === 'manual' && selectedCaptainIds.includes(p.id);
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-900/60 transition">
-                      <td className="py-1.5 px-3 font-mono text-slate-400">{idx + 1}</td>
-                      <td className="py-1.5 px-3 font-semibold text-white">{p.name}</td>
-                      {captainMode === 'manual' && (
-                        <td className="py-1.5 px-3 text-center">
-                          {isCaptain ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">
-                              <Crown size={10} className="fill-current" /> Captain
-                            </span>
-                          ) : (
-                            <span className="text-[10px] text-slate-500">Player</span>
-                          )}
-                        </td>
+          <div className="max-h-[380px] lg:max-h-[440px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl p-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {playerPool.map((p, idx) => {
+                const isCaptain = captainMode === 'manual' && selectedCaptainIds.includes(p.id);
+                return (
+                  <div
+                    key={p.id}
+                    className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border text-xs transition ${
+                      isCaptain
+                        ? 'bg-amber-500/10 border-amber-500/40'
+                        : 'bg-slate-900/80 border-slate-800 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono text-[11px] text-slate-400 shrink-0">{idx + 1}.</span>
+                      <span className="font-semibold text-white truncate" title={p.name}>
+                        {p.name}
+                      </span>
+                      {isCaptain && (
+                        <Crown size={11} className="text-amber-300 fill-current shrink-0" title="Captain" />
                       )}
-                      {isAdmin && (
-                        <td className="py-1.5 px-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => removePlayer(p.id)}
-                            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition"
-                            title="Remove player"
-                          >
-                            <X size={14} />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    </div>
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={() => removePlayer(p.id)}
+                        className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition shrink-0"
+                        title="Remove player"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -687,10 +678,10 @@ export function SetupView({
       </div>
 
         </div>
-        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'lg:col-span-12 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start' : activeTab === 'players' ? 'lg:col-span-5' : 'lg:col-span-6'}>
-          {/* Number of Courts (Tab 1: Players) */}
+        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'lg:col-span-12 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start' : activeTab === 'players' ? 'hidden' : 'lg:col-span-6'}>
+          {/* Number of Courts (Tab 3: Matchup Config) */}
           {setNumCourts && (
-            <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-2' : 'hidden'}>
+            <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-2' : 'hidden'}>
               <div className="flex items-center justify-between gap-2">
                 <label className="text-slate-200 text-sm font-bold">Number of Courts</label>
                 <span className="text-[11px] font-mono text-slate-400">

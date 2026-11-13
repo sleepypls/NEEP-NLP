@@ -21,7 +21,7 @@ export function DraftView({
   const isDraftComplete = pickPointer >= pickSequence.length;
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 pb-24 animate-in fade-in duration-200">
+    <div className="max-w-6xl mx-auto px-4 py-6 pb-24 animate-in fade-in duration-200">
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-white text-3xl font-display uppercase tracking-wide font-semibold">Snake Draft</h2>
         {!isAdmin && (
@@ -77,7 +77,7 @@ export function DraftView({
       )}
 
       {/* Team Rosters Board */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {teams.map((team, idx) => (
           <div
             key={team.id}
@@ -86,7 +86,7 @@ export function DraftView({
             }`}
             style={{ borderColor: team.color.accent }}
           >
-            <div className="flex items-center justify-between gap-2 mb-3">
+            <div className="flex items-start justify-between gap-2 mb-3">
               {editingTeamId === team.id && isAdmin ? (
                 <form
                   onSubmit={(e) => {
@@ -109,15 +109,15 @@ export function DraftView({
                       }
                       setEditingTeamId(null);
                     }}
-                    className="w-full bg-slate-800 border border-[#d7f24c] rounded-lg px-2 py-0.5 text-white text-xs font-bold focus:outline-none"
+                    className="w-full bg-slate-800 border border-[#d7f24c] rounded-lg px-2 py-0.5 text-white text-sm font-bold focus:outline-none"
                   />
                   <button type="submit" className="text-[#d7f24c] p-0.5 shrink-0">
                     <Check size={14} />
                   </button>
                 </form>
               ) : (
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="font-bold text-white text-sm truncate">{team.name}</span>
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <span className="font-bold text-white text-base leading-snug break-words">{team.name}</span>
                   {isAdmin && onRenameTeam && (
                     <button
                       type="button"
@@ -133,8 +133,8 @@ export function DraftView({
                   )}
                 </div>
               )}
-              <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full shrink-0">
-                {team.draftOrder.length} players
+              <span className="text-xs font-mono font-bold text-slate-300 bg-slate-800 border border-slate-700/70 px-2.5 py-0.5 rounded-full shrink-0 whitespace-nowrap">
+                {team.draftOrder.length} {team.draftOrder.length === 1 ? 'player' : 'players'}
               </span>
             </div>
             <ol className="space-y-1.5 text-sm">
@@ -143,15 +143,18 @@ export function DraftView({
                 const canMoveUp = i > 0;
                 const canMoveDown = i < team.draftOrder.length - 1;
                 return (
-                  <li key={pid} className="flex items-center gap-1.5 bg-slate-800/80 rounded-lg px-2.5 py-1.5 text-slate-200">
-                    <span className="font-mono text-xs text-slate-500 w-4 shrink-0">{i + 1}.</span>
-                    <span className="font-medium truncate flex-1">{playersById[pid]}</span>
-                    {isCaptain && (
-                      <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
-                        <Crown size={11} className="fill-current" /> Captain
-                      </span>
-                    )}
-                    {isAdmin && onReorderDraftPosition && team.draftOrder.length > 1 && (
+                  <li key={pid} className="flex items-center justify-between gap-2 bg-slate-800/80 rounded-xl px-3 py-2 text-slate-200">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="font-mono text-xs text-slate-500 w-5 shrink-0">{i + 1}.</span>
+                      <span className="font-semibold text-white break-words">{playersById[pid]}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isCaptain && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                          <Crown size={11} className="fill-current" /> Captain
+                        </span>
+                      )}
+                      {isAdmin && onReorderDraftPosition && team.draftOrder.length > 1 && (
                       <div className="flex items-center gap-0.5 shrink-0 ml-1">
                         <button
                           type="button"
@@ -173,6 +176,7 @@ export function DraftView({
                         </button>
                       </div>
                     )}
+                    </div>
                   </li>
                 );
               })}
