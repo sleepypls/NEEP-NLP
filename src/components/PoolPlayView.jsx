@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Trophy,
   Swords,
@@ -9,24 +9,38 @@ import {
   Flame,
   ArrowRight,
   RefreshCw,
+  Pencil,
 } from 'lucide-react';
 import {
   getEntryDisplayName,
   computePoolStandings,
   evaluatePoolOrKnockoutMatch,
   getKnockoutRoundLabel,
+  getEffectiveMatchFormat,
+  resizeGamesForBestOf,
   generatePoolStandingsCSV,
   generatePoolAndKnockoutMatchesCSV,
 } from '../utils/poolTournament';
 import { triggerCsvDownload } from '../utils/tournament';
+import { EditPoolMatchModal } from './EditPoolMatchModal';
 
-function MatchScoreEditor({ match, entryA, entryB, bestOf, pointsTo, onSave, onToggleLive, isAdmin }) {
-  const [games, setGames] = useState(() =>
-    (match.games && match.games.length > 0
-      ? match.games
-      : Array.from({ length: bestOf === 3 ? 3 : 1 }, (_, i) => ({ gameNum: i + 1, scoreA: '', scoreB: '' }))
-    ).map((g) => ({ ...g }))
-  );
+function MatchScoreEditor({
+  match,
+  entryA,
+  entryB,
+  bestOf,
+  pointsTo,
+  isCustomFormat,
+  onSave,
+  onToggleLive,
+  onEditMatchup,
+  isAdmin,
+}) {
+  const [games, setGames] = useState(() => resizeGamesForBestOf(match.games || [], bestOf));
+
+  useEffect(() => {
+    setGames(resizeGamesForBestOf(match.games || [], bestOf));
+  }, [match.id, match.games, bestOf]);
 
   const evalRes = evaluatePoolOrKnockoutMatch(games, bestOf);
   const nameA = getEntryDisplayName(entryA);
@@ -52,15 +66,20 @@ function MatchScoreEditor({ match, entryA, entryB, bestOf, pointsTo, onSave, onT
       }`}
     >
       <div className="flex items-center justify-between gap-2 mb-2.5">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
           {match.round && (
             <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-400 px-2 py-0.5 rounded-md">
               R{match.round}
             </span>
           )}
-          {match.seedLabelA && match.seedLabelB && (
+          {(match.seedLabelA || match.seedLabelB) && (
             <span className="text-[10px] font-mono font-bold bg-slate-800 text-[#d7f24c] px-2 py-0.5 rounded-md">
-              {match.seedLabelA} vs {match.seedLabelB}
+              {match.seedLabelA || 'TBD'} vs {match.seedLabelB || 'TBD'}
+            </span>
+          )}
+          {isCustomFormat && (
+            <span className="text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-md">
+              {bestOf > 1 ? `Bo${bestOf}` : '1G'} &bull; {pointsTo}pts
             </span>
           )}
           {match.inProgress && !match.saved && (
@@ -75,18 +94,32 @@ function MatchScoreEditor({ match, entryA, entryB, bestOf, pointsTo, onSave, onT
           )}
         </div>
 
-        {isAdmin && !match.saved && entryA && entryB && onToggleLive && (
-          <button
-            type="button"
-            onClick={onToggleLive}
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition ${
-              match.inProgress
-                ? 'bg-amber-400/20 text-amber-300 border-amber-400/40'
-                : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'
-            }`}
-          >
-            {match.inProgress ? 'On Court' : 'Mark Live'}
-          </button>
+        {isAdmin && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onEditMatchup && (
+              <button
+                type="button"
+                onClick={onEditMatchup}
+                title="Edit matchup or scoring format"
+                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-[#d7f24c] border border-slate-700 transition"
+              >
+                <Pencil size={12} />
+              </button>
+            )}
+            {!match.saved && entryA && entryB && onToggleLive && (
+              <button
+                type="button"
+                onClick={onToggleLive}
+                className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition ${
+                  match.inProgress
+                    ? 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+                    : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'
+                }`}
+              >
+                {match.inProgress ? 'On Court' : 'Mark Live'}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -104,7 +137,7 @@ function MatchScoreEditor({ match, entryA, entryB, bestOf, pointsTo, onSave, onT
           >
             {nameA} {match.winnerId && match.winnerId === entryA?.id && '✓'}
           </span>
-          {bestOf === 3 && (
+          {bestOf > 1 && (
             <span className="text-xs font-mono font-bold text-slate-400">
               {evalRes.gamesWonA}G
             </span>
@@ -122,7 +155,7 @@ function MatchScoreEditor({ match, entryA, entryB, bestOf, pointsTo, onSave, onT
           >
             {nameB} {match.winnerId && match.winnerId === entryB?.id && '✓'}
           </span>
-          {bestOf === 3 && (
+          {bestOf > 1 && (
             <span className="text-xs font-mono font-bold text-slate-400">
               {evalRes.gamesWonB}G
             </span>
@@ -133,14 +166,14 @@ function MatchScoreEditor({ match, entryA, entryB, bestOf, pointsTo, onSave, onT
       {/* Game Score Inputs */}
       {entryA && entryB && (
         <div className="space-y-2">
-          <div className={`grid gap-2 ${bestOf === 3 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1'}`}>
+          <div className={`grid gap-2 ${bestOf > 1 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1'}`}>
             {games.map((g, gIdx) => (
               <div
                 key={gIdx}
                 className="flex items-center justify-between gap-2 bg-slate-950/80 border border-slate-800 rounded-xl px-2.5 py-1.5"
               >
                 <span className="text-[10px] font-mono font-bold text-slate-500 shrink-0">
-                  {bestOf === 3 ? `G${gIdx + 1}` : `to ${pointsTo}`}
+                  {bestOf > 1 ? `G${gIdx + 1}` : `to ${pointsTo}`}
                 </span>
                 <div className="flex items-center gap-1.5">
                   <input
@@ -194,17 +227,28 @@ export function PoolPlayView({
   roomId,
   onSavePoolMatch,
   onTogglePoolMatchLive,
+  onEditPoolMatch,
   onGenerateKnockout,
   onSaveKnockoutMatch,
   onToggleKnockoutMatchLive,
+  onEditKnockoutMatch,
   isAdmin,
 }) {
-  const [activeTab, setActiveTab] = useState(tournament?.knockout ? 'knockout' : 'pools');
+  const hasPools = Boolean(tournament?.pools && tournament.pools.length > 0 && tournament?.structure !== 'knockout_only');
+  const [activeTab, setActiveTab] = useState(!hasPools || tournament?.knockout ? 'knockout' : 'pools');
   const [selectedPoolId, setSelectedPoolId] = useState('all');
+  const [editingMatchCtx, setEditingMatchCtx] = useState(null);
+
+  useEffect(() => {
+    if (!hasPools) {
+      setActiveTab('knockout');
+    }
+  }, [hasPools]);
 
   if (!tournament) return null;
 
   const {
+    structure = 'pools_knockout',
     discipline = 'doubles',
     entries = [],
     pools = [],
@@ -214,6 +258,7 @@ export function PoolPlayView({
     knockout = null,
   } = tournament;
 
+  const isKnockoutOnly = structure === 'knockout_only' || pools.length === 0;
   const entryMap = new Map(entries.map((e) => [e.id, e]));
   const totalPoolMatches = pools.reduce((sum, p) => sum + (p.matches?.length || 0), 0);
   const completedPoolMatches = pools.reduce(
@@ -225,6 +270,8 @@ export function PoolPlayView({
   const visiblePools =
     selectedPoolId === 'all' ? pools : pools.filter((p) => p.id === selectedPoolId);
 
+  const effectiveTab = isKnockoutOnly ? 'knockout' : activeTab;
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 pb-24 animate-in fade-in duration-200">
       {/* Header & CSV Exports */}
@@ -234,27 +281,43 @@ export function PoolPlayView({
             <h2 className="text-white text-2xl sm:text-3xl font-display uppercase tracking-wide font-semibold">
               {discipline === 'doubles' ? 'Doubles' : 'Singles'} Tournament
             </h2>
-            <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
-              {completedPoolMatches}/{totalPoolMatches} Pool Matches
-            </span>
+            {isKnockoutOnly ? (
+              <span className="text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+                Knockout Only
+              </span>
+            ) : (
+              <span className="text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                {completedPoolMatches}/{totalPoolMatches} Pool Matches
+              </span>
+            )}
           </div>
           <p className="text-slate-400 text-xs mt-0.5">
-            Pool Play: {poolFormat.bestOf === 3 ? 'Best of 3' : '1 Game'} to {poolFormat.pointsTo} &bull; Knockout:{' '}
-            {knockoutFormat.bestOf === 3 ? 'Best of 3' : '1 Game'} to {knockoutFormat.pointsTo} &bull; Top {advancePerPool}/pool advance
+            {!isKnockoutOnly && (
+              <>
+                Pool Play: {poolFormat.bestOf > 1 ? `Best of ${poolFormat.bestOf}` : '1 Game'} to {poolFormat.pointsTo} &bull;{' '}
+              </>
+            )}
+            Knockout:{' '}
+            {knockoutFormat.useRoundFormats
+              ? 'Custom Per-Round Formats'
+              : `${knockoutFormat.bestOf > 1 ? `Best of ${knockoutFormat.bestOf}` : '1 Game'} to ${knockoutFormat.pointsTo}`}
+            {!isKnockoutOnly && <> &bull; Top {advancePerPool}/pool advance</>}
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              const csv = generatePoolStandingsCSV(tournament, roomId);
-              triggerCsvDownload(`${roomId || 'room'}-pool-standings.csv`, csv);
-            }}
-            className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[#d7f24c] text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
-          >
-            <Download size={13} /> Standings CSV
-          </button>
+          {!isKnockoutOnly && (
+            <button
+              type="button"
+              onClick={() => {
+                const csv = generatePoolStandingsCSV(tournament, roomId);
+                triggerCsvDownload(`${roomId || 'room'}-pool-standings.csv`, csv);
+              }}
+              className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[#d7f24c] text-xs font-bold flex items-center gap-1.5 transition active:scale-95"
+            >
+              <Download size={13} /> Standings CSV
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
@@ -270,30 +333,36 @@ export function PoolPlayView({
 
       {/* Main Stage Tabs: Pools vs Knockout */}
       <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
-        <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 w-full max-w-sm shadow-lg">
-          <button
-            type="button"
-            onClick={() => setActiveTab('pools')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-              activeTab === 'pools'
-                ? 'bg-[#d7f24c] text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Swords size={14} /> Pool Play ({pools.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('knockout')}
-            className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-              activeTab === 'knockout'
-                ? 'bg-amber-400 text-slate-950 shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Trophy size={14} /> Knockout Bracket
-          </button>
-        </div>
+        {!isKnockoutOnly ? (
+          <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 w-full max-w-sm shadow-lg">
+            <button
+              type="button"
+              onClick={() => setActiveTab('pools')}
+              className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                effectiveTab === 'pools'
+                  ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Swords size={14} /> Pool Play ({pools.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('knockout')}
+              className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                effectiveTab === 'knockout'
+                  ? 'bg-amber-400 text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Trophy size={14} /> Knockout Bracket
+            </button>
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2 text-xs font-bold text-amber-400">
+            <Trophy size={14} /> Single-Elimination Knockout Bracket
+          </div>
+        )}
 
         {isAdmin && (
           <button
@@ -309,14 +378,20 @@ export function PoolPlayView({
             }`}
           >
             {knockout ? <RefreshCw size={14} /> : <Play size={14} />}
-            <span>{knockout ? 'Re-Seed Knockout from Standings' : 'Advance to Knockout Bracket'}</span>
+            <span>
+              {isKnockoutOnly
+                ? 'Re-Seed Knockout Bracket'
+                : knockout
+                  ? 'Re-Seed Knockout from Standings'
+                  : 'Advance to Knockout Bracket'}
+            </span>
             <ArrowRight size={14} />
           </button>
         )}
       </div>
 
       {/* POOLS TAB */}
-      {activeTab === 'pools' && (
+      {effectiveTab === 'pools' && (
         <div className="space-y-6">
           {pools.length > 1 && (
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
@@ -443,21 +518,35 @@ export function PoolPlayView({
                     {pool.name} Match Schedule ({pool.matches.length} Matches)
                   </span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {pool.matches.map((match) => (
-                      <MatchScoreEditor
-                        key={match.id}
-                        match={match}
-                        entryA={entryMap.get(match.entryAId)}
-                        entryB={entryMap.get(match.entryBId)}
-                        bestOf={poolFormat.bestOf}
-                        pointsTo={poolFormat.pointsTo}
-                        isAdmin={isAdmin}
-                        onToggleLive={() => onTogglePoolMatchLive(pool.id, match.id)}
-                        onSave={(games, winnerId) =>
-                          onSavePoolMatch(pool.id, match.id, games, winnerId)
-                        }
-                      />
-                    ))}
+                    {pool.matches.map((match) => {
+                      const fmt = getEffectiveMatchFormat(tournament, match, { isKnockout: false });
+                      return (
+                        <MatchScoreEditor
+                          key={match.id}
+                          match={match}
+                          entryA={entryMap.get(match.entryAId)}
+                          entryB={entryMap.get(match.entryBId)}
+                          bestOf={fmt.bestOf}
+                          pointsTo={fmt.pointsTo}
+                          isCustomFormat={fmt.isCustom}
+                          isAdmin={isAdmin}
+                          onToggleLive={() => onTogglePoolMatchLive(pool.id, match.id)}
+                          onEditMatchup={() =>
+                            setEditingMatchCtx({
+                              type: 'pool',
+                              poolId: pool.id,
+                              match,
+                              stageLabel: `${pool.name} \u2022 R${match.round}`,
+                              defaultFormat: getEffectiveMatchFormat(tournament, null, { isKnockout: false }),
+                              allowBye: false,
+                            })
+                          }
+                          onSave={(games, winnerId) =>
+                            onSavePoolMatch(pool.id, match.id, games, winnerId)
+                          }
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -467,7 +556,7 @@ export function PoolPlayView({
       )}
 
       {/* KNOCKOUT BRACKET TAB */}
-      {activeTab === 'knockout' && (
+      {effectiveTab === 'knockout' && (
         <div className="space-y-6">
           {!knockout ? (
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-xl">
@@ -531,66 +620,182 @@ export function PoolPlayView({
 
               {/* Knockout Rounds */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {knockout.rounds.map((round, rIdx) => (
-                  <div key={rIdx} className="space-y-3">
-                    <h3 className="text-xs font-black uppercase tracking-widest text-amber-400 px-1">
-                      {getKnockoutRoundLabel(knockout.rounds.length, rIdx)}
-                    </h3>
-                    {round.map((m) =>
-                      m.isBye ? (
-                        <div
-                          key={m.id}
-                          className="rounded-2xl border border-slate-800/60 bg-slate-900/40 p-3 text-xs text-slate-400"
-                        >
-                          <span className="font-bold text-white">
-                            {getEntryDisplayName(entryMap.get(m.winnerId))}
-                          </span>{' '}
-                          <span className="text-slate-500">(BYE &mdash; Advances)</span>
-                        </div>
-                      ) : (
-                        <MatchScoreEditor
-                          key={m.id}
-                          match={m}
-                          entryA={entryMap.get(m.entryAId)}
-                          entryB={entryMap.get(m.entryBId)}
-                          bestOf={knockoutFormat.bestOf}
-                          pointsTo={knockoutFormat.pointsTo}
-                          isAdmin={isAdmin}
-                          onToggleLive={() => onToggleKnockoutMatchLive(rIdx, m.matchIdx, false)}
-                          onSave={(games, winnerId) =>
-                            onSaveKnockoutMatch(rIdx, m.matchIdx, games, winnerId, false)
-                          }
-                        />
-                      )
-                    )}
-                  </div>
-                ))}
+                {knockout.rounds.map((round, rIdx) => {
+                  const roundFmt = getEffectiveMatchFormat(tournament, null, {
+                    isKnockout: true,
+                    totalRounds: knockout.rounds.length,
+                    roundIdx: rIdx,
+                    isBronze: false,
+                  });
+                  const roundTitle = getKnockoutRoundLabel(knockout.rounds.length, rIdx);
+                  return (
+                    <div key={rIdx} className="space-y-3">
+                      <div className="flex items-center justify-between gap-2 px-1">
+                        <h3 className="text-xs font-black uppercase tracking-widest text-amber-400">
+                          {roundTitle}
+                        </h3>
+                        <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
+                          {roundFmt.bestOf > 1 ? `Bo${roundFmt.bestOf}` : '1G'} to {roundFmt.pointsTo}
+                        </span>
+                      </div>
+                      {round.map((m) => {
+                        const matchFmt = getEffectiveMatchFormat(tournament, m, {
+                          isKnockout: true,
+                          totalRounds: knockout.rounds.length,
+                          roundIdx: rIdx,
+                          isBronze: false,
+                        });
+                        if (m.isBye) {
+                          return (
+                            <div
+                              key={m.id}
+                              className="rounded-2xl border border-slate-800/60 bg-slate-900/40 p-3 text-xs text-slate-400 flex items-center justify-between gap-2"
+                            >
+                              <div className="min-w-0 truncate">
+                                <span className="font-bold text-white">
+                                  {getEntryDisplayName(entryMap.get(m.winnerId || m.entryAId || m.entryBId))}
+                                </span>{' '}
+                                <span className="text-slate-500">(BYE &mdash; Advances)</span>
+                              </div>
+                              {isAdmin && onEditKnockoutMatch && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditingMatchCtx({
+                                      type: 'knockout',
+                                      roundIdx: rIdx,
+                                      matchIdx: m.matchIdx,
+                                      isBronze: false,
+                                      match: m,
+                                      stageLabel: roundTitle,
+                                      defaultFormat: roundFmt,
+                                      allowBye: true,
+                                    })
+                                  }
+                                  title="Edit matchup or assign opponent"
+                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-[#d7f24c] border border-slate-700 transition shrink-0"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        }
+                        return (
+                          <MatchScoreEditor
+                            key={m.id}
+                            match={m}
+                            entryA={entryMap.get(m.entryAId)}
+                            entryB={entryMap.get(m.entryBId)}
+                            bestOf={matchFmt.bestOf}
+                            pointsTo={matchFmt.pointsTo}
+                            isCustomFormat={matchFmt.isCustom}
+                            isAdmin={isAdmin}
+                            onToggleLive={() => onToggleKnockoutMatchLive(rIdx, m.matchIdx, false)}
+                            onEditMatchup={() =>
+                              setEditingMatchCtx({
+                                type: 'knockout',
+                                roundIdx: rIdx,
+                                matchIdx: m.matchIdx,
+                                isBronze: false,
+                                match: m,
+                                stageLabel: roundTitle,
+                                defaultFormat: roundFmt,
+                                allowBye: rIdx === 0,
+                              })
+                            }
+                            onSave={(games, winnerId) =>
+                              onSaveKnockoutMatch(rIdx, m.matchIdx, games, winnerId, false)
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Bronze Medal Match */}
-              {knockout.bronzeMatch && (
-                <div className="max-w-md">
-                  <h3 className="text-xs font-black uppercase tracking-widest text-orange-400 px-1 mb-2.5 flex items-center gap-1.5">
-                    <Award size={14} /> Bronze Medal Match (3rd Place)
-                  </h3>
-                  <MatchScoreEditor
-                    match={knockout.bronzeMatch}
-                    entryA={entryMap.get(knockout.bronzeMatch.entryAId)}
-                    entryB={entryMap.get(knockout.bronzeMatch.entryBId)}
-                    bestOf={knockoutFormat.bestOf}
-                    pointsTo={knockoutFormat.pointsTo}
-                    isAdmin={isAdmin}
-                    onToggleLive={() => onToggleKnockoutMatchLive(0, 0, true)}
-                    onSave={(games, winnerId) =>
-                      onSaveKnockoutMatch(0, 0, games, winnerId, true)
-                    }
-                  />
-                </div>
-              )}
+              {knockout.bronzeMatch && (() => {
+                const bronzeRoundDefault = getEffectiveMatchFormat(tournament, null, {
+                  isKnockout: true,
+                  totalRounds: knockout.rounds.length,
+                  roundIdx: knockout.rounds.length - 1,
+                  isBronze: true,
+                });
+                const bronzeFmt = getEffectiveMatchFormat(tournament, knockout.bronzeMatch, {
+                  isKnockout: true,
+                  totalRounds: knockout.rounds.length,
+                  roundIdx: knockout.rounds.length - 1,
+                  isBronze: true,
+                });
+                return (
+                  <div className="max-w-md">
+                    <div className="flex items-center justify-between gap-2 px-1 mb-2.5">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-orange-400 flex items-center gap-1.5">
+                        <Award size={14} /> Bronze Medal Match (3rd Place)
+                      </h3>
+                      <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
+                        {bronzeFmt.bestOf > 1 ? `Bo${bronzeFmt.bestOf}` : '1G'} to {bronzeFmt.pointsTo}
+                      </span>
+                    </div>
+                    <MatchScoreEditor
+                      match={knockout.bronzeMatch}
+                      entryA={entryMap.get(knockout.bronzeMatch.entryAId)}
+                      entryB={entryMap.get(knockout.bronzeMatch.entryBId)}
+                      bestOf={bronzeFmt.bestOf}
+                      pointsTo={bronzeFmt.pointsTo}
+                      isCustomFormat={bronzeFmt.isCustom}
+                      isAdmin={isAdmin}
+                      onToggleLive={() => onToggleKnockoutMatchLive(0, 0, true)}
+                      onEditMatchup={() =>
+                        setEditingMatchCtx({
+                          type: 'knockout',
+                          roundIdx: 0,
+                          matchIdx: 0,
+                          isBronze: true,
+                          match: knockout.bronzeMatch,
+                          stageLabel: 'Bronze Medal Match',
+                          defaultFormat: bronzeRoundDefault,
+                          allowBye: false,
+                        })
+                      }
+                      onSave={(games, winnerId) =>
+                        onSaveKnockoutMatch(0, 0, games, winnerId, true)
+                      }
+                    />
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
       )}
+
+      {/* Edit Matchup & Format Modal */}
+      <EditPoolMatchModal
+        isOpen={Boolean(editingMatchCtx)}
+        onClose={() => setEditingMatchCtx(null)}
+        match={editingMatchCtx?.match}
+        entries={entries}
+        stageLabel={editingMatchCtx?.stageLabel}
+        defaultFormat={editingMatchCtx?.defaultFormat || { bestOf: 1, pointsTo: 11 }}
+        allowBye={Boolean(editingMatchCtx?.allowBye)}
+        isAdmin={isAdmin}
+        onSave={(payload) => {
+          if (!editingMatchCtx) return;
+          if (editingMatchCtx.type === 'pool' && onEditPoolMatch) {
+            onEditPoolMatch(editingMatchCtx.poolId, editingMatchCtx.match.id, payload);
+          } else if (editingMatchCtx.type === 'knockout' && onEditKnockoutMatch) {
+            onEditKnockoutMatch(
+              editingMatchCtx.roundIdx,
+              editingMatchCtx.matchIdx,
+              editingMatchCtx.isBronze,
+              payload
+            );
+          }
+        }}
+      />
     </div>
   );
 }

@@ -21,6 +21,8 @@ import {
   generatePoolsAndSchedule,
   generateKnockoutBracket,
   advanceKnockoutWinner,
+  getEffectiveMatchFormat,
+  resizeGamesForBestOf,
 } from './utils/poolTournament';
 
 import {
@@ -256,6 +258,7 @@ export default function App() {
   });
   const [tournamentStyle, setTournamentStyle] = useState(() => initialSaved?.tournamentStyle || 'mlp');
   const [poolDiscipline, setPoolDiscipline] = useState(() => initialSaved?.poolDiscipline || 'doubles');
+  const [poolStructure, setPoolStructure] = useState(() => initialSaved?.poolStructure || 'pools_knockout');
   const [poolEntries, setPoolEntries] = useState(() => initialSaved?.poolEntries || []);
   const [poolNumPools, setPoolNumPools] = useState(() => initialSaved?.poolNumPools || 2);
   const [poolAdvancePerPool, setPoolAdvancePerPool] = useState(() => initialSaved?.poolAdvancePerPool || 2);
@@ -456,6 +459,7 @@ export default function App() {
         if (cloudTourn) {
           if (cloudTourn.tournamentStyle) setTournamentStyle(cloudTourn.tournamentStyle);
           if (cloudTourn.poolDiscipline) setPoolDiscipline(cloudTourn.poolDiscipline);
+          if (cloudTourn.poolStructure) setPoolStructure(cloudTourn.poolStructure);
           if (cloudTourn.poolEntries !== undefined) setPoolEntries(cloudTourn.poolEntries);
           if (cloudTourn.poolNumPools) setPoolNumPools(cloudTourn.poolNumPools);
           if (cloudTourn.poolAdvancePerPool) setPoolAdvancePerPool(cloudTourn.poolAdvancePerPool);
@@ -603,6 +607,7 @@ export default function App() {
           adminPin,
           tournamentStyle,
           poolDiscipline,
+          poolStructure,
           poolEntries,
           poolNumPools,
           poolAdvancePerPool,
@@ -619,7 +624,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
-  }, [roomId, adminPin, tournamentStyle, poolDiscipline, poolEntries, poolNumPools, poolAdvancePerPool, poolSeedingMode, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolTournament, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+  }, [roomId, adminPin, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolSeedingMode, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolTournament, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
 
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
@@ -646,6 +651,7 @@ export default function App() {
         adminPin,
         tournamentStyle,
         poolDiscipline,
+        poolStructure,
         poolEntries,
         poolNumPools,
         poolAdvancePerPool,
@@ -1451,6 +1457,7 @@ export default function App() {
       const style = saved.tournamentStyle || 'mlp';
       setTournamentStyle(style);
       setPoolDiscipline(saved.poolDiscipline || 'doubles');
+      setPoolStructure(saved.poolStructure || 'pools_knockout');
       setPoolEntries(saved.poolEntries || []);
       setPoolNumPools(saved.poolNumPools || 2);
       setPoolAdvancePerPool(saved.poolAdvancePerPool || 2);
@@ -1483,6 +1490,7 @@ export default function App() {
       const defCfg = getEffectiveDefaultConfig(cleanRoom);
       setTournamentStyle('mlp');
       setPoolDiscipline('doubles');
+      setPoolStructure('pools_knockout');
       setPoolEntries([]);
       setPoolNumPools(2);
       setPoolAdvancePerPool(2);
@@ -1546,6 +1554,7 @@ export default function App() {
     const defCfg = getEffectiveDefaultConfig(cleanRoom);
     setView(initialView);
     setPoolDiscipline('doubles');
+    setPoolStructure('pools_knockout');
     setPoolEntries([]);
     setPoolNumPools(2);
     setPoolAdvancePerPool(2);
@@ -1586,6 +1595,7 @@ export default function App() {
         adminPin: newPin,
         tournamentStyle: style,
         poolDiscipline: 'doubles',
+        poolStructure: 'pools_knockout',
         poolEntries: [],
         poolNumPools: 2,
         poolAdvancePerPool: 2,
@@ -1728,6 +1738,7 @@ export default function App() {
     const built = generatePoolsAndSchedule({
       entries: poolEntries,
       discipline: poolDiscipline,
+      structure: poolStructure,
       numPools: poolNumPools,
       poolFormat: poolMatchFormat,
       knockoutFormat: knockoutMatchFormat,
@@ -1739,6 +1750,7 @@ export default function App() {
     setView('poolPlay');
     broadcastTournamentChange({
       tournamentStyle: 'tournament',
+      poolStructure,
       poolTournament: built,
       view: 'poolPlay',
     });
@@ -1758,7 +1770,8 @@ export default function App() {
                   ...m,
                   games,
                   winnerId: winnerId || null,
-                  status: winnerId ? 'completed' : m.status === 'completed' ? 'pending' : m.status,
+                  saved: Boolean(winnerId),
+                  inProgress: false,
                 }
               : m
           ),
@@ -1778,8 +1791,40 @@ export default function App() {
         return {
           ...pool,
           matches: pool.matches.map((m) => {
-            if (m.id !== matchId || m.winnerId) return m;
-            return { ...m, status: m.status === 'live' ? 'pending' : 'live' };
+            if (m.id !== matchId || m.saved) return m;
+            return { ...m, inProgress: !m.inProgress };
+          }),
+        };
+      }),
+    };
+    setPoolTournament(updated);
+    broadcastTournamentChange({ poolTournament: updated });
+  }
+
+  function handleEditPoolMatch(poolId, matchId, { entryAId, entryBId, customFormat }) {
+    if (!poolTournament) return;
+    const updated = {
+      ...poolTournament,
+      pools: poolTournament.pools.map((pool) => {
+        if (pool.id !== poolId) return pool;
+        return {
+          ...pool,
+          matches: pool.matches.map((m) => {
+            if (m.id !== matchId) return m;
+            const nextBestOf = customFormat?.bestOf || poolTournament.poolFormat?.bestOf || 1;
+            const entrantsChanged = m.entryAId !== entryAId || m.entryBId !== entryBId;
+            return {
+              ...m,
+              entryAId,
+              entryBId,
+              customFormat: customFormat || null,
+              games: entrantsChanged
+                ? resizeGamesForBestOf([], nextBestOf)
+                : resizeGamesForBestOf(m.games, nextBestOf),
+              saved: entrantsChanged ? false : m.saved,
+              winnerId: entrantsChanged ? null : m.winnerId,
+              inProgress: entrantsChanged ? false : m.inProgress,
+            };
           }),
         };
       }),
@@ -1799,7 +1844,7 @@ export default function App() {
     broadcastTournamentChange({ poolTournament: updated });
   }
 
-  function handleSaveKnockoutMatch(roundIdx, matchIdx, isBronze, games, winnerId) {
+  function handleSaveKnockoutMatch(roundIdx, matchIdx, games, winnerId, isBronze = false) {
     if (!poolTournament || !poolTournament.knockout) return;
     let updatedKnockout = { ...poolTournament.knockout };
     if (isBronze) {
@@ -1809,8 +1854,10 @@ export default function App() {
           ...updatedKnockout.bronzeMatch,
           games,
           winnerId: winnerId || null,
-          status: winnerId ? 'completed' : 'pending',
+          saved: Boolean(winnerId),
+          inProgress: false,
         },
+        bronzeId: winnerId || null,
       };
     } else {
       updatedKnockout = {
@@ -1825,7 +1872,8 @@ export default function App() {
                       ...m,
                       games,
                       winnerId: winnerId || null,
-                      status: winnerId ? 'completed' : 'pending',
+                      saved: Boolean(winnerId),
+                      inProgress: false,
                     }
               )
         ),
@@ -1839,15 +1887,15 @@ export default function App() {
     broadcastTournamentChange({ poolTournament: updated });
   }
 
-  function handleToggleKnockoutMatchLive(roundIdx, matchIdx, isBronze) {
+  function handleToggleKnockoutMatchLive(roundIdx, matchIdx, isBronze = false) {
     if (!poolTournament || !poolTournament.knockout) return;
     let updatedKnockout = { ...poolTournament.knockout };
-    if (isBronze && updatedKnockout.bronzeMatch && !updatedKnockout.bronzeMatch.winnerId) {
+    if (isBronze && updatedKnockout.bronzeMatch && !updatedKnockout.bronzeMatch.saved) {
       updatedKnockout = {
         ...updatedKnockout,
         bronzeMatch: {
           ...updatedKnockout.bronzeMatch,
-          status: updatedKnockout.bronzeMatch.status === 'live' ? 'pending' : 'live',
+          inProgress: !updatedKnockout.bronzeMatch.inProgress,
         },
       };
     } else if (!isBronze) {
@@ -1857,13 +1905,83 @@ export default function App() {
           rI !== roundIdx
             ? r
             : r.map((m, mI) =>
-                mI !== matchIdx || m.winnerId
+                mI !== matchIdx || m.saved
                   ? m
-                  : { ...m, status: m.status === 'live' ? 'pending' : 'live' }
+                  : { ...m, inProgress: !m.inProgress }
               )
         ),
       };
     }
+    const updated = { ...poolTournament, knockout: updatedKnockout };
+    setPoolTournament(updated);
+    broadcastTournamentChange({ poolTournament: updated });
+  }
+
+  function handleEditKnockoutMatch(roundIdx, matchIdx, isBronze, { entryAId, entryBId, customFormat }) {
+    if (!poolTournament || !poolTournament.knockout) return;
+    let updatedKnockout = JSON.parse(JSON.stringify(poolTournament.knockout));
+    const totalRounds = updatedKnockout.rounds.length;
+
+    if (isBronze && updatedKnockout.bronzeMatch) {
+      const bm = updatedKnockout.bronzeMatch;
+      const fmt = getEffectiveMatchFormat(poolTournament, { customFormat }, {
+        isKnockout: true,
+        totalRounds,
+        roundIdx: totalRounds - 1,
+        isBronze: true,
+      });
+      const entrantsChanged = bm.entryAId !== entryAId || bm.entryBId !== entryBId;
+      updatedKnockout.bronzeMatch = {
+        ...bm,
+        entryAId: entryAId || null,
+        entryBId: entryBId || null,
+        customFormat: customFormat || null,
+        games: entrantsChanged
+          ? resizeGamesForBestOf([], fmt.bestOf)
+          : resizeGamesForBestOf(bm.games, fmt.bestOf),
+        saved: entrantsChanged ? false : bm.saved,
+        winnerId: entrantsChanged ? null : bm.winnerId,
+        inProgress: entrantsChanged ? false : bm.inProgress,
+      };
+      if (entrantsChanged) {
+        updatedKnockout.bronzeId = null;
+      }
+    } else {
+      const m = updatedKnockout.rounds[roundIdx]?.[matchIdx];
+      if (!m) return;
+      const fmt = getEffectiveMatchFormat(poolTournament, { customFormat }, {
+        isKnockout: true,
+        totalRounds,
+        roundIdx,
+        isBronze: false,
+      });
+      const entrantsChanged = m.entryAId !== entryAId || m.entryBId !== entryBId;
+      const isNowBye = roundIdx === 0 && Boolean((entryAId && !entryBId) || (!entryAId && entryBId));
+
+      const nextMatch = {
+        ...m,
+        entryAId: entryAId || null,
+        entryBId: entryBId || null,
+        isBye: isNowBye,
+        customFormat: customFormat || null,
+        games: entrantsChanged
+          ? resizeGamesForBestOf([], fmt.bestOf)
+          : resizeGamesForBestOf(m.games, fmt.bestOf),
+        saved: isNowBye ? true : (entrantsChanged ? false : m.saved),
+        winnerId: isNowBye ? (entryAId || entryBId) : (entrantsChanged ? null : m.winnerId),
+        inProgress: entrantsChanged ? false : m.inProgress,
+      };
+      updatedKnockout.rounds[roundIdx][matchIdx] = nextMatch;
+
+      if (isNowBye && nextMatch.winnerId) {
+        updatedKnockout = advanceKnockoutWinner(updatedKnockout, roundIdx, matchIdx, nextMatch.winnerId);
+      } else if (entrantsChanged && roundIdx + 1 < totalRounds) {
+        const nextIdx = Math.floor(matchIdx / 2);
+        const slot = matchIdx % 2 === 0 ? 'entryAId' : 'entryBId';
+        updatedKnockout.rounds[roundIdx + 1][nextIdx][slot] = null;
+      }
+    }
+
     const updated = { ...poolTournament, knockout: updatedKnockout };
     setPoolTournament(updated);
     broadcastTournamentChange({ poolTournament: updated });
@@ -2334,6 +2452,11 @@ export default function App() {
               setPoolDiscipline(val);
               broadcastTournamentChange({ poolDiscipline: val });
             }}
+            structure={poolStructure}
+            setStructure={(val) => {
+              setPoolStructure(val);
+              broadcastTournamentChange({ poolStructure: val });
+            }}
             entries={poolEntries}
             onAddEntry={handleAddPoolEntry}
             onAddMultipleEntries={handleAddMultiplePoolEntries}
@@ -2409,9 +2532,11 @@ export default function App() {
             roomId={roomId}
             onSavePoolMatch={handleSavePoolMatch}
             onTogglePoolMatchLive={handleTogglePoolMatchLive}
+            onEditPoolMatch={handleEditPoolMatch}
             onGenerateKnockout={handleGeneratePoolKnockout}
             onSaveKnockoutMatch={handleSaveKnockoutMatch}
             onToggleKnockoutMatchLive={handleToggleKnockoutMatchLive}
+            onEditKnockoutMatch={handleEditKnockoutMatch}
             isAdmin={isAdmin}
           />
         )}

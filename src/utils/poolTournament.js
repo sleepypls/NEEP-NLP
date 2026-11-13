@@ -17,13 +17,76 @@ export function getEntryDisplayName(entry) {
   return `Entry ${entry.id}`;
 }
 
+export const KNOCKOUT_ROUND_KEYS = [
+  { key: 'r32', label: 'Round of 32' },
+  { key: 'r16', label: 'Round of 16' },
+  { key: 'quarters', label: 'Quarterfinals' },
+  { key: 'semis', label: 'Semifinals' },
+  { key: 'final', label: 'Gold Medal Final' },
+  { key: 'bronze', label: 'Bronze Medal Match' },
+];
+
+export function getKnockoutRoundKey(totalRounds, roundIdx, isBronze = false) {
+  if (isBronze) return 'bronze';
+  const remaining = totalRounds - roundIdx;
+  if (remaining === 1) return 'final';
+  if (remaining === 2) return 'semis';
+  if (remaining === 3) return 'quarters';
+  if (remaining === 4) return 'r16';
+  return 'r32';
+}
+
+export function getEffectiveMatchFormat(
+  tournament,
+  match,
+  { isKnockout = false, totalRounds = 1, roundIdx = 0, isBronze = false } = {}
+) {
+  if (match && match.customFormat && match.customFormat.bestOf) {
+    return {
+      bestOf: Number(match.customFormat.bestOf) || 1,
+      pointsTo: Number(match.customFormat.pointsTo) || 11,
+      isCustom: true,
+    };
+  }
+
+  const koFmt = tournament?.knockoutFormat || { bestOf: 3, pointsTo: 11 };
+  if (isKnockout) {
+    if (koFmt.useRoundFormats && koFmt.roundFormats) {
+      const roundKey = getKnockoutRoundKey(totalRounds, roundIdx, isBronze);
+      const rf = koFmt.roundFormats[roundKey];
+      if (rf && rf.bestOf) {
+        return {
+          bestOf: Number(rf.bestOf) || 1,
+          pointsTo: Number(rf.pointsTo) || Number(koFmt.pointsTo) || 11,
+          isCustom: false,
+          isRoundSpecific: true,
+        };
+      }
+    }
+    return {
+      bestOf: Number(koFmt.bestOf) || 3,
+      pointsTo: Number(koFmt.pointsTo) || 11,
+      isCustom: false,
+    };
+  }
+
+  const poolFmt = tournament?.poolFormat || { bestOf: 1, pointsTo: 15 };
+  return {
+    bestOf: Number(poolFmt.bestOf) || 1,
+    pointsTo: Number(poolFmt.pointsTo) || 11,
+    isCustom: false,
+  };
+}
+
 /**
- * Generates balanced pools using serpentine (snake) seeding,
- * and creates a full round-robin match schedule for each pool.
+ * Generates either:
+ * - Pool Play + Seeded Knockout (`structure === 'pools_knockout'`)
+ * - Direct Single-Elimination Knockout (`structure === 'knockout_only'`)
  */
 export function generatePoolsAndSchedule({
   entries = [],
   discipline = 'doubles',
+  structure = 'pools_knockout',
   numPools = 2,
   poolFormat = { bestOf: 1, pointsTo: 15, winByTwo: true },
   knockoutFormat = { bestOf: 3, pointsTo: 11, winByTwo: true },
@@ -35,6 +98,28 @@ export function generatePoolsAndSchedule({
     ...e,
     seed: e.seed || idx + 1,
   }));
+
+  if (structure === 'knockout_only') {
+    const knockout = generateDirectKnockoutTournament({
+      entries: cleanEntries,
+      knockoutFormat,
+      includeBronze,
+      seedingMode,
+    });
+    return {
+      structure: 'knockout_only',
+      discipline,
+      entries: cleanEntries,
+      pools: [],
+      poolFormat,
+      knockoutFormat,
+      advancePerPool,
+      includeBronze,
+      seedingMode,
+      knockout,
+      stage: 'knockout',
+    };
+  }
 
   const poolCount = Math.max(1, Math.min(numPools, Math.floor(cleanEntries.length / 2) || 1));
   const poolLetters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -93,6 +178,7 @@ export function generatePoolsAndSchedule({
   });
 
   return {
+    structure: 'pools_knockout',
     discipline,
     entries: cleanEntries,
     pools,
@@ -100,13 +186,14 @@ export function generatePoolsAndSchedule({
     knockoutFormat,
     advancePerPool,
     includeBronze,
+    seedingMode,
     knockout: null,
     stage: 'pools', // 'pools' | 'knockout' | 'complete'
   };
 }
 
 export function createEmptyGames(bestOf = 1) {
-  const count = bestOf === 3 ? 3 : 1;
+  const count = Math.max(1, Number(bestOf) || 1);
   return Array.from({ length: count }, (_, i) => ({
     gameNum: i + 1,
     scoreA: '',
@@ -114,8 +201,20 @@ export function createEmptyGames(bestOf = 1) {
   }));
 }
 
+export function resizeGamesForBestOf(existingGames = [], bestOf = 1) {
+  const count = Math.max(1, Number(bestOf) || 1);
+  return Array.from({ length: count }, (_, i) => {
+    const prev = existingGames[i];
+    return {
+      gameNum: i + 1,
+      scoreA: prev && prev.scoreA !== undefined ? prev.scoreA : '',
+      scoreB: prev && prev.scoreB !== undefined ? prev.scoreB : '',
+    };
+  });
+}
+
 /**
- * Evaluates a match's games array (1 game or Best of 3) to determine match winner & totals.
+ * Evaluates a match's games array (Best of 1, 3, or 5) to determine match winner & totals.
  */
 export function evaluatePoolOrKnockoutMatch(games = [], bestOf = 1) {
   let gamesWonA = 0;
@@ -138,7 +237,7 @@ export function evaluatePoolOrKnockoutMatch(games = [], bestOf = 1) {
     else gamesWonB++;
   }
 
-  const neededToWin = bestOf === 3 ? 2 : 1;
+  const neededToWin = Math.ceil((Number(bestOf) || 1) / 2);
   const isComplete = gamesWonA >= neededToWin || gamesWonB >= neededToWin;
   const winnerSide = isComplete ? (gamesWonA > gamesWonB ? 'A' : 'B') : null;
 
@@ -188,7 +287,8 @@ export function computePoolStandings(pool, entries = [], bestOf = 1) {
 
   (pool.matches || []).forEach((m) => {
     if (!m.saved || !m.winnerId) return;
-    const evalRes = evaluatePoolOrKnockoutMatch(m.games, bestOf);
+    const matchBestOf = m.customFormat?.bestOf || bestOf;
+    const evalRes = evaluatePoolOrKnockoutMatch(m.games, matchBestOf);
     const sA = statsMap.get(m.entryAId);
     const sB = statsMap.get(m.entryBId);
     if (!sA || !sB) return;
@@ -220,7 +320,7 @@ export function computePoolStandings(pool, entries = [], bestOf = 1) {
     sB.pointsAgainst += evalRes.pointsA;
     sB.pointDiff = sB.pointsFor - sB.pointsAgainst;
 
-    const pairKey = [m.entryAId, m.entryBId].sort((a, b) => a - b).join('|');
+    const pairKey = [String(m.entryAId), String(m.entryBId)].sort().join('|');
     h2hWinners.set(pairKey, m.winnerId);
   });
 
@@ -228,7 +328,7 @@ export function computePoolStandings(pool, entries = [], bestOf = 1) {
   rows.sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     // Head-to-head check
-    const pairKey = [a.entryId, b.entryId].sort((x, y) => x - y).join('|');
+    const pairKey = [String(a.entryId), String(b.entryId)].sort().join('|');
     const h2hWinner = h2hWinners.get(pairKey);
     if (h2hWinner === a.entryId) return -1;
     if (h2hWinner === b.entryId) return 1;
@@ -244,19 +344,161 @@ export function computePoolStandings(pool, entries = [], bestOf = 1) {
   return rows;
 }
 
+function buildSeededBracket({ qualifiers, knockoutFormat, includeBronze = true }) {
+  if (!qualifiers || qualifiers.length < 2) return null;
+
+  let bracketSize = 2;
+  while (bracketSize < qualifiers.length) bracketSize *= 2;
+
+  const seededSlots = Array.from({ length: bracketSize }, (_, i) => qualifiers[i] || null);
+  const seedOrder = getBracketSeedOrder(bracketSize);
+
+  const rounds = [];
+  const totalRounds = Math.log2(bracketSize);
+
+  // Round 0
+  const r0Fmt = getEffectiveMatchFormat({ knockoutFormat }, null, {
+    isKnockout: true,
+    totalRounds,
+    roundIdx: 0,
+  });
+  const round0 = [];
+  for (let i = 0; i < bracketSize; i += 2) {
+    const qA = seededSlots[seedOrder[i] - 1];
+    const qB = seededSlots[seedOrder[i + 1] - 1];
+    const isBye = !qA || !qB;
+    round0.push({
+      id: `ko-r0-m${i / 2}`,
+      roundIdx: 0,
+      matchIdx: i / 2,
+      entryAId: qA ? qA.entryId : null,
+      entryBId: qB ? qB.entryId : null,
+      seedLabelA: qA ? qA.seedLabel : null,
+      seedLabelB: qB ? qB.seedLabel : null,
+      isBye,
+      games: createEmptyGames(r0Fmt.bestOf),
+      inProgress: false,
+      saved: isBye,
+      winnerId: isBye ? (qA ? qA.entryId : qB ? qB.entryId : null) : null,
+    });
+  }
+  rounds.push(round0);
+
+  // Subsequent rounds
+  for (let r = 1; r < totalRounds; r++) {
+    const prevRound = rounds[r - 1];
+    const rFmt = getEffectiveMatchFormat({ knockoutFormat }, null, {
+      isKnockout: true,
+      totalRounds,
+      roundIdx: r,
+    });
+    const currRound = [];
+    for (let i = 0; i < prevRound.length; i += 2) {
+      const mA = prevRound[i];
+      const mB = prevRound[i + 1];
+      currRound.push({
+        id: `ko-r${r}-m${i / 2}`,
+        roundIdx: r,
+        matchIdx: i / 2,
+        entryAId: mA.isBye ? mA.winnerId : null,
+        entryBId: mB.isBye ? mB.winnerId : null,
+        seedLabelA: mA.isBye ? (mA.entryAId ? mA.seedLabelA : mA.seedLabelB) : null,
+        seedLabelB: mB.isBye ? (mB.entryAId ? mB.seedLabelA : mB.seedLabelB) : null,
+        isBye: false,
+        games: createEmptyGames(rFmt.bestOf),
+        inProgress: false,
+        saved: false,
+        winnerId: null,
+      });
+    }
+    rounds.push(currRound);
+  }
+
+  const bronzeFmt = getEffectiveMatchFormat({ knockoutFormat }, null, {
+    isKnockout: true,
+    totalRounds,
+    roundIdx: totalRounds - 1,
+    isBronze: true,
+  });
+  const bronzeMatch =
+    includeBronze && totalRounds >= 2
+      ? {
+          id: 'ko-bronze',
+          isBronze: true,
+          entryAId: null,
+          entryBId: null,
+          games: createEmptyGames(bronzeFmt.bestOf),
+          inProgress: false,
+          saved: false,
+          winnerId: null,
+        }
+      : null;
+
+  return {
+    rounds,
+    bronzeMatch,
+    championId: null,
+    silverId: null,
+    bronzeId: null,
+  };
+}
+
+/**
+ * Generates a Single-Elimination Knockout Bracket directly from entries (no pool play).
+ */
+export function generateDirectKnockoutTournament({
+  entries = [],
+  knockoutFormat,
+  includeBronze = true,
+  seedingMode = 'snake',
+}) {
+  const ordered =
+    seedingMode === 'random'
+      ? [...entries].sort(() => Math.random() - 0.5)
+      : [...entries];
+
+  const qualifiers = ordered.map((e, idx) => ({
+    entryId: e.id,
+    seedLabel: `#${idx + 1}`,
+  }));
+
+  return buildSeededBracket({ qualifiers, knockoutFormat, includeBronze });
+}
+
 /**
  * Generates standard cross-pool seeded Single-Elimination Knockout Bracket
+ * (or re-seeds a direct knockout bracket if no pools exist)
  * + optional Bronze Medal (3rd place) match.
  */
 export function generateKnockoutBracket(tournament) {
-  const { pools = [], entries = [], advancePerPool = 2, poolFormat, knockoutFormat, includeBronze = true } = tournament;
-  const bestOfPool = poolFormat?.bestOf || 1;
-  const bestOfKo = knockoutFormat?.bestOf || 3;
+  const {
+    structure = 'pools_knockout',
+    pools = [],
+    entries = [],
+    advancePerPool = 2,
+    poolFormat,
+    knockoutFormat,
+    includeBronze = true,
+    seedingMode = 'snake',
+  } = tournament;
+
+  if (structure === 'knockout_only' || pools.length === 0) {
+    return generateDirectKnockoutTournament({
+      entries,
+      knockoutFormat,
+      includeBronze,
+      seedingMode,
+    });
+  }
 
   // Collect qualifiers per pool, ordered by placement rank (1st place across pools, then 2nd place, etc.)
   const poolStandings = pools.map((pool) => ({
     pool,
-    rows: computePoolStandings(pool, entries, bestOfPool),
+    rows: computePoolStandings(
+      pool,
+      entries,
+      getEffectiveMatchFormat(tournament, null, { isKnockout: false }).bestOf
+    ),
   }));
 
   const qualifiers = [];
@@ -266,6 +508,7 @@ export function generateKnockoutBracket(tournament) {
       if (rows[rank]) {
         rankSlice.push({
           entryId: rows[rank].entryId,
+          seedLabel: `${pool.name.replace('Pool ', '')}${rank + 1}`,
           poolName: pool.name,
           poolIdx,
           poolRank: rank + 1,
@@ -281,87 +524,7 @@ export function generateKnockoutBracket(tournament) {
     qualifiers.push(...rankSlice);
   }
 
-  if (qualifiers.length < 2) return null;
-
-  // Pad to next power of 2
-  let bracketSize = 2;
-  while (bracketSize < qualifiers.length) bracketSize *= 2;
-
-  const seededSlots = Array.from({ length: bracketSize }, (_, i) => qualifiers[i] || null);
-  const seedOrder = getBracketSeedOrder(bracketSize);
-
-  const rounds = [];
-  const totalRounds = Math.log2(bracketSize);
-
-  // Round 0
-  const round0 = [];
-  for (let i = 0; i < bracketSize; i += 2) {
-    const qA = seededSlots[seedOrder[i] - 1];
-    const qB = seededSlots[seedOrder[i + 1] - 1];
-    const isBye = !qA || !qB;
-    round0.push({
-      id: `ko-r0-m${i / 2}`,
-      roundIdx: 0,
-      matchIdx: i / 2,
-      entryAId: qA ? qA.entryId : null,
-      entryBId: qB ? qB.entryId : null,
-      seedLabelA: qA ? `${qA.poolName.replace('Pool ', '')}${qA.poolRank}` : null,
-      seedLabelB: qB ? `${qB.poolName.replace('Pool ', '')}${qB.poolRank}` : null,
-      isBye,
-      games: createEmptyGames(bestOfKo),
-      inProgress: false,
-      saved: isBye,
-      winnerId: isBye ? (qA ? qA.entryId : qB ? qB.entryId : null) : null,
-    });
-  }
-  rounds.push(round0);
-
-  // Subsequent rounds
-  for (let r = 1; r < totalRounds; r++) {
-    const prevRound = rounds[r - 1];
-    const currRound = [];
-    for (let i = 0; i < prevRound.length; i += 2) {
-      const mA = prevRound[i];
-      const mB = prevRound[i + 1];
-      currRound.push({
-        id: `ko-r${r}-m${i / 2}`,
-        roundIdx: r,
-        matchIdx: i / 2,
-        entryAId: mA.isBye ? mA.winnerId : null,
-        entryBId: mB.isBye ? mB.winnerId : null,
-        seedLabelA: null,
-        seedLabelB: null,
-        isBye: false,
-        games: createEmptyGames(bestOfKo),
-        inProgress: false,
-        saved: false,
-        winnerId: null,
-      });
-    }
-    rounds.push(currRound);
-  }
-
-  const bronzeMatch =
-    includeBronze && totalRounds >= 2
-      ? {
-          id: 'ko-bronze',
-          isBronze: true,
-          entryAId: null,
-          entryBId: null,
-          games: createEmptyGames(bestOfKo),
-          inProgress: false,
-          saved: false,
-          winnerId: null,
-        }
-      : null;
-
-  return {
-    rounds,
-    bronzeMatch,
-    championId: null,
-    silverId: null,
-    bronzeId: null,
-  };
+  return buildSeededBracket({ qualifiers, knockoutFormat, includeBronze });
 }
 
 function getBracketSeedOrder(size) {
