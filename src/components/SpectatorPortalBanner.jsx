@@ -189,121 +189,120 @@ export function SpectatorPortalBanner({
   const tabs = [
     {
       id: 'current',
-      label: 'Current Matches',
+      label: 'Current',
       count: currentMatches.length,
       icon: Flame,
       isLive: currentMatches.length > 0,
     },
     {
       id: 'upcoming',
-      label: 'Upcoming Matches',
+      label: 'Upcoming',
       count: upcomingMatches.length,
       icon: Clock,
     },
     ...(hasPools ? [{ id: 'pools', label: 'Pools', icon: Swords }] : []),
     {
       id: 'knockout',
-      label: 'Knockout Bracket',
+      label: 'Knockout',
       icon: Trophy,
     },
   ];
 
   return (
-    <div className="max-w-6xl mx-auto px-4 pt-4">
-      <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-4 shadow-xl space-y-3">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1.5 text-xs font-black bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1 rounded-full">
-            <Eye size={13} className="text-[#d7f24c]" /> Spectator View
-          </span>
-          <span className="text-xs font-bold text-slate-400">
-            {currentMatches.length} live &bull; {upcomingMatches.length} upcoming
-          </span>
-        </div>
-
-        {/* Tabs */}
-        <div className="grid grid-cols-2 sm:flex bg-slate-950/80 border border-slate-800 rounded-2xl p-1 gap-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = resolvedTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => onChangeTab?.(tab.id)}
-                className={`sm:flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                  isActive
-                    ? tab.id === 'current' && tab.isLive
-                      ? 'bg-amber-400 text-slate-950 shadow-md'
-                      : 'bg-[#d7f24c] text-slate-950 shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                }`}
-              >
-                {tab.isLive && !isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0" />
-                )}
-                <Icon size={13} className="shrink-0" />
-                <span className="truncate">{tab.label}</span>
-                {typeof tab.count === 'number' && tab.count > 0 && (
-                  <span
-                    className={`px-1.5 py-0.2 rounded-full text-[10px] font-black font-mono ${
-                      isActive
-                        ? 'bg-slate-950/20 text-slate-950'
-                        : tab.isLive
-                          ? 'bg-amber-400/20 text-amber-300'
-                          : 'bg-slate-800 text-slate-300'
-                    }`}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Tab Body for Current & Upcoming Matches */}
-        {resolvedTab === 'current' && (
-          currentMatches.length === 0 ? (
-            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center space-y-2">
-              <p className="text-xs text-slate-400">
-                No matches are currently live on court.
-              </p>
-              {upcomingMatches.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onChangeTab?.('upcoming')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[#d7f24c] text-xs font-bold border border-slate-700 transition"
-                >
-                  <Clock size={12} /> View Upcoming Matches ({upcomingMatches.length})
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {currentMatches.map((item) => (
-                <SpectatorMatchCard key={item.key} item={item} />
-              ))}
-            </div>
-          )
-        )}
-
-        {resolvedTab === 'upcoming' && (
-          upcomingMatches.length === 0 ? (
-            <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center">
-              <p className="text-xs text-slate-400 italic">
-                No upcoming matches queued right now.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {upcomingMatches.map((item) => (
-                <SpectatorMatchCard key={item.key} item={item} />
-              ))}
-            </div>
-          )
-        )}
+    <div className="max-w-6xl mx-auto px-4 pt-4 space-y-3">
+      {/* Spectator Banner */}
+      <div className="bg-slate-900/95 border border-slate-800 rounded-2xl px-4 py-2.5 shadow-lg flex items-center justify-between gap-2 flex-wrap">
+        <span className="inline-flex items-center gap-1.5 text-xs font-black bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1 rounded-full">
+          <Eye size={13} className="text-[#d7f24c]" /> Spectator View
+        </span>
+        <span className="text-xs font-bold text-slate-400">
+          {currentMatches.length} live &bull; {upcomingMatches.length} upcoming
+        </span>
       </div>
+
+      {/* Tabs Under Banner */}
+      <div className="flex items-center gap-1 bg-slate-900/95 border border-slate-800 rounded-2xl p-1 shadow-lg">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = resolvedTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onChangeTab?.(tab.id)}
+              className={`flex-1 py-2 px-1.5 sm:px-3 rounded-xl text-[11px] sm:text-xs font-bold transition flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap ${
+                isActive
+                  ? tab.id === 'current' && tab.isLive
+                    ? 'bg-amber-400 text-slate-950 shadow-md'
+                    : 'bg-[#d7f24c] text-slate-950 shadow-md'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
+              }`}
+            >
+              {tab.isLive && !isActive && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0 hidden xs:inline-block" />
+              )}
+              <Icon size={12} className="shrink-0 hidden sm:inline" />
+              <span>{tab.label}</span>
+              {typeof tab.count === 'number' && tab.count > 0 && (
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-black font-mono ${
+                    isActive
+                      ? 'bg-slate-950/20 text-slate-950'
+                      : tab.isLive
+                        ? 'bg-amber-400/20 text-amber-300'
+                        : 'bg-slate-800 text-slate-300'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Body for Current & Upcoming Matches */}
+      {resolvedTab === 'current' && (
+        currentMatches.length === 0 ? (
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 text-center space-y-2">
+            <p className="text-xs text-slate-400">
+              No matches are currently live on court.
+            </p>
+            {upcomingMatches.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onChangeTab?.('upcoming')}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-[#d7f24c] text-xs font-bold border border-slate-700 transition"
+              >
+                <Clock size={12} /> View Upcoming ({upcomingMatches.length})
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {currentMatches.map((item) => (
+              <SpectatorMatchCard key={item.key} item={item} />
+            ))}
+          </div>
+        )
+      )}
+
+      {resolvedTab === 'upcoming' && (
+        upcomingMatches.length === 0 ? (
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 text-center">
+            <p className="text-xs text-slate-400 italic">
+              No upcoming matches queued right now.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {upcomingMatches.map((item) => (
+              <SpectatorMatchCard key={item.key} item={item} />
+            ))}
+          </div>
+        )
+      )}
     </div>
   );
 }
+

@@ -829,14 +829,14 @@ export function PlayerPortalBanner({
   const tabs = [
     {
       id: 'current',
-      label: 'Current Match',
+      label: 'Current',
       count: featuredItems.length,
       icon: Flame,
       isLive: featuredItems.length > 0,
     },
     {
       id: 'upcoming',
-      label: 'Upcoming Matches',
+      label: 'Upcoming',
       count: upcomingItems.length,
       icon: Clock,
     },
@@ -919,7 +919,7 @@ export function PlayerPortalBanner({
         )}
 
         {/* Player View Tabs */}
-        <div className="grid grid-cols-2 sm:flex bg-slate-950/80 border border-slate-800 rounded-2xl p-1 gap-1">
+        <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-2xl p-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = resolvedTab === tab.id;
@@ -928,7 +928,7 @@ export function PlayerPortalBanner({
                 key={tab.id}
                 type="button"
                 onClick={() => onChangePlayerTab?.(tab.id)}
-                className={`sm:flex-1 py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 whitespace-nowrap ${
+                className={`flex-1 py-2 px-1.5 sm:px-3 rounded-xl text-[11px] sm:text-xs font-bold transition flex items-center justify-center gap-1 sm:gap-1.5 whitespace-nowrap ${
                   isActive
                     ? tab.id === 'current' && tab.isLive
                       ? 'bg-amber-400 text-slate-950 shadow-md'
@@ -937,10 +937,10 @@ export function PlayerPortalBanner({
                 }`}
               >
                 {tab.isLive && !isActive && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0 hidden xs:inline-block" />
                 )}
-                <Icon size={13} className="shrink-0" />
-                <span className="truncate">{tab.label}</span>
+                <Icon size={12} className="shrink-0 hidden sm:inline" />
+                <span>{tab.label}</span>
                 {typeof tab.count === 'number' && tab.count > 0 && (
                   <span
                     className={`px-1.5 py-0.2 rounded-full text-[10px] font-black font-mono ${
