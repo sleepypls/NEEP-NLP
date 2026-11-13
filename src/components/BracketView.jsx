@@ -33,7 +33,7 @@ function MatchCard({
           onOpen();
         }
       }}
-      className={`w-full text-left bg-slate-900 border rounded-2xl p-3.5 mb-3 transition shadow-lg ${
+      className={`w-full text-left bg-slate-900 border rounded-2xl p-3.5 transition shadow-lg ${
         clickable
           ? 'border-slate-800 hover:border-slate-700 active:scale-[0.99] cursor-pointer'
           : 'border-slate-850 opacity-60 cursor-default'
@@ -233,35 +233,64 @@ export function BracketView({
         </div>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
-        {bracket.rounds.map((round, ri) => (
-          <div key={ri} className="min-w-[270px] flex-1">
-            <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3.5 px-1">
-              {roundName(totalRounds, ri)}
-            </p>
-            {round.map((match, mi) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                teams={teams}
-                numCourts={numCourts}
-                isAdmin={isAdmin}
-                onToggleCourt={
-                  onSetMatchAssignedCourts
-                    ? (courtNum) => {
-                        const curr = Array.isArray(match.assignedCourts) ? match.assignedCourts : [];
-                        const next = curr.includes(courtNum)
-                          ? curr.filter((c) => c !== courtNum)
-                          : [...curr, courtNum].sort((a, b) => a - b);
-                        onSetMatchAssignedCourts(ri, mi, next);
+      <div className="flex items-stretch overflow-x-auto pb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
+        {bracket.rounds.map((round, ri) => {
+          const hasNextRound = ri < totalRounds - 1;
+          const nextRoundLen = hasNextRound ? bracket.rounds[ri + 1].length : 0;
+          return (
+            <React.Fragment key={ri}>
+              <div className="min-w-[270px] flex-1 flex flex-col">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-3.5 px-1 shrink-0">
+                  {roundName(totalRounds, ri)}
+                </p>
+                <div className="flex-1 flex flex-col justify-around gap-3">
+                  {round.map((match, mi) => (
+                    <MatchCard
+                      key={match.id}
+                      match={match}
+                      teams={teams}
+                      numCourts={numCourts}
+                      isAdmin={isAdmin}
+                      onToggleCourt={
+                        onSetMatchAssignedCourts
+                          ? (courtNum) => {
+                              const curr = Array.isArray(match.assignedCourts) ? match.assignedCourts : [];
+                              const next = curr.includes(courtNum)
+                                ? curr.filter((c) => c !== courtNum)
+                                : [...curr, courtNum].sort((a, b) => a - b);
+                              onSetMatchAssignedCourts(ri, mi, next);
+                            }
+                          : undefined
                       }
-                    : undefined
-                }
-                onOpen={() => onOpenMatch(ri, mi)}
-              />
-            ))}
-          </div>
-        ))}
+                      onOpen={() => onOpenMatch(ri, mi)}
+                    />
+                  ))}
+                </div>
+              </div>
+              {hasNextRound && (
+                <div className="w-7 sm:w-9 shrink-0 flex flex-col pt-8">
+                  <div className="flex-1 flex flex-col justify-around">
+                    {Array.from({ length: Math.max(1, nextRoundLen) }, (_, pairIdx) => {
+                      const hasPair = round.length >= (pairIdx + 1) * 2;
+                      return (
+                        <div key={pairIdx} className="flex-1 flex items-center">
+                          {hasPair ? (
+                            <>
+                              <div className="w-1/2 h-1/2 border-t-2 border-b-2 border-r-2 border-slate-600/80 rounded-r-lg" />
+                              <div className="w-1/2 h-0.5 bg-slate-600/80" />
+                            </>
+                          ) : (
+                            <div className="w-full h-0.5 bg-slate-600/80" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
 
       <MlpCourtAssignModal

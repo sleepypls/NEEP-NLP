@@ -3281,6 +3281,8 @@ export default function App() {
             onTogglePoolMatchLive={handleTogglePoolMatchLive}
             onSaveKnockoutMatch={handleSaveKnockoutMatch}
             onToggleKnockoutMatchLive={handleToggleKnockoutMatchLive}
+            onGenerateKnockout={handleGeneratePoolKnockout}
+            onEditKnockoutMatch={handleEditKnockoutMatch}
             onBatchAssignPoolCourtsLive={handleBatchAssignPoolCourtsAndLive}
             bracket={bracket}
             teams={teams}

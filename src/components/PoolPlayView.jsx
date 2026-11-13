@@ -213,7 +213,7 @@ function MatchScoreEditor({
       {/* Game Score Inputs */}
       {entryA && entryB && (
         <div className="space-y-2">
-          <div className={`grid gap-2 ${bestOf > 1 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1'}`}>
+          <div className="grid grid-cols-1 gap-2">
             {games.map((g, gIdx) => (
               <div
                 key={gIdx}
@@ -926,8 +926,8 @@ export function PoolPlayView({
                 </div>
               )}
 
-              {/* Knockout Rounds */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Knockout Rounds (Tree with Connector Lines) */}
+              <div className="flex items-stretch overflow-x-auto pb-4 -mx-2 px-2 sm:mx-0 sm:px-0">
                 {knockout.rounds.map((round, rIdx) => {
                   const roundFmt = getEffectiveMatchFormat(tournament, null, {
                     isKnockout: true,
@@ -936,95 +936,122 @@ export function PoolPlayView({
                     isBronze: false,
                   });
                   const roundTitle = getKnockoutRoundLabel(knockout.rounds.length, rIdx);
+                  const hasNextRound = rIdx < knockout.rounds.length - 1;
+                  const nextRoundLen = hasNextRound ? knockout.rounds[rIdx + 1].length : 0;
                   return (
-                    <div key={rIdx} className="space-y-3">
-                      <div className="flex items-center justify-between gap-2 px-1">
-                        <h3 className="text-xs font-black uppercase tracking-widest text-amber-400">
-                          {roundTitle}
-                        </h3>
-                        <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
-                          {roundFmt.bestOf > 1 ? `Bo${roundFmt.bestOf}` : '1G'} to {roundFmt.pointsTo}
-                        </span>
-                      </div>
-                      {round.map((m) => {
-                        const matchFmt = getEffectiveMatchFormat(tournament, m, {
-                          isKnockout: true,
-                          totalRounds: knockout.rounds.length,
-                          roundIdx: rIdx,
-                          isBronze: false,
-                        });
-                        if (m.isBye) {
-                          return (
-                            <div
-                              key={m.id}
-                              className="rounded-2xl border border-slate-800/60 bg-slate-900/40 p-3 text-xs text-slate-400 flex items-center justify-between gap-2"
-                            >
-                              <div className="min-w-0 truncate">
-                                <span className="font-bold text-white">
-                                  {getEntryDisplayName(entryMap.get(m.winnerId || m.entryAId || m.entryBId))}
-                                </span>{' '}
-                                <span className="text-slate-500">(BYE &mdash; Advances)</span>
-                              </div>
-                              {isAdmin && onEditKnockoutMatch && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setEditingMatchCtx({
-                                      type: 'knockout',
-                                      roundIdx: rIdx,
-                                      matchIdx: m.matchIdx,
-                                      isBronze: false,
-                                      match: m,
-                                      stageLabel: roundTitle,
-                                      defaultFormat: roundFmt,
-                                      allowBye: true,
-                                    })
-                                  }
-                                  title="Edit matchup or assign opponent"
-                                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-[#d7f24c] border border-slate-700 transition shrink-0"
+                    <React.Fragment key={rIdx}>
+                      <div className="min-w-[290px] sm:min-w-[310px] flex-1 flex flex-col">
+                        <div className="flex items-center justify-between gap-2 px-1 mb-3 shrink-0">
+                          <h3 className="text-xs font-black uppercase tracking-widest text-amber-400">
+                            {roundTitle}
+                          </h3>
+                          <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-full">
+                            {roundFmt.bestOf > 1 ? `Bo${roundFmt.bestOf}` : '1G'} to {roundFmt.pointsTo}
+                          </span>
+                        </div>
+                        <div className="flex-1 flex flex-col justify-around gap-3">
+                          {round.map((m) => {
+                            const matchFmt = getEffectiveMatchFormat(tournament, m, {
+                              isKnockout: true,
+                              totalRounds: knockout.rounds.length,
+                              roundIdx: rIdx,
+                              isBronze: false,
+                            });
+                            if (m.isBye) {
+                              return (
+                                <div
+                                  key={m.id}
+                                  className="rounded-2xl border border-slate-800/60 bg-slate-900/40 p-3 text-xs text-slate-400 flex items-center justify-between gap-2"
                                 >
-                                  <Pencil size={12} />
-                                </button>
-                              )}
-                            </div>
-                          );
-                        }
-                        return (
-                          <MatchScoreEditor
-                            key={m.id}
-                            match={m}
-                            entryA={entryMap.get(m.entryAId)}
-                            entryB={entryMap.get(m.entryBId)}
-                            bestOf={matchFmt.bestOf}
-                            pointsTo={matchFmt.pointsTo}
-                            isCustomFormat={matchFmt.isCustom}
-                            numCourts={numCourts}
-                            onSetCourt={
-                              onSetKnockoutMatchCourt
-                                ? (ct) => onSetKnockoutMatchCourt(rIdx, m.matchIdx, false, ct)
-                                : undefined
+                                  <div className="min-w-0 truncate">
+                                    <span className="font-bold text-white">
+                                      {getEntryDisplayName(entryMap.get(m.winnerId || m.entryAId || m.entryBId))}
+                                    </span>{' '}
+                                    <span className="text-slate-500">(BYE &mdash; Advances)</span>
+                                  </div>
+                                  {isAdmin && onEditKnockoutMatch && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setEditingMatchCtx({
+                                          type: 'knockout',
+                                          roundIdx: rIdx,
+                                          matchIdx: m.matchIdx,
+                                          isBronze: false,
+                                          match: m,
+                                          stageLabel: roundTitle,
+                                          defaultFormat: roundFmt,
+                                          allowBye: true,
+                                        })
+                                      }
+                                      title="Edit matchup or assign opponent"
+                                      className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-[#d7f24c] border border-slate-700 transition shrink-0"
+                                    >
+                                      <Pencil size={12} />
+                                    </button>
+                                  )}
+                                </div>
+                              );
                             }
-                            isAdmin={isAdmin}
-                            onToggleLive={() => onToggleKnockoutMatchLive(rIdx, m.matchIdx, false)}
-                            onEditMatchup={() =>
-                              setEditingMatchCtx({
-                                type: 'knockout',
-                                roundIdx: rIdx,
-                                matchIdx: m.matchIdx,
-                                isBronze: false,
-                                match: m,
-                                stageLabel: roundTitle,
-                                defaultFormat: roundFmt,
-                                allowBye: rIdx === 0,
-                              })
-                            }
-                            onSave={(games, winnerId) =>
-                              onSaveKnockoutMatch(rIdx, m.matchIdx, games, winnerId, false)
-                            }
-                          />
-                        );
-                      })}
-                    </div>
+                            return (
+                              <MatchScoreEditor
+                                key={m.id}
+                                match={m}
+                                entryA={entryMap.get(m.entryAId)}
+                                entryB={entryMap.get(m.entryBId)}
+                                bestOf={matchFmt.bestOf}
+                                pointsTo={matchFmt.pointsTo}
+                                isCustomFormat={matchFmt.isCustom}
+                                numCourts={numCourts}
+                                onSetCourt={
+                                  onSetKnockoutMatchCourt
+                                    ? (ct) => onSetKnockoutMatchCourt(rIdx, m.matchIdx, false, ct)
+                                    : undefined
+                                }
+                                isAdmin={isAdmin}
+                                onToggleLive={() => onToggleKnockoutMatchLive(rIdx, m.matchIdx, false)}
+                                onEditMatchup={() =>
+                                  setEditingMatchCtx({
+                                    type: 'knockout',
+                                    roundIdx: rIdx,
+                                    matchIdx: m.matchIdx,
+                                    isBronze: false,
+                                    match: m,
+                                    stageLabel: roundTitle,
+                                    defaultFormat: roundFmt,
+                                    allowBye: rIdx === 0,
+                                  })
+                                }
+                                onSave={(games, winnerId) =>
+                                  onSaveKnockoutMatch(rIdx, m.matchIdx, games, winnerId, false)
+                                }
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                      {hasNextRound && (
+                        <div className="w-7 sm:w-9 shrink-0 flex flex-col pt-7">
+                          <div className="flex-1 flex flex-col justify-around">
+                            {Array.from({ length: Math.max(1, nextRoundLen) }, (_, pairIdx) => {
+                              const hasPair = round.length >= (pairIdx + 1) * 2;
+                              return (
+                                <div key={pairIdx} className="flex-1 flex items-center">
+                                  {hasPair ? (
+                                    <>
+                                      <div className="w-1/2 h-1/2 border-t-2 border-b-2 border-r-2 border-slate-600/80 rounded-r-lg" />
+                                      <div className="w-1/2 h-0.5 bg-slate-600/80" />
+                                    </>
+                                  ) : (
+                                    <div className="w-full h-0.5 bg-slate-600/80" />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </div>

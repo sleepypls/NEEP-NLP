@@ -10,6 +10,7 @@ import {
   ShieldAlert,
   ArrowLeft,
   LayoutGrid,
+  Trophy,
 } from 'lucide-react';
 import { LiveTimer, formatDuration, formatClockTime } from './LiveTimer';
 import {
@@ -366,6 +367,8 @@ export function ScorekeeperDashboardView({
   onTogglePoolMatchLive,
   onSaveKnockoutMatch,
   onToggleKnockoutMatchLive,
+  onGenerateKnockout,
+  onEditKnockoutMatch,
   onBatchAssignPoolCourtsLive,
   // MLP props
   bracket = null,
@@ -1077,6 +1080,119 @@ export function ScorekeeperDashboardView({
           </div>
         );
       })()}
+
+      {/* Knockout Seeding Panel (Pools & Knockout Scorekeeper) */}
+      {tournamentStyle === 'tournament' && poolTournament && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-5 shadow-xl space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="text-white text-sm font-bold flex items-center gap-2">
+                <Trophy size={15} className="text-amber-400" /> Knockout Stage Seeding
+              </h3>
+              <p className="text-slate-400 text-xs mt-0.5">
+                {poolTournament.knockout
+                  ? 'Adjust Round 1 knockout matchups or re-seed from current pool standings.'
+                  : 'Generate and seed the Knockout Bracket from current pool standings.'}
+              </p>
+            </div>
+            {onGenerateKnockout && poolTournament.structure !== 'knockout_only' && (
+              <button
+                type="button"
+                onClick={onGenerateKnockout}
+                className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition active:scale-95 flex items-center gap-1.5 shadow-md shadow-amber-400/15"
+              >
+                <Trophy size={13} />
+                {poolTournament.knockout ? 'Re-Seed from Pools' : 'Generate Knockout Bracket'}
+              </button>
+            )}
+          </div>
+
+          {poolTournament.knockout?.rounds?.[0] && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {poolTournament.knockout.rounds[0].map((m, idx) => {
+                const entries = poolTournament.entries || [];
+                const isLocked = Boolean(m.saved || m.inProgress);
+                return (
+                  <div
+                    key={m.id || idx}
+                    className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 space-y-2"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-300">
+                        Match #{idx + 1}
+                      </span>
+                      {m.isBye && (
+                        <span className="text-[10px] font-bold bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">
+                          BYE
+                        </span>
+                      )}
+                      {isLocked && (
+                        <span className="text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                          {m.saved ? 'Completed' : 'Live'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block mb-1">
+                          Seed A
+                        </span>
+                        <select
+                          disabled={isLocked || !onEditKnockoutMatch}
+                          value={m.entryAId || ''}
+                          onChange={(e) =>
+                            onEditKnockoutMatch &&
+                            onEditKnockoutMatch(0, m.matchIdx, false, {
+                              entryAId: e.target.value || null,
+                              entryBId: m.entryBId || null,
+                              customFormat: m.customFormat || null,
+                              court: m.court || null,
+                            })
+                          }
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-semibold focus:outline-none focus:ring-1 focus:ring-[#d7f24c] disabled:opacity-50"
+                        >
+                          <option value="">— BYE / TBD —</option>
+                          {entries.map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                              {getEntryDisplayName(entry)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold block mb-1">
+                          Seed B
+                        </span>
+                        <select
+                          disabled={isLocked || !onEditKnockoutMatch}
+                          value={m.entryBId || ''}
+                          onChange={(e) =>
+                            onEditKnockoutMatch &&
+                            onEditKnockoutMatch(0, m.matchIdx, false, {
+                              entryAId: m.entryAId || null,
+                              entryBId: e.target.value || null,
+                              customFormat: m.customFormat || null,
+                              court: m.court || null,
+                            })
+                          }
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-white font-semibold focus:outline-none focus:ring-1 focus:ring-[#d7f24c] disabled:opacity-50"
+                        >
+                          <option value="">— BYE / TBD —</option>
+                          {entries.map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                              {getEntryDisplayName(entry)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
