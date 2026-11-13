@@ -47,3 +47,4 @@ export function validateGameScore(scoreA, scoreB, pointsTo = 11, winByTwo = true
 
   return { valid: true };
 }
+

@@ -523,9 +523,9 @@ export default function App() {
           if (cloudTourn.poolNumCourts) setPoolNumCourts(cloudTourn.poolNumCourts);
           if (cloudTourn.poolTournament !== undefined) {
             setPoolTournament(cloudTourn.poolTournament);
-            if (cloudTourn.poolTournament) {
+            if (!isAdmin && cloudTourn.poolTournament) {
               setView((curr) =>
-                curr === 'poolSetup' || curr === 'setup' || (!isAdmin && curr === 'draft')
+                curr === 'poolSetup' || curr === 'setup' || curr === 'draft'
                   ? 'poolPlay'
                   : curr
               );
@@ -558,7 +558,7 @@ export default function App() {
           if (cloudTourn.sittingOut) setSittingOut(cloudTourn.sittingOut);
           if (cloudTourn.bracket !== undefined) {
             setBracket(cloudTourn.bracket);
-            if (cloudTourn.bracket) {
+            if (!isAdmin && cloudTourn.bracket) {
               // Spectator/player smart routing: if bracket exists while still on setup or draft, route to bracket!
               setView((curr) => (curr === 'setup' || curr === 'draft' ? 'bracket' : curr));
             }
@@ -566,11 +566,6 @@ export default function App() {
           if (cloudTourn.adminPin) setAdminPin(cloudTourn.adminPin);
           if (cloudTourn.isTournamentLocked !== undefined) {
             setIsTournamentLocked(Boolean(cloudTourn.isTournamentLocked));
-          }
-
-          // If admin, sync view if cloud had a progression
-          if (isAdmin && cloudTourn.view) {
-            setView((curr) => (curr === 'setup' && cloudTourn.bracket ? 'bracket' : curr));
           }
         }
         },
