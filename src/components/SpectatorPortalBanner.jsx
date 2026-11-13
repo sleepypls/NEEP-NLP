@@ -82,7 +82,7 @@ export function SpectatorPortalBanner({
   if (isTournament && poolTournament) {
     const entryMap = new Map((poolTournament.entries || []).map((e) => [e.id, e]));
 
-    (poolTournament.pools || []).forEach((pool) => {
+    (poolTournament.pools || []).forEach((pool, poolIdx) => {
       (pool.matches || []).forEach((m) => {
         if (m.saved || !m.entryAId || !m.entryBId) return;
         const fmt = getEffectiveMatchFormat(poolTournament, m, { isKnockout: false });
@@ -95,6 +95,8 @@ export function SpectatorPortalBanner({
           stage: `${pool.name} • Round ${roundNum}`,
           roundLabel: `Round ${roundNum}`,
           roundSortOrder: roundNum,
+          poolName: pool.name,
+          poolSortOrder: poolIdx,
           nameA: getEntryDisplayName(entryMap.get(m.entryAId)),
           nameB: getEntryDisplayName(entryMap.get(m.entryBId)),
           liveStartedAt: m.liveStartedAt || null,
@@ -316,24 +318,72 @@ export function SpectatorPortalBanner({
           const sortedGroups = Array.from(roundGroups.values()).sort((a, b) => a.order - b.order);
 
           return (
-            <div className="space-y-4">
-              {sortedGroups.map((group) => (
-                <div key={group.label} className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-[#d7f24c] bg-[#d7f24c]/10 border border-[#d7f24c]/25 px-2.5 py-0.5 rounded-full">
-                      {group.label}
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-500">
-                      {group.items.length} {group.items.length === 1 ? 'match' : 'matches'}
-                    </span>
+            <div className="space-y-5">
+              {sortedGroups.map((group) => {
+                const hasPoolSubgroups = group.items.some((item) => item.poolName);
+                if (!hasPoolSubgroups) {
+                  return (
+                    <div key={group.label} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-[#d7f24c] bg-[#d7f24c]/10 border border-[#d7f24c]/25 px-2.5 py-0.5 rounded-full">
+                          {group.label}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-500">
+                          {group.items.length} {group.items.length === 1 ? 'match' : 'matches'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {group.items.map((item) => (
+                          <SpectatorMatchCard key={item.key} item={item} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                const poolGroups = new Map();
+                group.items.forEach((item) => {
+                  const pName = item.poolName || 'Matches';
+                  const pOrder = item.poolSortOrder ?? 9999;
+                  if (!poolGroups.has(pName)) {
+                    poolGroups.set(pName, { name: pName, order: pOrder, items: [] });
+                  }
+                  poolGroups.get(pName).items.push(item);
+                });
+                const sortedPools = Array.from(poolGroups.values()).sort((a, b) => a.order - b.order);
+
+                return (
+                  <div key={group.label} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-[#d7f24c] bg-[#d7f24c]/10 border border-[#d7f24c]/25 px-2.5 py-0.5 rounded-full">
+                        {group.label}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-500">
+                        {group.items.length} {group.items.length === 1 ? 'match' : 'matches'}
+                      </span>
+                    </div>
+                    <div className="space-y-3 pl-2 border-l-2 border-slate-800">
+                      {sortedPools.map((poolGroup) => (
+                        <div key={poolGroup.name} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-slate-200 bg-slate-800/90 border border-slate-700 px-2.5 py-0.5 rounded-lg">
+                              {poolGroup.name}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-500">
+                              {poolGroup.items.length} {poolGroup.items.length === 1 ? 'match' : 'matches'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {poolGroup.items.map((item) => (
+                              <SpectatorMatchCard key={item.key} item={item} />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {group.items.map((item) => (
-                      <SpectatorMatchCard key={item.key} item={item} />
-                    ))}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           );
         })()
