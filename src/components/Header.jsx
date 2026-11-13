@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Users, LogOut, LayoutGrid } from 'lucide-react';
+import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Users, LogOut, LayoutGrid, UserCheck } from 'lucide-react';
 import { isCloudEnabled } from '../services/firebase';
 import { APP_VERSION } from '../version';
 
@@ -17,6 +17,8 @@ export function Header({
   onOpenRoomModal,
   isAdmin,
   onUnlockAdmin,
+  loggedInPlayerName,
+  onOpenPlayerLogin,
   onOpenRosterModal,
   onExitToLanding,
 }) {
@@ -171,6 +173,25 @@ export function Header({
               {roomId || 'Room'}
             </span>
           </button>
+
+          {/* Player Login Pill */}
+          {!isAdmin && onOpenPlayerLogin && (
+            <button
+              type="button"
+              onClick={onOpenPlayerLogin}
+              title={loggedInPlayerName ? `Signed in as ${loggedInPlayerName}. Click to switch.` : 'Player Login for match alerts & self-scoring'}
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] sm:text-[11px] font-bold transition whitespace-nowrap max-w-[110px] ${
+                loggedInPlayerName
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                  : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-emerald-300'
+              }`}
+            >
+              <UserCheck size={12} className="shrink-0" />
+              <span className="truncate">
+                {loggedInPlayerName ? loggedInPlayerName : 'Player'}
+              </span>
+            </button>
+          )}
 
           {/* Admin vs Spectator Role */}
           {isAdmin ? (

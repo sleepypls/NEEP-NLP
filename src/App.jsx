@@ -18,6 +18,8 @@ import { AdminPortalView } from './components/AdminPortalView';
 import { PoolSetupView } from './components/PoolSetupView';
 import { PoolPlayView } from './components/PoolPlayView';
 import { ScorekeeperDashboardView } from './components/ScorekeeperDashboardView';
+import { PlayerLoginModal } from './components/PlayerLoginModal';
+import { PlayerPortalBanner } from './components/PlayerPortalBanner';
 import {
   generatePoolsAndSchedule,
   generateKnockoutBracket,
@@ -239,7 +241,7 @@ export default function App() {
       const params = new URLSearchParams(window.location.search);
       const mode = params.get('mode');
       const pin = params.get('pin');
-      if (mode === 'spectator') return false;
+      if (mode === 'spectator' || mode === 'player') return false;
       if (mode === 'admin') {
         const expectedPin = initialSaved?.adminPin || DEFAULT_ADMIN_PIN;
         return !pin || pin === expectedPin;
@@ -247,6 +249,28 @@ export default function App() {
     } catch (e) {}
     return true;
   });
+
+  const [loggedInPlayerName, setLoggedInPlayerName] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const urlPlayer = params.get('player');
+      if (urlPlayer && urlPlayer.trim()) return urlPlayer.trim();
+      return localStorage.getItem(`neep_player_login_${initialRoomId || 'default'}`) || '';
+    } catch (e) {
+      return '';
+    }
+  });
+  const [isPlayerLoginOpen, setIsPlayerLoginOpen] = useState(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('mode') === 'player' && !params.get('player');
+    } catch (e) {
+      return false;
+    }
+  });
+  const [notifPermission, setNotifPermission] = useState(() =>
+    typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+  );
 
   const [view, setView] = useState(() => {
     try {
@@ -1029,7 +1053,7 @@ export default function App() {
     const teamB = teams.find((t) => t.id === match.teamBId);
     const updatedGames = match.games.map((g) =>
       g.id === gameId
-        ? { ...g, scoreA: Number(scoreA), scoreB: Number(scoreB), saved: true, inProgress: false, liveStartedAt: null }
+        ? { ...g, scoreA: Number(scoreA), scoreB: Number(scoreB), saved: true, inProgress: false, liveStartedAt: null, pendingScore: null }
         : g
     );
     const gamesWonA = updatedGames.filter((g) => g.saved && g.scoreA > g.scoreB).length;
@@ -2066,6 +2090,7 @@ export default function App() {
                   saved: Boolean(winnerId),
                   inProgress: false,
                   liveStartedAt: null,
+                  pendingScore: null,
                 }
               : m
           ),
@@ -2186,6 +2211,7 @@ export default function App() {
           saved: Boolean(winnerId),
           inProgress: false,
           liveStartedAt: null,
+          pendingScore: null,
         },
         bronzeId: winnerId || null,
       };
@@ -2205,6 +2231,7 @@ export default function App() {
                       saved: Boolean(winnerId),
                       inProgress: false,
                       liveStartedAt: null,
+                      pendingScore: null,
                     }
               )
         ),
@@ -2372,6 +2399,92 @@ export default function App() {
     const updated = { ...poolTournament, pools: nextPools, knockout: nextKnockout };
     setPoolTournament(updated);
     broadcastTournamentChange({ poolTournament: updated });
+  }
+
+  function handleLoginPlayer(name) {
+    const clean = String(name || '').trim();
+    setLoggedInPlayerName(clean);
+    try {
+      localStorage.setItem(`neep_player_login_${roomId || 'default'}`, clean);
+    } catch (e) {}
+  }
+
+  function handleLogoutPlayer() {
+    setLoggedInPlayerName('');
+    try {
+      localStorage.removeItem(`neep_player_login_${roomId || 'default'}`);
+    } catch (e) {}
+  }
+
+  async function handleRequestNotifPermission() {
+    if (typeof Notification === 'undefined') return;
+    try {
+      const res = await Notification.requestPermission();
+      setNotifPermission(res);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  function updatePoolMatchPendingScore(item, pendingScore) {
+    if (!poolTournament) return;
+    let updated = poolTournament;
+    if (item.type === 'pool') {
+      updated = {
+        ...poolTournament,
+        pools: (poolTournament.pools || []).map((p) =>
+          p.id !== item.poolId
+            ? p
+            : {
+                ...p,
+                matches: (p.matches || []).map((m) =>
+                  m.id === item.match.id ? { ...m, pendingScore } : m
+                ),
+              }
+        ),
+      };
+    } else if (item.type === 'knockout' && poolTournament.knockout) {
+      const ko = JSON.parse(JSON.stringify(poolTournament.knockout));
+      if (item.isBronze && ko.bronzeMatch) {
+        ko.bronzeMatch = { ...ko.bronzeMatch, pendingScore };
+      } else if (ko.rounds?.[item.roundIdx]?.[item.matchIdx]) {
+        ko.rounds[item.roundIdx][item.matchIdx] = {
+          ...ko.rounds[item.roundIdx][item.matchIdx],
+          pendingScore,
+        };
+      }
+      updated = { ...poolTournament, knockout: ko };
+    }
+    setPoolTournament(updated);
+    broadcastTournamentChange({ poolTournament: updated });
+  }
+
+  function handleApprovePoolPendingScore(item) {
+    const pending = item?.match?.pendingScore;
+    if (!pending) return;
+    if (item.type === 'pool') {
+      handleSavePoolMatch(item.poolId, item.match.id, pending.games, pending.winnerId);
+    } else if (item.type === 'knockout') {
+      handleSaveKnockoutMatch(item.roundIdx, item.matchIdx, pending.games, pending.winnerId, item.isBronze);
+    }
+  }
+
+  function updateMlpGamePendingScore(item, pendingScore) {
+    if (!bracket) return;
+    const nb = JSON.parse(JSON.stringify(bracket));
+    const match = nb.rounds[item.round]?.[item.idx];
+    if (!match?.games) return;
+    match.games = match.games.map((g) =>
+      g.id === item.game.id ? { ...g, pendingScore } : g
+    );
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
+  }
+
+  function handleApproveMlpPendingScore(item) {
+    const pending = item?.game?.pendingScore;
+    if (!pending) return;
+    handleSaveGameAt(item.round, item.idx, item.game.id, pending.scoreA, pending.scoreB);
   }
 
   function handleEditKnockoutMatch(roundIdx, matchIdx, isBronze, { entryAId, entryBId, customFormat, court }) {
@@ -2752,12 +2865,34 @@ export default function App() {
         onOpenRoomModal={() => setIsRoomModalOpen(true)}
         isAdmin={isAdmin}
         onUnlockAdmin={handleUnlockAdmin}
+        loggedInPlayerName={loggedInPlayerName}
+        onOpenPlayerLogin={() => setIsPlayerLoginOpen(true)}
         onOpenRosterModal={() => {
           setRosterModalTeamId(null);
           setIsRosterModalOpen(true);
         }}
         onExitToLanding={handleExitToLanding}
       />
+
+      {!isAdmin && loggedInPlayerName && (poolTournament || bracket) && (
+        <PlayerPortalBanner
+          loggedInPlayerName={loggedInPlayerName}
+          onOpenPlayerLogin={() => setIsPlayerLoginOpen(true)}
+          tournamentStyle={tournamentStyle}
+          poolTournament={poolTournament}
+          bracket={bracket}
+          teams={teams}
+          playersById={playersById}
+          notifPermission={notifPermission}
+          onRequestNotifPermission={handleRequestNotifPermission}
+          onSubmitPoolPendingScore={updatePoolMatchPendingScore}
+          onApprovePoolPendingScore={handleApprovePoolPendingScore}
+          onRejectPoolPendingScore={(item) => updatePoolMatchPendingScore(item, null)}
+          onSubmitMlpPendingScore={updateMlpGamePendingScore}
+          onApproveMlpPendingScore={handleApproveMlpPendingScore}
+          onRejectMlpPendingScore={(item) => updateMlpGamePendingScore(item, null)}
+        />
+      )}
 
       <main className="flex-1">
         {view === 'setup' && (
@@ -3137,6 +3272,32 @@ export default function App() {
         onReorderDraftPosition={handleReorderDraftPosition}
         isAdmin={isAdmin}
         initialTeamId={rosterModalTeamId}
+      />
+      <PlayerLoginModal
+        isOpen={isPlayerLoginOpen}
+        onClose={() => setIsPlayerLoginOpen(false)}
+        playerNames={
+          tournamentStyle === 'tournament'
+            ? [
+                ...((poolTournament?.entries || poolEntries || []).flatMap((e) =>
+                  Array.isArray(e.players) && e.players.length > 0 ? e.players : [e.name]
+                )),
+                ...savedPlayers,
+              ]
+            : [
+                ...Object.values(playersById || {}).map((p) =>
+                  typeof p === 'string' ? p : p?.name
+                ),
+                ...playerPool.map((p) => p?.name),
+                ...savedPlayers,
+              ]
+        }
+        loggedInPlayerName={loggedInPlayerName}
+        onLoginPlayer={handleLoginPlayer}
+        onLogoutPlayer={handleLogoutPlayer}
+        roomId={roomId}
+        notifPermission={notifPermission}
+        onRequestNotifPermission={handleRequestNotifPermission}
       />
     </div>
   );

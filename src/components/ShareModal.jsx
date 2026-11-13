@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { X, Copy, Check, Eye, ShieldCheck, Lock, KeyRound, Download } from 'lucide-react';
+import { X, Copy, Check, Eye, ShieldCheck, Lock, KeyRound, Download, UserCheck } from 'lucide-react';
 import { generateQrMatrix, renderQrCardPngDataUrl } from '../utils/qrcode';
 
 function QrSvg({ url, size = 144 }) {
@@ -30,8 +30,9 @@ function QrSvg({ url, size = 144 }) {
 
 export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
   const [copiedSpectator, setCopiedSpectator] = useState(false);
+  const [copiedPlayer, setCopiedPlayer] = useState(false);
   const [copiedAdmin, setCopiedAdmin] = useState(false);
-  const [qrMode, setQrMode] = useState(() => (isAdmin ? 'admin' : 'spectator'));
+  const [qrMode, setQrMode] = useState(() => (isAdmin ? 'player' : 'player'));
   const [downloadedQr, setDownloadedQr] = useState(false);
 
   if (!isOpen) return null;
@@ -39,15 +40,20 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
   const baseUrl = window.location.origin + window.location.pathname;
   const currentRoom = roomId || 'neep-main';
   const spectatorUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}&mode=spectator`;
+  const playerUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}&mode=player`;
   const adminUrl = `${baseUrl}?room=${encodeURIComponent(currentRoom)}&mode=admin&pin=${encodeURIComponent(adminPin || '1234')}`;
-  const effectiveMode = isAdmin ? qrMode : 'spectator';
-  const activeQrUrl = effectiveMode === 'admin' ? adminUrl : spectatorUrl;
+  const effectiveMode = !isAdmin && qrMode === 'admin' ? 'player' : qrMode;
+  const activeQrUrl =
+    effectiveMode === 'admin' ? adminUrl : effectiveMode === 'player' ? playerUrl : spectatorUrl;
 
-  function copyToClipboard(text, isSpectator) {
+  function copyToClipboard(text, target) {
     navigator.clipboard.writeText(text).then(() => {
-      if (isSpectator) {
+      if (target === 'spectator') {
         setCopiedSpectator(true);
         setTimeout(() => setCopiedSpectator(false), 2000);
+      } else if (target === 'player') {
+        setCopiedPlayer(true);
+        setTimeout(() => setCopiedPlayer(false), 2000);
       } else {
         setCopiedAdmin(true);
         setTimeout(() => setCopiedAdmin(false), 2000);
@@ -118,41 +124,55 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
 
         {/* QR Code Section with Download Option */}
         <div className="bg-slate-950/90 border border-slate-800 rounded-2xl p-4 mb-4 text-center">
-          {isAdmin && (
-            <div className="flex items-center justify-between gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 mb-3">
+          <div className="flex items-center justify-between gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 mb-3">
+            <button
+              type="button"
+              onClick={() => setQrMode('player')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 ${
+                effectiveMode === 'player'
+                  ? 'bg-emerald-400 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <UserCheck size={12} />
+              Player QR
+            </button>
+            <button
+              type="button"
+              onClick={() => setQrMode('spectator')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 ${
+                effectiveMode === 'spectator'
+                  ? 'bg-cyan-400 text-slate-950 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Eye size={12} />
+              Spectator QR
+            </button>
+            {isAdmin && (
               <button
                 type="button"
                 onClick={() => setQrMode('admin')}
-                className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 ${
                   effectiveMode === 'admin'
                     ? 'bg-[#d7f24c] text-slate-950 shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <ShieldCheck size={13} />
-                Admin Pass QR
+                <ShieldCheck size={12} />
+                Admin QR
               </button>
-              <button
-                type="button"
-                onClick={() => setQrMode('spectator')}
-                className={`flex-1 py-1.5 px-2.5 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-                  effectiveMode === 'spectator'
-                    ? 'bg-cyan-400 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <Eye size={13} />
-                Spectator QR
-              </button>
-            </div>
-          )}
+            )}
+          </div>
 
           <QrSvg url={activeQrUrl} size={144} />
 
           <p className="text-[11px] text-slate-400 mt-2.5 mb-3">
             {effectiveMode === 'admin'
               ? 'Scan or save this QR Pass to return to this room with Admin PIN access.'
-              : 'Players & fans can scan to watch live match scores and brackets.'}
+              : effectiveMode === 'player'
+                ? 'Players scan to sign in, get court alerts, and enter/approve match scores.'
+                : 'Fans can scan to watch live match scores and brackets.'}
           </p>
 
           <button
@@ -164,9 +184,35 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
             <span>
               {downloadedQr
                 ? 'QR Pass Saved!'
-                : `Save ${effectiveMode === 'admin' ? 'Admin' : 'Spectator'} QR Code (.PNG)`}
+                : `Save ${effectiveMode === 'admin' ? 'Admin' : effectiveMode === 'player' ? 'Player' : 'Spectator'} QR Code (.PNG)`}
             </span>
           </button>
+        </div>
+
+        {/* Player Login Link */}
+        <div className="bg-slate-850 border border-slate-750 rounded-2xl p-3.5 mb-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+              <UserCheck size={14} className="text-emerald-400" /> Player Login Link
+            </span>
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+              Alerts &amp; Self-Score
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <input
+              readOnly
+              value={playerUrl}
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 select-all focus:outline-none"
+            />
+            <button
+              onClick={() => copyToClipboard(playerUrl, 'player')}
+              className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition"
+            >
+              {copiedPlayer ? <Check size={14} /> : <Copy size={14} />}
+              {copiedPlayer ? 'Copied' : 'Copy'}
+            </button>
+          </div>
         </div>
 
         {/* Spectator Link */}
@@ -176,7 +222,7 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
               <Eye size={14} className="text-cyan-400" /> Spectator Link (Read-Only)
             </span>
             <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded-full font-bold">
-              For Players & Fans
+              For Fans
             </span>
           </div>
           <div className="flex gap-2">
@@ -186,7 +232,7 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
               className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 select-all focus:outline-none"
             />
             <button
-              onClick={() => copyToClipboard(spectatorUrl, true)}
+              onClick={() => copyToClipboard(spectatorUrl, 'spectator')}
               className="px-3.5 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition"
             >
               {copiedSpectator ? <Check size={14} /> : <Copy size={14} />}
@@ -213,7 +259,7 @@ export function ShareModal({ isOpen, onClose, isAdmin, adminPin, roomId }) {
                 className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-300 select-all focus:outline-none"
               />
               <button
-                onClick={() => copyToClipboard(adminUrl, false)}
+                onClick={() => copyToClipboard(adminUrl, 'admin')}
                 className="px-3.5 py-2 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 font-bold text-xs flex items-center gap-1.5 active:scale-95 transition"
               >
                 {copiedAdmin ? <Check size={14} /> : <Copy size={14} />}
