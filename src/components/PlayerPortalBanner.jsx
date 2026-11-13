@@ -638,13 +638,16 @@ export function PlayerPortalBanner({
         const inA = entryHasPlayer(eA);
         const inB = entryHasPlayer(eB);
         if (!inA && !inB) return;
+        const roundNum = Number(m.round) || 1;
         myPoolMatches.push({
           key: `pool:${pool.id}:${m.id}`,
           type: 'pool',
           poolId: pool.id,
           match: m,
           mySide: inA ? 'A' : 'B',
-          stage: `${pool.name} • Round ${m.round || 1}`,
+          stage: `${pool.name} • Round ${roundNum}`,
+          roundLabel: `Round ${roundNum}`,
+          roundSortOrder: roundNum,
           nameA: getEntryDisplayName(eA),
           nameB: getEntryDisplayName(eB),
           format: getEffectiveMatchFormat(poolTournament, m, { isKnockout: false }),
@@ -673,6 +676,8 @@ export function PlayerPortalBanner({
             match: m,
             mySide: inA ? 'A' : 'B',
             stage: rLabel,
+            roundLabel: rLabel,
+            roundSortOrder: 1000 + rIdx,
             nameA: getEntryDisplayName(eA),
             nameB: getEntryDisplayName(eB),
             format: getEffectiveMatchFormat(poolTournament, m, {
@@ -703,6 +708,8 @@ export function PlayerPortalBanner({
           match: bm,
           mySide: inA ? 'A' : 'B',
           stage: 'Bronze Medal',
+          roundLabel: 'Bronze Medal',
+          roundSortOrder: 2000,
           nameA: getEntryDisplayName(eA),
           nameB: getEntryDisplayName(eB),
           format: getEffectiveMatchFormat(poolTournament, bm, {
@@ -742,6 +749,8 @@ export function PlayerPortalBanner({
             gameIndex: gIdx,
             mySide: inA ? 'A' : 'B',
             matchLabel,
+            roundLabel: `Round ${rIdx + 1}`,
+            roundSortOrder: rIdx + 1,
             namesA: (g.pairA || []).map(getPlayerName).join(' & '),
             namesB: (g.pairB || []).map(getPlayerName).join(' & '),
           });
@@ -1000,11 +1009,38 @@ export function PlayerPortalBanner({
                 No upcoming matches queued right now for <strong className="text-slate-200">{loggedInPlayerName}</strong>.
               </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {upcomingItems.map(renderItemCard)}
-            </div>
-          )
+          ) : (() => {
+            const roundGroups = new Map();
+            upcomingItems.forEach((item) => {
+              const label = item.roundLabel || 'Upcoming';
+              const order = item.roundSortOrder ?? 9999;
+              if (!roundGroups.has(label)) {
+                roundGroups.set(label, { label, order, items: [] });
+              }
+              roundGroups.get(label).items.push(item);
+            });
+            const sortedGroups = Array.from(roundGroups.values()).sort((a, b) => a.order - b.order);
+
+            return (
+              <div className="space-y-4">
+                {sortedGroups.map((group) => (
+                  <div key={group.label} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-[#d7f24c] bg-[#d7f24c]/10 border border-[#d7f24c]/25 px-2.5 py-0.5 rounded-full">
+                        {group.label}
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-500">
+                        {group.items.length} {group.items.length === 1 ? 'match' : 'matches'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {group.items.map(renderItemCard)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()
         )}
       </div>
     </div>

@@ -87,11 +87,14 @@ export function SpectatorPortalBanner({
         if (m.saved || !m.entryAId || !m.entryBId) return;
         const fmt = getEffectiveMatchFormat(poolTournament, m, { isKnockout: false });
         const bestOf = fmt?.bestOf || 1;
+        const roundNum = Number(m.round) || 1;
         allMatches.push({
           key: `pool:${pool.id}:${m.id}`,
           isLive: Boolean(m.inProgress && !m.saved),
           court: m.court || null,
-          stage: `${pool.name} • Round ${m.round || 1}`,
+          stage: `${pool.name} • Round ${roundNum}`,
+          roundLabel: `Round ${roundNum}`,
+          roundSortOrder: roundNum,
           nameA: getEntryDisplayName(entryMap.get(m.entryAId)),
           nameB: getEntryDisplayName(entryMap.get(m.entryBId)),
           liveStartedAt: m.liveStartedAt || null,
@@ -119,6 +122,8 @@ export function SpectatorPortalBanner({
             isLive: Boolean(m.inProgress && !m.saved),
             court: m.court || null,
             stage: rLabel,
+            roundLabel: rLabel,
+            roundSortOrder: 1000 + rIdx,
             nameA: getEntryDisplayName(entryMap.get(m.entryAId)),
             nameB: getEntryDisplayName(entryMap.get(m.entryBId)),
             liveStartedAt: m.liveStartedAt || null,
@@ -143,6 +148,8 @@ export function SpectatorPortalBanner({
         isLive: Boolean(bm.inProgress && !bm.saved),
         court: bm.court || null,
         stage: 'Bronze Medal',
+        roundLabel: 'Bronze Medal',
+        roundSortOrder: 2000,
         nameA: getEntryDisplayName(entryMap.get(bm.entryAId)),
         nameB: getEntryDisplayName(entryMap.get(bm.entryBId)),
         liveStartedAt: bm.liveStartedAt || null,
@@ -169,6 +176,8 @@ export function SpectatorPortalBanner({
             isLive: Boolean(g.inProgress && !g.saved),
             court: g.court || null,
             stage: `${matchLabel} • Game ${gIdx + 1}`,
+            roundLabel: `Round ${rIdx + 1}`,
+            roundSortOrder: rIdx + 1,
             nameA: (g.pairA || []).map(getPlayerName).join(' & '),
             nameB: (g.pairB || []).map(getPlayerName).join(' & '),
             liveStartedAt: g.liveStartedAt || null,
@@ -294,13 +303,40 @@ export function SpectatorPortalBanner({
               No upcoming matches queued right now.
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {upcomingMatches.map((item) => (
-              <SpectatorMatchCard key={item.key} item={item} />
-            ))}
-          </div>
-        )
+        ) : (() => {
+          const roundGroups = new Map();
+          upcomingMatches.forEach((item) => {
+            const label = item.roundLabel || 'Upcoming';
+            const order = item.roundSortOrder ?? 9999;
+            if (!roundGroups.has(label)) {
+              roundGroups.set(label, { label, order, items: [] });
+            }
+            roundGroups.get(label).items.push(item);
+          });
+          const sortedGroups = Array.from(roundGroups.values()).sort((a, b) => a.order - b.order);
+
+          return (
+            <div className="space-y-4">
+              {sortedGroups.map((group) => (
+                <div key={group.label} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-[#d7f24c] bg-[#d7f24c]/10 border border-[#d7f24c]/25 px-2.5 py-0.5 rounded-full">
+                      {group.label}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {group.items.length} {group.items.length === 1 ? 'match' : 'matches'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {group.items.map((item) => (
+                      <SpectatorMatchCard key={item.key} item={item} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()
       )}
     </div>
   );

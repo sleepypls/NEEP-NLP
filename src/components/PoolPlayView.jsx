@@ -879,50 +879,72 @@ export function PoolPlayView({
                 </div>
 
                 {/* Pool Matches Grid (hidden until user clicks/touches pool) */}
-                {isScheduleExpanded && (
-                  <div className="pt-1 border-t border-slate-800/80">
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2.5">
-                      {pool.name} Match Schedule ({pool.matches.length} Matches)
-                    </span>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {pool.matches.map((match) => {
-                        const fmt = getEffectiveMatchFormat(tournament, match, { isKnockout: false });
-                        return (
-                          <MatchScoreEditor
-                            key={match.id}
-                            match={match}
-                            entryA={entryMap.get(match.entryAId)}
-                            entryB={entryMap.get(match.entryBId)}
-                            bestOf={fmt.bestOf}
-                            pointsTo={fmt.pointsTo}
-                            isCustomFormat={fmt.isCustom}
-                            numCourts={numCourts}
-                            onSetCourt={
-                              onSetPoolMatchCourt
-                                ? (ct) => onSetPoolMatchCourt(pool.id, match.id, ct)
-                                : undefined
-                            }
-                            isAdmin={isAdmin}
-                            onToggleLive={() => onTogglePoolMatchLive(pool.id, match.id)}
-                            onEditMatchup={() =>
-                              setEditingMatchCtx({
-                                type: 'pool',
-                                poolId: pool.id,
-                                match,
-                                stageLabel: `${pool.name} \u2022 R${match.round}`,
-                                defaultFormat: getEffectiveMatchFormat(tournament, null, { isKnockout: false }),
-                                allowBye: false,
-                              })
-                            }
-                            onSave={(games, winnerId) =>
-                              onSavePoolMatch(pool.id, match.id, games, winnerId)
-                            }
-                          />
-                        );
-                      })}
+                {isScheduleExpanded && (() => {
+                  const matchesByRound = new Map();
+                  pool.matches.forEach((m) => {
+                    const r = Number(m.round) || 1;
+                    if (!matchesByRound.has(r)) matchesByRound.set(r, []);
+                    matchesByRound.get(r).push(m);
+                  });
+                  const sortedRounds = Array.from(matchesByRound.entries()).sort((a, b) => a[0] - b[0]);
+
+                  return (
+                    <div className="pt-2 border-t border-slate-800/80 space-y-4">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                        {pool.name} Match Schedule ({pool.matches.length} Matches)
+                      </span>
+                      {sortedRounds.map(([roundNum, roundMatches]) => (
+                        <div key={roundNum} className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-black uppercase tracking-wider text-[#d7f24c] bg-[#d7f24c]/10 border border-[#d7f24c]/25 px-2.5 py-0.5 rounded-full">
+                              Round {roundNum}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-500">
+                              {roundMatches.length} {roundMatches.length === 1 ? 'match' : 'matches'}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {roundMatches.map((match) => {
+                              const fmt = getEffectiveMatchFormat(tournament, match, { isKnockout: false });
+                              return (
+                                <MatchScoreEditor
+                                  key={match.id}
+                                  match={match}
+                                  entryA={entryMap.get(match.entryAId)}
+                                  entryB={entryMap.get(match.entryBId)}
+                                  bestOf={fmt.bestOf}
+                                  pointsTo={fmt.pointsTo}
+                                  isCustomFormat={fmt.isCustom}
+                                  numCourts={numCourts}
+                                  onSetCourt={
+                                    onSetPoolMatchCourt
+                                      ? (ct) => onSetPoolMatchCourt(pool.id, match.id, ct)
+                                      : undefined
+                                  }
+                                  isAdmin={isAdmin}
+                                  onToggleLive={() => onTogglePoolMatchLive(pool.id, match.id)}
+                                  onEditMatchup={() =>
+                                    setEditingMatchCtx({
+                                      type: 'pool',
+                                      poolId: pool.id,
+                                      match,
+                                      stageLabel: `${pool.name} \u2022 R${match.round}`,
+                                      defaultFormat: getEffectiveMatchFormat(tournament, null, { isKnockout: false }),
+                                      allowBye: false,
+                                    })
+                                  }
+                                  onSave={(games, winnerId) =>
+                                    onSavePoolMatch(pool.id, match.id, games, winnerId)
+                                  }
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             );
           })}

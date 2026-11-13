@@ -2983,12 +2983,12 @@ export default function App() {
         onToggleTournamentLock={handleToggleTournamentLock}
         onUnlockAdmin={handleUnlockAdmin}
         loggedInPlayerName={loggedInPlayerName}
-        onOpenPlayerLogin={() => setIsPlayerLoginOpen(true)}
+        onOpenPlayerLogin={isSpectatorPortalActive ? null : () => setIsPlayerLoginOpen(true)}
         onOpenRosterModal={() => {
           setRosterModalTeamId(null);
           setIsRosterModalOpen(true);
         }}
-        onExitToLanding={handleExitToLanding}
+        onExitToLanding={isSpectatorPortalActive ? null : handleExitToLanding}
         hideNavTabs={isViewerPortalActive}
       />
 
