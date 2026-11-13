@@ -1012,6 +1012,44 @@ export function generateTournamentLeaderboardCSV(statsList = [], roomId = '', la
 }
 
 /**
+ * Collects a Set of entry IDs currently playing in any live (inProgress && !saved)
+ * pool or knockout match.
+ */
+export function getBusyPoolEntryIds(tournament, excludeMatchKey = null) {
+  const busy = new Set();
+  if (!tournament) return busy;
+  (tournament.pools || []).forEach((pool) => {
+    (pool.matches || []).forEach((m) => {
+      const key = `pool:${pool.id}:${m.id}`;
+      if (m.inProgress && !m.saved && key !== excludeMatchKey) {
+        if (m.entryAId) busy.add(m.entryAId);
+        if (m.entryBId) busy.add(m.entryBId);
+      }
+    });
+  });
+  const ko = tournament.knockout;
+  if (ko && Array.isArray(ko.rounds)) {
+    ko.rounds.forEach((round, rIdx) => {
+      round.forEach((m) => {
+        const key = `ko:${rIdx}:${m.matchIdx}`;
+        if (!m.isBye && m.inProgress && !m.saved && key !== excludeMatchKey) {
+          if (m.entryAId) busy.add(m.entryAId);
+          if (m.entryBId) busy.add(m.entryBId);
+        }
+      });
+    });
+    if (ko.bronzeMatch && excludeMatchKey !== 'ko:bronze') {
+      const bm = ko.bronzeMatch;
+      if (bm.inProgress && !bm.saved) {
+        if (bm.entryAId) busy.add(bm.entryAId);
+        if (bm.entryBId) busy.add(bm.entryBId);
+      }
+    }
+  }
+  return busy;
+}
+
+/**
  * Computes currently live courts, free courts, eligible ready-to-play matches,
  * and smart conflict-free court suggestions for Pools + Knockout.
  */

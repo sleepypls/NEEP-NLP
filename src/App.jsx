@@ -25,6 +25,7 @@ import {
   getEffectiveMatchFormat,
   resizeGamesForBestOf,
   distributeCourtsToPools,
+  getBusyPoolEntryIds,
 } from './utils/poolTournament';
 
 import {
@@ -34,6 +35,9 @@ import {
   advanceWinner,
   distributeCourtsToMatches,
   redistributeFreedCourtsToOngoingMatches,
+  getBusyMlpPlayerIds,
+  getMlpGamePlayerIds,
+  hasMlpPlayerConflict,
   computeAllStats,
   randomizePendingMatchups,
   revertPendingMatchups,
@@ -1101,6 +1105,15 @@ export default function App() {
     if (!bracket) return;
     const match = bracket.rounds[round]?.[idx];
     if (!match?.games) return;
+    const targetGame = match.games.find((g) => g.id === gameId);
+    if (!targetGame || targetGame.saved) return;
+    if (!targetGame.inProgress) {
+      const busyPlayers = getBusyMlpPlayerIds(bracket, gameId);
+      if (hasMlpPlayerConflict(targetGame, busyPlayers)) {
+        alert('Cannot mark live: one or more players in this game are already playing in another live game.');
+        return;
+      }
+    }
     const updatedGames = match.games.map((g) => {
       if (g.id !== gameId || g.saved) return g;
       const nextLive = !g.inProgress;
@@ -1135,12 +1148,19 @@ export default function App() {
     if (!bracket || !Array.isArray(assignments) || assignments.length === 0) return;
     const nb = JSON.parse(JSON.stringify(bracket));
     const now = Date.now();
+    const busyPlayers = getBusyMlpPlayerIds(nb);
+    let anyApplied = false;
     assignments.forEach((a) => {
       const r = a.round !== undefined ? a.round : activePath?.round;
       const i = a.idx !== undefined ? a.idx : activePath?.idx;
       if (r === undefined || i === undefined) return;
       const match = nb.rounds[r]?.[i];
       if (!match?.games) return;
+      const targetGame = match.games.find((g) => g.id === a.gameId);
+      if (!targetGame || targetGame.saved || targetGame.inProgress) return;
+      if (hasMlpPlayerConflict(targetGame, busyPlayers)) return;
+      getMlpGamePlayerIds(targetGame).forEach((pid) => busyPlayers.add(pid));
+      anyApplied = true;
       match.games = match.games.map((g) =>
         g.id === a.gameId
           ? {
@@ -1152,6 +1172,7 @@ export default function App() {
           : g
       );
     });
+    if (!anyApplied) return;
     setBracket(nb);
     broadcastTournamentChange({ bracket: nb });
   }
@@ -2050,13 +2071,23 @@ export default function App() {
 
   function handleTogglePoolMatchLive(poolId, matchId) {
     if (!poolTournament) return;
+    const pool = (poolTournament.pools || []).find((p) => p.id === poolId);
+    const target = pool?.matches?.find((m) => m.id === matchId);
+    if (!target || target.saved) return;
+    if (!target.inProgress) {
+      const busy = getBusyPoolEntryIds(poolTournament, `pool:${poolId}:${matchId}`);
+      if ((target.entryAId && busy.has(target.entryAId)) || (target.entryBId && busy.has(target.entryBId))) {
+        alert('Cannot mark live: one or more players/teams in this match are already playing on another court.');
+        return;
+      }
+    }
     const updated = {
       ...poolTournament,
-      pools: poolTournament.pools.map((pool) => {
-        if (pool.id !== poolId) return pool;
+      pools: poolTournament.pools.map((p) => {
+        if (p.id !== poolId) return p;
         return {
-          ...pool,
-          matches: pool.matches.map((m) => {
+          ...p,
+          matches: p.matches.map((m) => {
             if (m.id !== matchId || m.saved) return m;
             const nextLive = !m.inProgress;
             return {
@@ -2184,16 +2215,36 @@ export default function App() {
     if (!poolTournament || !poolTournament.knockout) return;
     let updatedKnockout = { ...poolTournament.knockout };
     if (isBronze && updatedKnockout.bronzeMatch && !updatedKnockout.bronzeMatch.saved) {
-      const nextLive = !updatedKnockout.bronzeMatch.inProgress;
+      const bm = updatedKnockout.bronzeMatch;
+      const nextLive = !bm.inProgress;
+      if (nextLive) {
+        const busy = getBusyPoolEntryIds(poolTournament, 'ko:bronze');
+        if ((bm.entryAId && busy.has(bm.entryAId)) || (bm.entryBId && busy.has(bm.entryBId))) {
+          alert('Cannot mark live: one or more players/teams in this match are already playing on another court.');
+          return;
+        }
+      }
       updatedKnockout = {
         ...updatedKnockout,
         bronzeMatch: {
-          ...updatedKnockout.bronzeMatch,
+          ...bm,
           inProgress: nextLive,
-          liveStartedAt: nextLive ? (updatedKnockout.bronzeMatch.liveStartedAt || Date.now()) : null,
+          liveStartedAt: nextLive ? (bm.liveStartedAt || Date.now()) : null,
         },
       };
     } else if (!isBronze) {
+      const targetMatch = updatedKnockout.rounds[roundIdx]?.[matchIdx];
+      if (!targetMatch || targetMatch.saved) return;
+      if (!targetMatch.inProgress) {
+        const busy = getBusyPoolEntryIds(poolTournament, `ko:${roundIdx}:${targetMatch.matchIdx}`);
+        if (
+          (targetMatch.entryAId && busy.has(targetMatch.entryAId)) ||
+          (targetMatch.entryBId && busy.has(targetMatch.entryBId))
+        ) {
+          alert('Cannot mark live: one or more players/teams in this match are already playing on another court.');
+          return;
+        }
+      }
       updatedKnockout = {
         ...updatedKnockout,
         rounds: updatedKnockout.rounds.map((r, rI) =>
@@ -2233,11 +2284,33 @@ export default function App() {
   function handleBatchAssignPoolCourtsAndLive(assignments) {
     if (!poolTournament || !Array.isArray(assignments) || assignments.length === 0) return;
     const now = Date.now();
+    const busyEntries = getBusyPoolEntryIds(poolTournament);
     const poolAssignMap = new Map();
     const koAssignMap = new Map();
     let bronzeAssign = null;
 
     assignments.forEach((a) => {
+      let eA = a.entryAId;
+      let eB = a.entryBId;
+      if (!eA || !eB) {
+        if (a.type === 'pool') {
+          const pm = (poolTournament.pools || [])
+            .find((p) => p.id === a.poolId)
+            ?.matches?.find((m) => m.id === a.matchId);
+          eA = pm?.entryAId;
+          eB = pm?.entryBId;
+        } else if (a.type === 'knockout') {
+          const km = a.isBronze
+            ? poolTournament.knockout?.bronzeMatch
+            : poolTournament.knockout?.rounds?.[a.roundIdx]?.[a.matchIdx];
+          eA = km?.entryAId;
+          eB = km?.entryBId;
+        }
+      }
+      if ((eA && busyEntries.has(eA)) || (eB && busyEntries.has(eB))) return;
+      if (eA) busyEntries.add(eA);
+      if (eB) busyEntries.add(eB);
+
       if (a.type === 'pool') {
         poolAssignMap.set(`${a.poolId}:${a.matchId}`, a.court);
       } else if (a.type === 'knockout') {
@@ -2245,6 +2318,7 @@ export default function App() {
         else koAssignMap.set(`${a.roundIdx}:${a.matchIdx}`, a.court);
       }
     });
+    if (poolAssignMap.size === 0 && koAssignMap.size === 0 && bronzeAssign === null) return;
 
     const nextPools = (poolTournament.pools || []).map((pool) => ({
       ...pool,

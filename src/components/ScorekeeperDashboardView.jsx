@@ -19,6 +19,7 @@ import {
   evaluatePoolOrKnockoutMatch,
   resizeGamesForBestOf,
 } from '../utils/poolTournament';
+import { getBusyMlpPlayerIds, getMlpGamePlayerIds } from '../utils/tournament';
 
 function PoolLiveCourtCard({
   courtNum,
@@ -430,6 +431,7 @@ export function ScorekeeperDashboardView({
   const mlpLiveByCourt = new Map();
   const mlpEligible = [];
   const mlpSuggestions = {};
+  const mlpBusyPlayerIds = !isPoolsMode && bracket ? getBusyMlpPlayerIds(bracket) : new Set();
   if (!isPoolsMode && bracket && Array.isArray(bracket.rounds)) {
     const teamMap = new Map((teams || []).map((t) => [t.id, t.name]));
     const getPlayerName = (id) => {
@@ -442,7 +444,7 @@ export function ScorekeeperDashboardView({
     bracket.rounds.forEach((round, rIdx) => {
       round.forEach((m, mIdx) => {
         if (m.isBye || !m.games) return;
-        const matchLabel = `${teamMap.get(m.teamAId) || 'Team A'} vs ${teamMap.get(m.teamBId) || 'Team B'}`;
+        const matchLabel = `${m.matchNumber ? `#${m.matchNumber} ` : ''}${teamMap.get(m.teamAId) || 'Team A'} vs ${teamMap.get(m.teamBId) || 'Team B'}`;
         m.games.forEach((g, gIdx) => {
           if (g.inProgress && !g.saved && g.court) {
             mlpLiveByCourt.set(Number(g.court), {
@@ -463,6 +465,7 @@ export function ScorekeeperDashboardView({
               gameIndex: gIdx,
               preCourt: g.court ? Number(g.court) : null,
               assignedCourts: m.assignedCourts || [],
+              players: getMlpGamePlayerIds(g),
               label: `G${gIdx + 1} (${matchLabel}): ${nA} vs ${nB}`,
             });
           }
@@ -471,16 +474,24 @@ export function ScorekeeperDashboardView({
     });
 
     const usedMlpKeys = new Set();
+    const plannedBusyPlayers = new Set(mlpBusyPlayerIds);
+    const isMlpFreeOfConflict = (e) =>
+      !usedMlpKeys.has(e.key) && !(e.players || []).some((pid) => plannedBusyPlayers.has(pid));
+    const reserveMlp = (e) => {
+      usedMlpKeys.add(e.key);
+      (e.players || []).forEach((pid) => plannedBusyPlayers.add(pid));
+    };
+
     for (let c = 1; c <= totalCourts; c++) {
       if (mlpLiveByCourt.has(c)) continue;
-      const pre = mlpEligible.find((e) => e.preCourt === c && !usedMlpKeys.has(e.key));
+      const pre = mlpEligible.find((e) => e.preCourt === c && isMlpFreeOfConflict(e));
       const matchPref =
         pre ||
-        mlpEligible.find((e) => (e.assignedCourts || []).includes(c) && !usedMlpKeys.has(e.key));
-      const next = matchPref || mlpEligible.find((e) => !usedMlpKeys.has(e.key));
+        mlpEligible.find((e) => (e.assignedCourts || []).includes(c) && isMlpFreeOfConflict(e));
+      const next = matchPref || mlpEligible.find((e) => isMlpFreeOfConflict(e));
       if (next) {
         mlpSuggestions[c] = next.key;
-        usedMlpKeys.add(next.key);
+        reserveMlp(next);
       }
     }
   }
@@ -488,6 +499,9 @@ export function ScorekeeperDashboardView({
   const activeSuggestions = isPoolsMode ? poolInfo?.suggestions || {} : mlpSuggestions;
   const activeEligible = isPoolsMode ? poolInfo?.eligibleMatches || [] : mlpEligible;
   const activeLiveMap = isPoolsMode ? poolLiveByCourt : mlpLiveByCourt;
+  const liveBusyIds = isPoolsMode ? (poolInfo?.busyEntryIds || new Set()) : mlpBusyPlayerIds;
+  const getParticipants = (item) =>
+    isPoolsMode ? [item?.entryAId, item?.entryBId].filter(Boolean) : item?.players || [];
 
   const freeCourtNums = [];
   for (let c = 1; c <= totalCourts; c++) {
@@ -502,15 +516,14 @@ export function ScorekeeperDashboardView({
   function handleStartSingleCourt(courtNum) {
     const key = getSelectedKeyForCourt(courtNum);
     if (!key) return;
+    const item = activeEligible.find((x) => x.key === key);
+    if (!item) return;
+    if (getParticipants(item).some((id) => liveBusyIds.has(id))) return;
     if (isPoolsMode) {
-      const matchObj = activeEligible.find((m) => m.key === key);
-      if (!matchObj) return;
-      onBatchAssignPoolCourtsLive([{ court: courtNum, ...matchObj }]);
+      onBatchAssignPoolCourtsLive([{ court: courtNum, ...item }]);
     } else {
-      const gameObj = activeEligible.find((g) => g.key === key);
-      if (!gameObj) return;
       onBatchAssignMlpCourtsLive([
-        { court: courtNum, round: gameObj.round, idx: gameObj.idx, gameId: gameObj.gameId },
+        { court: courtNum, round: item.round, idx: item.idx, gameId: item.gameId },
       ]);
     }
     setFreeCourtChoices((prev) => {
@@ -522,11 +535,17 @@ export function ScorekeeperDashboardView({
 
   function handleAutoStartAllFreeCourts() {
     const assignments = [];
+    const batchBusy = new Set(liveBusyIds);
+    const batchKeys = new Set();
     freeCourtNums.forEach((courtNum) => {
       const key = getSelectedKeyForCourt(courtNum);
-      if (!key) return;
+      if (!key || batchKeys.has(key)) return;
       const obj = activeEligible.find((x) => x.key === key);
       if (!obj) return;
+      const parts = getParticipants(obj);
+      if (parts.some((id) => batchBusy.has(id))) return;
+      batchKeys.add(key);
+      parts.forEach((id) => batchBusy.add(id));
       if (isPoolsMode) {
         assignments.push({ court: courtNum, ...obj });
       } else {
@@ -628,7 +647,21 @@ export function ScorekeeperDashboardView({
                 <div className="py-6 text-center text-xs text-slate-500 italic">
                   No pending matchups waiting right now.
                 </div>
-              ) : (
+              ) : (() => {
+                const otherKeys = new Set();
+                const otherBusy = new Set(liveBusyIds);
+                freeCourtNums.forEach((otherC) => {
+                  if (otherC === courtNum) return;
+                  const ok = getSelectedKeyForCourt(otherC);
+                  if (!ok) return;
+                  otherKeys.add(ok);
+                  const oi = activeEligible.find((x) => x.key === ok);
+                  if (oi) getParticipants(oi).forEach((id) => otherBusy.add(id));
+                });
+                const selectedItem = selectedKey ? activeEligible.find((x) => x.key === selectedKey) : null;
+                const selectedHasLiveConflict =
+                  selectedItem && getParticipants(selectedItem).some((id) => liveBusyIds.has(id));
+                return (
                 <>
                   <div>
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1">
@@ -642,24 +675,35 @@ export function ScorekeeperDashboardView({
                       className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
                     >
                       <option value="">— Choose Matchup —</option>
-                      {activeEligible.map((m) => (
-                        <option key={m.key} value={m.key}>
-                          {m.label}
-                        </option>
-                      ))}
+                      {activeEligible.map((m) => {
+                        const isSelectedElsewhere = otherKeys.has(m.key);
+                        const hasBusyParticipant = getParticipants(m).some((id) => otherBusy.has(id));
+                        const isBlocked = isSelectedElsewhere || hasBusyParticipant;
+                        const suffix = isSelectedElsewhere
+                          ? ' (Selected on another court)'
+                          : hasBusyParticipant
+                            ? ' (Player on court)'
+                            : '';
+                        return (
+                          <option key={m.key} value={m.key} disabled={isBlocked}>
+                            {m.label}{suffix}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
                   <button
                     type="button"
-                    disabled={!selectedKey}
+                    disabled={!selectedKey || selectedHasLiveConflict}
                     onClick={() => handleStartSingleCourt(courtNum)}
                     className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-[#d7f24c] hover:text-slate-950 text-[#d7f24c] border border-[#d7f24c]/30 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95"
                   >
                     <Play size={13} className="fill-current" /> Start Live on Court {courtNum}
                   </button>
                 </>
-              )}
+                );
+              })()}
             </div>
           );
         })}

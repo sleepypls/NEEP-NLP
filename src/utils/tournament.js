@@ -1208,6 +1208,40 @@ export function redistributeFreedCourtsToOngoingMatches(bracket, numCourts = 2) 
   return nb;
 }
 
+/**
+ * Returns all player IDs participating in an MLP game.
+ */
+export function getMlpGamePlayerIds(game) {
+  if (!game) return [];
+  return [...(game.pairA || []), ...(game.pairB || [])].filter(Boolean);
+}
+
+/**
+ * Collects a Set of player IDs currently playing in any live (inProgress && !saved) MLP game across the bracket.
+ */
+export function getBusyMlpPlayerIds(bracket, excludeGameId = null) {
+  const busy = new Set();
+  if (!bracket || !Array.isArray(bracket.rounds)) return busy;
+  bracket.rounds.forEach((round) => {
+    round.forEach((m) => {
+      (m.games || []).forEach((g) => {
+        if (g.inProgress && !g.saved && g.id !== excludeGameId) {
+          getMlpGamePlayerIds(g).forEach((pid) => busy.add(pid));
+        }
+      });
+    });
+  });
+  return busy;
+}
+
+/**
+ * Returns true if any player in `game` is present in `busyPlayerIds`.
+ */
+export function hasMlpPlayerConflict(game, busyPlayerIds) {
+  if (!game || !busyPlayerIds || busyPlayerIds.size === 0) return false;
+  return getMlpGamePlayerIds(game).some((pid) => busyPlayerIds.has(pid));
+}
+
 export function roundName(totalRounds, roundIdx) {
   const remaining = totalRounds - roundIdx;
   if (remaining === 1) return 'Final';

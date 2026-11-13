@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Flame, RefreshCw, AlertTriangle, Check } from 'lucide-react';
 import { buildPoolCourtSuggestions, getEntryDisplayName } from '../utils/poolTournament';
+import { getBusyMlpPlayerIds, getMlpGamePlayerIds, hasMlpPlayerConflict } from '../utils/tournament';
 import { LiveTimer } from './LiveTimer';
 
 export function PoolCourtAssignModal({
@@ -149,6 +150,17 @@ export function PoolCourtAssignModal({
                 const designatedPool = (tournament?.pools || []).find((p) =>
                   (p.assignedCourts || []).includes(courtNum)
                 );
+                const otherSelectedKeys = new Set();
+                const otherBusyEntryIds = new Set(busyEntryIds);
+                Object.entries(selections).forEach(([cStr, k]) => {
+                  if (Number(cStr) === courtNum || !k) return;
+                  otherSelectedKeys.add(k);
+                  const om = matchByKey.get(k);
+                  if (om) {
+                    if (om.entryAId) otherBusyEntryIds.add(om.entryAId);
+                    if (om.entryBId) otherBusyEntryIds.add(om.entryBId);
+                  }
+                });
                 return (
                   <div
                     key={courtNum}
@@ -175,11 +187,22 @@ export function PoolCourtAssignModal({
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
                     >
                       <option value="">— Leave Unassigned —</option>
-                      {eligibleMatches.map((m) => (
-                        <option key={m.key} value={m.key}>
-                          {m.label}
-                        </option>
-                      ))}
+                      {eligibleMatches.map((m) => {
+                        const isSelectedElsewhere = otherSelectedKeys.has(m.key);
+                        const hasBusyEntrant =
+                          otherBusyEntryIds.has(m.entryAId) || otherBusyEntryIds.has(m.entryBId);
+                        const isBlocked = isSelectedElsewhere || hasBusyEntrant;
+                        const suffix = isSelectedElsewhere
+                          ? ' (Selected on another court)'
+                          : hasBusyEntrant
+                            ? ' (Player on court)'
+                            : '';
+                        return (
+                          <option key={m.key} value={m.key} disabled={isBlocked}>
+                            {m.label}{suffix}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 );
@@ -209,7 +232,7 @@ export function PoolCourtAssignModal({
           </button>
           <button
             type="button"
-            disabled={selectedEntries.length === 0}
+            disabled={selectedEntries.length === 0 || conflictWarnings.length > 0}
             onClick={handleSubmit}
             className="flex-[2] py-2.5 rounded-xl bg-[#d7f24c] hover:bg-[#c6e140] disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95"
           >
@@ -244,6 +267,15 @@ export function MlpCourtAssignModal({
   const totalCourts = Math.max(1, Number(numCourts) || 2);
   const liveByCourt = new Map();
   const teamMap = new Map((teams || []).map((t) => [t.id, t.name]));
+  const busyPlayerIds = bracket
+    ? getBusyMlpPlayerIds(bracket)
+    : (() => {
+        const s = new Set();
+        (games || []).forEach((g) => {
+          if (g.inProgress && !g.saved) getMlpGamePlayerIds(g).forEach((pid) => s.add(pid));
+        });
+        return s;
+      })();
 
   // Scan ALL matches in bracket (if provided) so courts live in any match are marked occupied
   if (bracket && Array.isArray(bracket.rounds)) {
@@ -328,28 +360,36 @@ export function MlpCourtAssignModal({
   function buildSuggestions() {
     const next = {};
     const usedKeys = new Set();
+    const plannedBusyPlayers = new Set(busyPlayerIds);
+    const isFreeOfConflict = (item) =>
+      !usedKeys.has(item.key) && !hasMlpPlayerConflict(item.game, plannedBusyPlayers);
+    const reserveItem = (item) => {
+      usedKeys.add(item.key);
+      getMlpGamePlayerIds(item.game).forEach((pid) => plannedBusyPlayers.add(pid));
+    };
+
     // Pass 1: pre-assigned court or matchup's designated courts
     freeCourts.forEach((c) => {
       const exactPre = eligibleGames.find(
-        (item) => Number(item.game.court) === c && !usedKeys.has(item.key)
+        (item) => Number(item.game.court) === c && isFreeOfConflict(item)
       );
       const matchPref =
         exactPre ||
         eligibleGames.find(
-          (item) => (item.assignedCourts || []).includes(c) && !usedKeys.has(item.key)
+          (item) => (item.assignedCourts || []).includes(c) && isFreeOfConflict(item)
         );
       if (matchPref) {
         next[c] = matchPref.key;
-        usedKeys.add(matchPref.key);
+        reserveItem(matchPref);
       }
     });
     // Pass 2: remaining games in order
     freeCourts.forEach((c) => {
       if (next[c]) return;
-      const cand = eligibleGames.find((item) => !usedKeys.has(item.key));
+      const cand = eligibleGames.find((item) => isFreeOfConflict(item));
       if (cand) {
         next[c] = cand.key;
-        usedKeys.add(cand.key);
+        reserveItem(cand);
       } else {
         next[c] = '';
       }
@@ -372,11 +412,30 @@ export function MlpCourtAssignModal({
       const item = eligibleByKey.get(key);
       return {
         court: Number(courtStr),
+        key,
+        item,
         gameId: item.game.id,
         round: item.round,
         idx: item.idx,
       };
     });
+
+  const seenGameKeys = new Set();
+  const seenPlayerIds = new Set(busyPlayerIds);
+  const conflictWarnings = [];
+  selectedList.forEach(({ court, key, item }) => {
+    if (seenGameKeys.has(key)) {
+      conflictWarnings.push(`"${gameLabel(item)}" is selected for more than one court.`);
+    }
+    seenGameKeys.add(key);
+    const pIds = getMlpGamePlayerIds(item.game);
+    if (pIds.some((pid) => seenPlayerIds.has(pid))) {
+      conflictWarnings.push(
+        `Court ${court}: "${gameLabel(item)}" includes a player already playing on another court.`
+      );
+    }
+    pIds.forEach((pid) => seenPlayerIds.add(pid));
+  });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
@@ -442,32 +501,65 @@ export function MlpCourtAssignModal({
             </div>
           ) : (
             <div className="space-y-2.5">
-              {freeCourts.map((courtNum) => (
-                <div
-                  key={courtNum}
-                  className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3 space-y-1.5"
-                >
-                  <span className="text-xs font-mono font-bold text-[#d7f24c] block">
-                    Court {courtNum}
-                  </span>
-                  <select
-                    value={selections[courtNum] || ''}
-                    onChange={(e) =>
-                      setSelections((prev) => ({
-                        ...prev,
-                        [courtNum]: e.target.value,
-                      }))
-                    }
-                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
+              {freeCourts.map((courtNum) => {
+                const otherSelectedKeys = new Set();
+                const otherBusyPlayers = new Set(busyPlayerIds);
+                Object.entries(selections).forEach(([cStr, k]) => {
+                  if (Number(cStr) === courtNum || !k) return;
+                  otherSelectedKeys.add(k);
+                  const oi = eligibleByKey.get(k);
+                  if (oi) {
+                    getMlpGamePlayerIds(oi.game).forEach((pid) => otherBusyPlayers.add(pid));
+                  }
+                });
+                return (
+                  <div
+                    key={courtNum}
+                    className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3 space-y-1.5"
                   >
-                    <option value="">— Leave Unassigned —</option>
-                    {eligibleGames.map((item) => (
-                      <option key={item.key} value={item.key}>
-                        {gameLabel(item)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                    <span className="text-xs font-mono font-bold text-[#d7f24c] block">
+                      Court {courtNum}
+                    </span>
+                    <select
+                      value={selections[courtNum] || ''}
+                      onChange={(e) =>
+                        setSelections((prev) => ({
+                          ...prev,
+                          [courtNum]: e.target.value,
+                        }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c]"
+                    >
+                      <option value="">— Leave Unassigned —</option>
+                      {eligibleGames.map((item) => {
+                        const isSelectedElsewhere = otherSelectedKeys.has(item.key);
+                        const hasBusyPlayer = hasMlpPlayerConflict(item.game, otherBusyPlayers);
+                        const isBlocked = isSelectedElsewhere || hasBusyPlayer;
+                        const suffix = isSelectedElsewhere
+                          ? ' (Selected on another court)'
+                          : hasBusyPlayer
+                            ? ' (Player on court)'
+                            : '';
+                        return (
+                          <option key={item.key} value={item.key} disabled={isBlocked}>
+                            {gameLabel(item)}{suffix}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {conflictWarnings.length > 0 && (
+            <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-3 space-y-1">
+              {conflictWarnings.map((w, i) => (
+                <p key={i} className="text-[11px] text-rose-300 flex items-start gap-1.5">
+                  <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                  <span>{w}</span>
+                </p>
               ))}
             </div>
           )}
@@ -483,9 +575,9 @@ export function MlpCourtAssignModal({
           </button>
           <button
             type="button"
-            disabled={selectedList.length === 0}
+            disabled={selectedList.length === 0 || conflictWarnings.length > 0}
             onClick={() => {
-              onApply(selectedList);
+              onApply(selectedList.map(({ court, gameId, round, idx }) => ({ court, gameId, round, idx })));
               onClose();
             }}
             className="flex-[2] py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 disabled:opacity-40 disabled:cursor-not-allowed text-slate-950 text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95"
