@@ -287,28 +287,51 @@ export function SetupView({
             No players yet. Add at least {numTeams * 2} to start a draft.
           </p>
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {playerPool.map((p) => {
-              const isCaptain = captainMode === 'manual' && selectedCaptainIds.includes(p.id);
-              return (
-                <span
-                  key={p.id}
-                  className={`flex items-center gap-1.5 border rounded-full pl-3 pr-1.5 py-1.5 text-sm font-medium transition ${
-                    isCaptain
-                      ? 'bg-amber-500/15 border-amber-500/50 text-amber-300 font-semibold shadow-sm shadow-amber-500/10'
-                      : 'bg-slate-800 border-slate-700 text-slate-200'
-                  }`}
-                >
-                  {isCaptain && <Crown size={13} className="text-amber-400 fill-current" />}
-                  <span>{p.name}</span>
-                  {isAdmin && (
-                    <button onClick={() => removePlayer(p.id)} className="p-1 rounded-full hover:bg-slate-700 text-slate-400 hover:text-red-400 transition">
-                      <X size={14} />
-                    </button>
-                  )}
-                </span>
-              );
-            })}
+          <div className="max-h-64 overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="py-2 px-3 font-bold w-12">#</th>
+                  <th className="py-2 px-3 font-bold">Player</th>
+                  {captainMode === 'manual' && <th className="py-2 px-3 font-bold w-24 text-center">Role</th>}
+                  {isAdmin && <th className="py-2 px-3 font-bold text-right w-16">Action</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/70">
+                {playerPool.map((p, idx) => {
+                  const isCaptain = captainMode === 'manual' && selectedCaptainIds.includes(p.id);
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-900/60 transition">
+                      <td className="py-2 px-3 font-mono text-slate-400">{idx + 1}</td>
+                      <td className="py-2 px-3 font-semibold text-white">{p.name}</td>
+                      {captainMode === 'manual' && (
+                        <td className="py-2 px-3 text-center">
+                          {isCaptain ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">
+                              <Crown size={10} className="fill-current" /> Captain
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-slate-500">Player</span>
+                          )}
+                        </td>
+                      )}
+                      {isAdmin && (
+                        <td className="py-2 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => removePlayer(p.id)}
+                            className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-red-400 transition"
+                            title="Remove player"
+                          >
+                            <X size={14} />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -386,53 +409,62 @@ export function SetupView({
               </button>
             </form>
 
-            {/* List of saved names in this room (Safe Quick-Add Chips) */}
+            {/* List of saved names in this room (Table View) */}
             {savedPlayers.length > 0 ? (
               <>
-                <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto pr-1">
-                  {[...savedPlayers]
-                    .sort((a, b) => {
-                      const aIn = playerPool.some((p) => p.name.trim().toLowerCase() === a.trim().toLowerCase());
-                      const bIn = playerPool.some((p) => p.name.trim().toLowerCase() === b.trim().toLowerCase());
-                      if (aIn === bIn) return a.localeCompare(b);
-                      return aIn ? 1 : -1;
-                    })
-                    .map((name) => {
-                      const isInPool = playerPool.some(
-                        (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
-                      );
+                <div className="max-h-52 overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                      <tr>
+                        <th className="py-2 px-3 font-bold">Player</th>
+                        <th className="py-2 px-3 font-bold text-center w-24">Status</th>
+                        <th className="py-2 px-3 font-bold text-right w-24">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/70">
+                      {[...savedPlayers]
+                        .sort((a, b) => {
+                          const aIn = playerPool.some((p) => p.name.trim().toLowerCase() === a.trim().toLowerCase());
+                          const bIn = playerPool.some((p) => p.name.trim().toLowerCase() === b.trim().toLowerCase());
+                          if (aIn === bIn) return a.localeCompare(b);
+                          return aIn ? 1 : -1;
+                        })
+                        .map((name) => {
+                          const isInPool = playerPool.some(
+                            (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
+                          );
 
-                      return (
-                        <span
-                          key={name}
-                          className={`inline-flex items-center gap-1.5 border rounded-full px-2.5 py-1 text-xs transition ${
-                            isInPool
-                              ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 shadow-sm'
-                              : 'bg-slate-800/80 hover:bg-slate-750 border-slate-700/70 text-slate-300'
-                          }`}
-                        >
-                          {isInPool ? (
-                            <span
-                              className="font-medium flex items-center gap-1 text-emerald-300 cursor-default"
-                              title={`${name} is currently in the active tournament`}
-                            >
-                              <Check size={11} className="stroke-[3] text-emerald-400" />
-                              <span>{name}</span>
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => onAddSavedPlayer(name)}
-                              className="font-medium hover:text-white flex items-center gap-1 active:scale-95 transition"
-                              title={`Add ${name} to tournament pool`}
-                            >
-                              <span>{name}</span>
-                              <span className="text-[#d7f24c] font-bold text-sm leading-none">+</span>
-                            </button>
-                          )}
-                        </span>
-                      );
-                    })}
+                          return (
+                            <tr key={name} className="hover:bg-slate-900/60 transition">
+                              <td className="py-2 px-3 font-semibold text-white">{name}</td>
+                              <td className="py-2 px-3 text-center">
+                                {isInPool ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                    <Check size={10} className="stroke-[3]" /> In Pool
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-medium text-slate-500">Available</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-right">
+                                {isInPool ? (
+                                  <span className="text-[11px] text-slate-500 italic">Added</span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => onAddSavedPlayer(name)}
+                                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 text-[#d7f24c] border border-[#d7f24c]/40 transition active:scale-95"
+                                    title={`Add ${name} to tournament pool`}
+                                  >
+                                    + Add
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
                 </div>
                 {availableSaved.length === 0 ? (
                   <div className="text-[11px] text-emerald-400/90 font-medium flex items-center gap-1.5 mt-2">

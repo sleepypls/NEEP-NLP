@@ -782,7 +782,6 @@ export function generatePoolStandingsCSV(tournament, roomId = '') {
   return lines.join('\r\n');
 }
 
-
 export function generatePoolAndKnockoutMatchesCSV(tournament, roomId = '') {
   if (!tournament) return '';
   const entryMap = new Map((tournament.entries || []).map((e) => [e.id, getEntryDisplayName(e)]));
@@ -867,10 +866,6 @@ export function generatePoolAndKnockoutMatchesCSV(tournament, roomId = '') {
   return lines.join('\r\n');
 }
 
-
-/**
- * Computes combined Pool Play + Knockout player & entry statistics for Leaderboard tab.
- */
 export function computeTournamentPlayerStats(tournament) {
   if (!tournament) return { entryStats: [], playerStats: [] };
   const entries = tournament.entries || [];

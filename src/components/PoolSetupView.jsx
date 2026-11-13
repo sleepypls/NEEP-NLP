@@ -602,52 +602,64 @@ export function PoolSetupView({
             No {discipline === 'doubles' ? 'teams' : 'players'} added yet. Add at least {isKnockoutOnly ? 2 : 3} to start.
           </p>
         ) : (
-          <div className="space-y-1.5 max-h-60 overflow-y-auto pr-1">
-            {entries.map((entry, idx) => (
-              <div
-                key={entry.id}
-                className="flex items-center justify-between gap-2 bg-slate-800/80 border border-slate-700/70 rounded-xl px-3 py-2 text-xs"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-mono text-[11px] font-bold text-[#d7f24c] bg-slate-900 border border-slate-700 px-1.5 py-0.5 rounded shrink-0">
-                    #{idx + 1}
-                  </span>
-                  <span className="text-white font-semibold truncate">{getEntryDisplayName(entry)}</span>
-                </div>
-                {isAdmin && (
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    {onMoveEntry && idx > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => onMoveEntry(idx, idx - 1)}
-                        className="text-slate-400 hover:text-white p-1 rounded-lg transition"
-                        title="Move seed up"
-                      >
-                        <ChevronUp size={14} />
-                      </button>
+          <div className="max-h-64 overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                <tr>
+                  <th className="py-2 px-3 font-bold w-14">Seed</th>
+                  <th className="py-2 px-3 font-bold">
+                    {discipline === 'doubles' ? 'Doubles Team' : 'Player'}
+                  </th>
+                  {isAdmin && <th className="py-2 px-3 font-bold text-right">Actions</th>}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/70">
+                {entries.map((entry, idx) => (
+                  <tr key={entry.id} className="hover:bg-slate-900/60 transition">
+                    <td className="py-2 px-3 font-mono font-bold text-[#d7f24c]">
+                      #{idx + 1}
+                    </td>
+                    <td className="py-2 px-3 font-semibold text-white">
+                      {getEntryDisplayName(entry)}
+                    </td>
+                    {isAdmin && (
+                      <td className="py-2 px-3 text-right">
+                        <div className="inline-flex items-center gap-0.5">
+                          {onMoveEntry && idx > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => onMoveEntry(idx, idx - 1)}
+                              className="text-slate-400 hover:text-white p-1 rounded-lg transition"
+                              title="Move seed up"
+                            >
+                              <ChevronUp size={14} />
+                            </button>
+                          )}
+                          {onMoveEntry && idx < entries.length - 1 && (
+                            <button
+                              type="button"
+                              onClick={() => onMoveEntry(idx, idx + 1)}
+                              className="text-slate-400 hover:text-white p-1 rounded-lg transition"
+                              title="Move seed down"
+                            >
+                              <ChevronDown size={14} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => onRemoveEntry(entry.id)}
+                            className="text-slate-400 hover:text-red-400 p-1 rounded-lg transition"
+                            title="Remove entry"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </td>
                     )}
-                    {onMoveEntry && idx < entries.length - 1 && (
-                      <button
-                        type="button"
-                        onClick={() => onMoveEntry(idx, idx + 1)}
-                        className="text-slate-400 hover:text-white p-1 rounded-lg transition"
-                        title="Move seed down"
-                      >
-                        <ChevronDown size={14} />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => onRemoveEntry(entry.id)}
-                      className="text-slate-400 hover:text-red-400 p-1 rounded-lg transition"
-                      title="Remove entry"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
@@ -740,58 +752,68 @@ export function PoolSetupView({
                     ? 'Click 2 players to fill Partner 1 & Partner 2'
                     : 'Click player to add to Singles draw'}
                 </span>
-                <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto pr-1">
-                  {[...savedPlayers]
-                    .sort((a, b) => {
-                      const aIn = activePlayerNamesLower.has(a.trim().toLowerCase());
-                      const bIn = activePlayerNamesLower.has(b.trim().toLowerCase());
-                      if (aIn === bIn) return a.localeCompare(b);
-                      return aIn ? 1 : -1;
-                    })
-                    .map((name) => {
-                      const lower = name.trim().toLowerCase();
-                      const isInPool = activePlayerNamesLower.has(lower);
-                      const isStagedPartner =
-                        discipline === 'doubles' &&
-                        (partner1.trim().toLowerCase() === lower || partner2.trim().toLowerCase() === lower);
+                <div className="max-h-52 overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                      <tr>
+                        <th className="py-2 px-3 font-bold">Player</th>
+                        <th className="py-2 px-3 font-bold text-center w-24">Status</th>
+                        <th className="py-2 px-3 font-bold text-right w-28">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/70">
+                      {[...savedPlayers]
+                        .sort((a, b) => {
+                          const aIn = activePlayerNamesLower.has(a.trim().toLowerCase());
+                          const bIn = activePlayerNamesLower.has(b.trim().toLowerCase());
+                          if (aIn === bIn) return a.localeCompare(b);
+                          return aIn ? 1 : -1;
+                        })
+                        .map((name) => {
+                          const lower = name.trim().toLowerCase();
+                          const isInPool = activePlayerNamesLower.has(lower);
+                          const isStagedPartner =
+                            discipline === 'doubles' &&
+                            (partner1.trim().toLowerCase() === lower || partner2.trim().toLowerCase() === lower);
 
-                      return (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => {
-                            if (discipline === 'singles' && isInPool) return;
-                            handleQuickPickDirectory(name);
-                          }}
-                          className={`inline-flex items-center gap-1 border rounded-full px-2.5 py-1 text-xs transition ${
-                            isStagedPartner
-                              ? 'bg-[#d7f24c]/15 border-[#d7f24c]/50 text-[#d7f24c] font-semibold'
-                              : isInPool
-                                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 shadow-sm'
-                                : 'bg-slate-800/80 hover:bg-slate-750 border-slate-700/70 text-slate-300 hover:text-white active:scale-95'
-                          }`}
-                          title={
-                            isInPool
-                              ? `${name} is already entered in this tournament`
-                              : discipline === 'doubles'
-                                ? `Pick ${name} as partner`
-                                : `Add ${name} to tournament`
-                          }
-                        >
-                          {isInPool ? (
-                            <>
-                              <Check size={11} className="stroke-[3] text-emerald-400" />
-                              <span>{name}</span>
-                            </>
-                          ) : (
-                            <>
-                              <span>{name}</span>
-                              <span className="text-[#d7f24c] font-bold text-sm leading-none">+</span>
-                            </>
-                          )}
-                        </button>
-                      );
-                    })}
+                          return (
+                            <tr key={name} className="hover:bg-slate-900/60 transition">
+                              <td className="py-2 px-3 font-semibold text-white">{name}</td>
+                              <td className="py-2 px-3 text-center">
+                                {isStagedPartner ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/40 px-2 py-0.5 rounded-full">
+                                    Staged
+                                  </span>
+                                ) : isInPool ? (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                    <Check size={10} className="stroke-[3]" /> Entered
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-medium text-slate-500">Available</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3 text-right">
+                                {isInPool && discipline === 'singles' ? (
+                                  <span className="text-[11px] text-slate-500 italic">In Draw</span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuickPickDirectory(name)}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition active:scale-95 ${
+                                      isStagedPartner
+                                        ? 'bg-slate-800 text-slate-400 border border-slate-700'
+                                        : 'bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 text-[#d7f24c] border border-[#d7f24c]/40'
+                                    }`}
+                                  >
+                                    {discipline === 'doubles' ? '+ Partner' : '+ Add'}
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
                 </div>
               </>
             ) : (
