@@ -2946,6 +2946,31 @@ export default function App() {
             adminPin={adminPin}
             setAdminPin={setAdminPin}
             onInitializeDraft={handleInitializeDraft}
+            hasExistingTournament={teams.length > 0 || Boolean(bracket)}
+            onReturnToEvent={() => setView(bracket ? 'bracket' : 'draft')}
+            onUpdateLiveSettings={() => {
+              let nextTeams = teams;
+              if (Array.isArray(customTeamNames) && customTeamNames.length > 0 && teams.length > 0) {
+                nextTeams = teams.map((t, idx) => {
+                  const custom = (customTeamNames[idx] || '').trim();
+                  return custom ? { ...t, name: custom } : t;
+                });
+                setTeams(nextTeams);
+              }
+              const nextView = bracket ? 'bracket' : 'draft';
+              setView(nextView);
+              broadcastTournamentChange({
+                teams: nextTeams,
+                numCourts,
+                goalScore,
+                dreambreakerScore,
+                dreambreakerFormat,
+                customTeamNames,
+                matchupCourtsConfig,
+                adminPin,
+                view: nextView,
+              });
+            }}
             isAdmin={isAdmin}
           />
         )}

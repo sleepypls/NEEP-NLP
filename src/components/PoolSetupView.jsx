@@ -118,6 +118,7 @@ export function PoolSetupView({
   onStartPoolTournament,
   isAdmin,
 }) {
+  const [activeTab, setActiveTab] = useState('entries');
   const [singleName, setSingleName] = useState('');
   const [partner1, setPartner1] = useState('');
   const [partner2, setPartner2] = useState('');
@@ -373,16 +374,39 @@ export function PoolSetupView({
           </span>
         )}
       </div>
-      <p className="text-slate-400 text-sm mb-6">
+      <p className="text-slate-400 text-sm mb-4">
         {isKnockoutOnly
           ? 'Configure Singles or Doubles entries and Direct Knockout Bracket elimination rules.'
           : 'Configure Singles or Doubles entries, Pool Play round-robin groups, and Knockout elimination rules.'}
       </p>
 
+      {/* Setup Configuration Tabs */}
+      <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-5 shadow-lg overflow-x-auto">
+        {[
+          { id: 'entries', label: '1. Players & Entries' },
+          { id: 'structure', label: isKnockoutOnly ? '2. Bracket & Courts' : '2. Pools & Bracket' },
+          { id: 'scoring', label: '3. Scoring Formats' },
+          { id: 'presets', label: '4. Room & Presets' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+              activeTab === tab.id
+                ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
-        <div className="lg:col-span-6">
+        <div className={activeTab === 'entries' ? 'lg:col-span-12 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start' : 'hidden'}>
           {/* Discipline & Structure Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4">
+      <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4">
         <div>
           <div className="flex items-center justify-between gap-2 mb-2">
             <label className="text-slate-200 text-sm font-bold">
@@ -466,7 +490,7 @@ export function PoolSetupView({
       </div>
 
       {/* Simplified Entries Manager Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
         <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
           <div>
             <label className="text-slate-200 text-sm font-bold block">
@@ -836,15 +860,19 @@ export function PoolSetupView({
       </div>
 
         </div>
-        <div className="lg:col-span-6">
+        <div className={activeTab === 'entries' ? 'hidden' : 'lg:col-span-12'}>
           {/* Pool & Knockout Rules Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4">
+      <div className={activeTab === 'structure' || activeTab === 'scoring' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 mb-4 shadow-xl space-y-4' : 'hidden'}>
         <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
           <Trophy size={16} className="text-amber-400" />{' '}
-          {isKnockoutOnly ? 'Knockout Structure & Match Formats' : 'Pool & Knockout Structure'}
+          {activeTab === 'scoring'
+            ? 'Match Scoring Formats & Bronze Medal'
+            : isKnockoutOnly
+              ? 'Knockout Bracket & Courts'
+              : 'Pool & Knockout Structure'}
         </label>
 
-        {!isKnockoutOnly && (
+        {!isKnockoutOnly && activeTab === 'structure' && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1074,7 +1102,7 @@ export function PoolSetupView({
         )}
 
         {/* Seeding */}
-        <div>
+        <div className={activeTab === 'structure' ? '' : 'hidden'}>
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
             {isKnockoutOnly ? 'Bracket Seeding' : 'Pool Seeding'}
           </span>
@@ -1107,7 +1135,7 @@ export function PoolSetupView({
         </div>
 
         {/* Pool Play Scoring Format */}
-        {!isKnockoutOnly && (
+        {!isKnockoutOnly && activeTab === 'scoring' && (
           <div className="pt-3 border-t border-slate-800 space-y-2">
             <span className="text-xs font-bold text-slate-300 block">Pool Play Match Format</span>
             <div className="grid grid-cols-3 gap-2">
@@ -1181,7 +1209,7 @@ export function PoolSetupView({
         )}
 
         {/* Knockout Scoring Format + Per-Round Formats */}
-        <div className="pt-3 border-t border-slate-800 space-y-2.5">
+        <div className={activeTab === 'scoring' ? 'pt-3 border-t border-slate-800 space-y-2.5' : 'hidden'}>
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-bold text-slate-300">
               {knockoutFormat?.useRoundFormats ? 'Default Knockout Format' : 'Knockout Match Format'}
@@ -1363,7 +1391,7 @@ export function PoolSetupView({
         </div>
 
         {/* Bronze Medal Toggle */}
-        <label className="flex items-start gap-3 cursor-pointer select-none pt-2 border-t border-slate-800">
+        <label className={activeTab === 'scoring' ? 'flex items-start gap-3 cursor-pointer select-none pt-2 border-t border-slate-800' : 'hidden'}>
           <input
             type="checkbox"
             disabled={!isAdmin}
@@ -1382,7 +1410,7 @@ export function PoolSetupView({
         </label>
 
         {/* Number of Courts */}
-        {setNumCourts && (
+        {setNumCourts && activeTab === 'structure' && (
           <div className="pt-3 border-t border-slate-800 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-bold text-slate-200">Number of Courts</span>
@@ -1430,7 +1458,7 @@ export function PoolSetupView({
 
       {/* Saved Configuration Presets Card (from MLP Style App) */}
       {isAdmin && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-3">
+        <div className={activeTab === 'presets' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-3' : 'hidden'}>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
               <Bookmark size={15} className="text-[#d7f24c]" /> Saved Tournament Configs
@@ -1529,7 +1557,7 @@ export function PoolSetupView({
       )}
 
       {/* Private Session & PIN Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className={activeTab === 'presets' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5 mb-2">
           <Lock size={15} className="text-amber-400" /> Private Session &amp; PIN
         </label>
@@ -1577,6 +1605,9 @@ export function PoolSetupView({
               className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono font-bold text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-60"
             />
           </div>
+        </div>
+      </div>
+
         </div>
       </div>
 
@@ -1645,9 +1676,6 @@ export function PoolSetupView({
           </button>
         </div>
       )}
-
-        </div>
-      </div>
 
       {/* Dedicated Directory Management Modal */}
       <DirectoryModal

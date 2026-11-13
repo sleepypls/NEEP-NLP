@@ -49,8 +49,12 @@ export function SetupView({
   adminPin,
   setAdminPin,
   onInitializeDraft,
+  hasExistingTournament = false,
+  onReturnToEvent,
+  onUpdateLiveSettings,
   isAdmin,
 }) {
+  const [activeTab, setActiveTab] = useState('players');
   const [nameInput, setNameInput] = useState('');
   const [directoryNameInput, setDirectoryNameInput] = useState('');
   const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
@@ -207,16 +211,72 @@ export function SetupView({
           </span>
         )}
       </div>
-      <p className="text-slate-400 text-sm mb-6 text-balance">
+      <p className="text-slate-400 text-sm mb-4 text-balance">
         {isAdmin
-          ? 'Add your player pool, pick team count, set score limits, and draft.'
+          ? 'Configure players, teams, courts, and scoring rules across the tabs below.'
           : 'Viewing tournament setup. Unlock Scorekeeper mode with PIN to make changes.'}
       </p>
 
+      {/* Event In Progress Banner (MLP) */}
+      {hasExistingTournament && (
+        <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-3.5 mb-4 flex items-center justify-between gap-3 flex-wrap">
+          <div className="min-w-0">
+            <span className="text-xs font-extrabold text-cyan-300 block">
+              Event Currently In Progress
+            </span>
+            <span className="text-[11px] text-slate-300">
+              You can update courts, score limits, or PIN and return without losing match progress.
+            </span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {onReturnToEvent && (
+              <button
+                type="button"
+                onClick={onReturnToEvent}
+                className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold border border-slate-700 transition"
+              >
+                Back to Event
+              </button>
+            )}
+            {isAdmin && onUpdateLiveSettings && (
+              <button
+                type="button"
+                onClick={onUpdateLiveSettings}
+                className="px-3 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 text-xs font-black transition active:scale-95"
+              >
+                Save Settings &amp; Return
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Setup Configuration Tabs */}
+      <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-5 shadow-lg overflow-x-auto">
+        {[
+          { id: 'players', label: '1. Players & Teams' },
+          { id: 'courts', label: '2. Courts & Matchups' },
+          { id: 'presets', label: '3. Room & Presets' },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+              activeTab === tab.id
+                ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
-        <div className="lg:col-span-6">
+        <div className={activeTab === 'courts' ? 'hidden' : 'lg:col-span-6'}>
           {/* Player Pool Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <label className="text-slate-300 text-sm font-semibold">
             Player Pool ({playerPool.length})
@@ -492,7 +552,7 @@ export function SetupView({
       </div>
 
       {/* Session & Privacy Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className={activeTab === 'presets' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-2">
           <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
             <Lock size={15} className="text-amber-400" /> Private Session & PIN
@@ -553,9 +613,9 @@ export function SetupView({
       </div>
 
         </div>
-        <div className="lg:col-span-6">
+        <div className={activeTab === 'courts' ? 'lg:col-span-12 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start' : 'lg:col-span-6'}>
           {/* Number of Teams */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <label className="text-slate-300 text-sm font-semibold mb-2 block">Number of Teams</label>
         <select
           disabled={!isAdmin}
@@ -574,7 +634,7 @@ export function SetupView({
       </div>
 
       {/* Captain Selection Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-2">
           <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
             <Crown size={16} className="text-amber-400" /> Captain Selection
@@ -692,7 +752,7 @@ export function SetupView({
       </div>
 
       {/* Goal Score Limit */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <label className="text-slate-300 text-sm font-semibold mb-2 block">Regulation Goal Score Limit</label>
         <div className="flex gap-2 mb-2">
           {[11, 15, 21].map((preset) => (
@@ -732,7 +792,7 @@ export function SetupView({
 
       {/* Number of Courts */}
       {setNumCourts && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+        <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
           <label className="text-slate-300 text-sm font-semibold mb-1 block">
             Number of Courts
           </label>
@@ -865,7 +925,7 @@ export function SetupView({
 
       {/* Custom Team Names (Optional) */}
       {setCustomTeamNames && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+        <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
           <label className="text-slate-300 text-sm font-semibold mb-1 block">
             Custom Team Names <span className="text-slate-500 text-xs font-normal">(Optional)</span>
           </label>
@@ -893,7 +953,7 @@ export function SetupView({
       )}
 
       {/* Dreambreaker Score Limit & Format */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <label className="text-slate-300 text-sm font-semibold mb-1 flex items-center justify-between">
           <span className="flex items-center gap-1.5"><Zap size={14} className="text-amber-400" /> Dreambreaker Format &amp; Score Limit</span>
           <span className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">Tiebreaker</span>
@@ -969,7 +1029,7 @@ export function SetupView({
       </div>
 
       {/* Partner Matchup Configuration Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-1">
           <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
             <ArrowRightLeft size={16} className="text-[#d7f24c]" /> Partner Matchup Configuration
@@ -1130,7 +1190,7 @@ export function SetupView({
       </div>
 
       {/* Uneven Teams Toggle */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <label className="flex items-start gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
@@ -1152,7 +1212,7 @@ export function SetupView({
 
       {/* Saved Tournament Configuration Settings Card */}
       {isAdmin && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+        <div className={activeTab === 'presets' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
           <div className="flex items-center justify-between mb-1 gap-2 flex-wrap">
             <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
               <Bookmark size={15} className="text-[#d7f24c]" /> Saved Tournament Configurations
@@ -1325,8 +1385,11 @@ export function SetupView({
         </div>
       )}
 
+        </div>
+      </div>
+
       {/* Dynamic Sizing Summary Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl text-sm text-slate-400">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl text-sm text-slate-400">
         <p className="font-semibold text-slate-300 mb-1">
           Roster Split: {numTeams} teams with{' '}
           <span className="text-white font-bold">
@@ -1346,23 +1409,42 @@ export function SetupView({
         )}
       </div>
 
-      {/* Initialize Draft Button */}
+      {/* Action Buttons */}
       {isAdmin && (
-        <button
-          onClick={onInitializeDraft}
-          disabled={!canInitialize}
-          className={`w-full py-4 rounded-2xl font-extrabold text-lg flex items-center justify-center gap-2 transition active:scale-95 ${
-            canInitialize
-              ? 'bg-[#d7f24c] text-slate-950 shadow-xl shadow-[#d7f24c]/20 hover:bg-[#c6e140]'
-              : 'bg-slate-800 text-slate-600 cursor-not-allowed'
-          }`}
-        >
-          Initialize Draft
-        </button>
-      )}
-
+        <div className="flex flex-col sm:flex-row gap-3">
+          {hasExistingTournament && onUpdateLiveSettings && (
+            <button
+              type="button"
+              onClick={onUpdateLiveSettings}
+              className="flex-1 py-4 rounded-2xl font-extrabold text-base flex items-center justify-center gap-2 transition active:scale-95 bg-cyan-400 hover:bg-cyan-300 text-slate-950 shadow-xl shadow-cyan-400/20"
+            >
+              Save Settings &amp; Return to Event
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              if (
+                hasExistingTournament &&
+                !window.confirm('An event is already in progress. Start a brand-new draft? This will replace the current teams and bracket.')
+              ) {
+                return;
+              }
+              onInitializeDraft();
+            }}
+            disabled={!canInitialize}
+            className={`flex-1 py-4 rounded-2xl font-extrabold text-base flex items-center justify-center gap-2 transition active:scale-95 ${
+              canInitialize
+                ? hasExistingTournament
+                  ? 'bg-slate-800 hover:bg-slate-750 text-[#d7f24c] border border-[#d7f24c]/40'
+                  : 'bg-[#d7f24c] text-slate-950 shadow-xl shadow-[#d7f24c]/20 hover:bg-[#c6e140]'
+                : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+            }`}
+          >
+            {hasExistingTournament ? 'Initialize New Draft' : 'Initialize Draft'}
+          </button>
         </div>
-      </div>
+      )}
 
       {/* Dedicated Directory Management Modal */}
       <DirectoryModal

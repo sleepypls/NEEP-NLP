@@ -104,6 +104,16 @@ export function Header({
             ) : (
               <>
                 <button
+                  onClick={() => setView('setup')}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    view === 'setup'
+                      ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Setup
+                </button>
+                <button
                   onClick={onBracketTab}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
                     view === 'bracket' || view === 'match' || view === 'dreambreakerSetup' || view === 'dreambreakerPlay' || view === 'draft'
@@ -329,6 +339,16 @@ export function Header({
             </>
           ) : (
             <>
+              <button
+                onClick={() => setView('setup')}
+                className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                  view === 'setup'
+                    ? 'text-[#d7f24c] border-b-2 border-[#d7f24c] bg-[#d7f24c]/5'
+                    : 'text-slate-500'
+                }`}
+              >
+                Setup
+              </button>
               <button
                 onClick={onBracketTab}
                 className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
