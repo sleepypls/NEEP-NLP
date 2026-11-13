@@ -236,6 +236,7 @@ export default function App() {
   const [savedDefaultConfig, setSavedDefaultConfig] = useState(() => initialConfigs.defaultConfig);
   const [configPresets, setConfigPresets] = useState(() => initialConfigs.presets || []);
   const [adminPin, setAdminPin] = useState(() => initialSaved?.adminPin || DEFAULT_ADMIN_PIN);
+  const [isTournamentLocked, setIsTournamentLocked] = useState(() => Boolean(initialSaved?.isTournamentLocked));
   const [isAdmin, setIsAdmin] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -521,6 +522,9 @@ export default function App() {
             }
           }
           if (cloudTourn.adminPin) setAdminPin(cloudTourn.adminPin);
+          if (cloudTourn.isTournamentLocked !== undefined) {
+            setIsTournamentLocked(Boolean(cloudTourn.isTournamentLocked));
+          }
 
           // If admin, sync view if cloud had a progression
           if (isAdmin && cloudTourn.view) {
@@ -643,6 +647,7 @@ export default function App() {
           poolIncludeBronze,
           poolNumCourts,
           poolTournament,
+          isTournamentLocked,
           view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
           captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig,
           teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
@@ -651,7 +656,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
-  }, [roomId, adminPin, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolTiebreakerRules, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolNumCourts, poolTournament, view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+  }, [roomId, adminPin, isTournamentLocked, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolTiebreakerRules, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolNumCourts, poolTournament, view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
 
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
@@ -676,6 +681,7 @@ export default function App() {
       saveTournamentToCloud(roomId, {
         roomId,
         adminPin,
+        isTournamentLocked,
         tournamentStyle,
         poolDiscipline,
         poolStructure,
@@ -697,6 +703,13 @@ export default function App() {
         ...updates,
       });
     }
+  }
+
+  function handleToggleTournamentLock() {
+    if (!isAdmin) return;
+    const next = !isTournamentLocked;
+    setIsTournamentLocked(next);
+    broadcastTournamentChange({ isTournamentLocked: next });
   }
 
   function handleAddPlayerToDirectory(name) {
@@ -2894,6 +2907,8 @@ export default function App() {
         roomId={roomId}
         onOpenRoomModal={() => setIsRoomModalOpen(true)}
         isAdmin={isAdmin}
+        isTournamentLocked={isTournamentLocked}
+        onToggleTournamentLock={handleToggleTournamentLock}
         onUnlockAdmin={handleUnlockAdmin}
         loggedInPlayerName={loggedInPlayerName}
         onOpenPlayerLogin={() => setIsPlayerLoginOpen(true)}
@@ -3002,6 +3017,8 @@ export default function App() {
               });
             }}
             isAdmin={isAdmin}
+            isTournamentLocked={isTournamentLocked}
+            onToggleTournamentLock={handleToggleTournamentLock}
           />
         )}
 
@@ -3218,6 +3235,8 @@ export default function App() {
             onUpdateTournamentSettings={handleUpdatePoolTournamentSettings}
             onStartPoolTournament={handleStartPoolTournament}
             isAdmin={isAdmin}
+            isTournamentLocked={isTournamentLocked}
+            onToggleTournamentLock={handleToggleTournamentLock}
           />
         )}
 

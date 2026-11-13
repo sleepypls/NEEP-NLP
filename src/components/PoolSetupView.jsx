@@ -11,6 +11,7 @@ import {
   Upload,
   Download,
   Lock,
+  Unlock,
   Sparkles,
   KeyRound,
   Award,
@@ -119,6 +120,8 @@ export function PoolSetupView({
   onUpdateTournamentSettings,
   onStartPoolTournament,
   isAdmin,
+  isTournamentLocked = false,
+  onToggleTournamentLock,
 }) {
   const [activeTab, setActiveTab] = useState('entries');
   const [singleName, setSingleName] = useState('');
@@ -414,15 +417,41 @@ export function PoolSetupView({
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
         <h2 className="text-white text-2xl font-display uppercase tracking-wide font-semibold">
           Tournament Setup
         </h2>
-        {!isAdmin && (
-          <span className="text-[11px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
-            <ShieldAlert size={12} /> Spectator Mode
-          </span>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && onToggleTournamentLock && (
+            <button
+              type="button"
+              onClick={onToggleTournamentLock}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition active:scale-95 ${
+                isTournamentLocked
+                  ? 'bg-amber-500/20 border-amber-400/50 text-amber-300 hover:bg-amber-500/30'
+                  : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+              }`}
+              title={
+                isTournamentLocked
+                  ? 'Tournament settings are locked (only admins can edit). Click to unlock.'
+                  : 'Lock tournament settings to prevent editing except by admins'
+              }
+            >
+              {isTournamentLocked ? <Lock size={13} /> : <Unlock size={13} />}
+              {isTournamentLocked ? 'Tournament Locked' : 'Lock Tournament'}
+            </button>
+          )}
+          {!isAdmin && isTournamentLocked && (
+            <span className="text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-1 rounded-full flex items-center gap-1">
+              <Lock size={12} /> Locked (Admins Only)
+            </span>
+          )}
+          {!isAdmin && (
+            <span className="text-[11px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <ShieldAlert size={12} /> Spectator Mode
+            </span>
+          )}
+        </div>
       </div>
       <p className="text-slate-400 text-sm mb-4">
         {isKnockoutOnly

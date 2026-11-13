@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Users, LogOut, LayoutGrid, UserCheck } from 'lucide-react';
+import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Unlock, Users, LogOut, LayoutGrid, UserCheck } from 'lucide-react';
 import { isCloudEnabled } from '../services/firebase';
 import { APP_VERSION } from '../version';
 
@@ -16,6 +16,8 @@ export function Header({
   roomId,
   onOpenRoomModal,
   isAdmin,
+  isTournamentLocked = false,
+  onToggleTournamentLock,
   onUnlockAdmin,
   loggedInPlayerName,
   onOpenPlayerLogin,
@@ -214,6 +216,35 @@ export function Header({
               </button>
             )
           )}
+
+          {/* Lock Tournament Settings (Admin toggle / Non-admin badge) */}
+          {isAdmin && onToggleTournamentLock ? (
+            <button
+              type="button"
+              onClick={onToggleTournamentLock}
+              title={
+                isTournamentLocked
+                  ? 'Tournament settings locked (only admins can edit). Click to unlock.'
+                  : 'Lock tournament settings to prevent editing except by admins'
+              }
+              className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border text-[10px] sm:text-[11px] font-bold transition whitespace-nowrap ${
+                isTournamentLocked
+                  ? 'bg-amber-500/20 border-amber-400/50 text-amber-300 hover:bg-amber-500/30'
+                  : 'bg-slate-900 hover:bg-slate-800 border-slate-800 text-slate-300 hover:text-white'
+              }`}
+            >
+              {isTournamentLocked ? <Lock size={11} className="shrink-0" /> : <Unlock size={11} className="shrink-0" />}
+              <span className="hidden md:inline">{isTournamentLocked ? 'Locked' : 'Lock'}</span>
+            </button>
+          ) : !isAdmin && isTournamentLocked ? (
+            <span
+              title="Tournament settings are locked by an Admin"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-300 text-[10px] sm:text-[11px] font-bold whitespace-nowrap"
+            >
+              <Lock size={11} className="shrink-0" />
+              <span className="hidden md:inline">Locked</span>
+            </span>
+          ) : null}
 
           {/* Admin vs Spectator Role */}
           {isAdmin ? (
