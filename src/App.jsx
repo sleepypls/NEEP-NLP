@@ -256,6 +256,10 @@ export default function App() {
   const [loggedInPlayerName, setLoggedInPlayerName] = useState(() => {
     try {
       const params = new URLSearchParams(window.location.search);
+      const mode = params.get('mode');
+      if (mode === 'spectator' || mode === 'admin') {
+        return '';
+      }
       const urlPlayer = params.get('player');
       if (urlPlayer && urlPlayer.trim()) {
         const clean = urlPlayer.trim();
