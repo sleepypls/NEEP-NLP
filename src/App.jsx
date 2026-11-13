@@ -822,6 +822,25 @@ export default function App() {
         playersById: updatedPlayersById,
       });
     }
+
+    // 3. Also update Tournament Style poolEntries if present
+    const hasInPoolEntries = poolEntries.some((entry) =>
+      (entry.players || []).some((p) => p.trim().toLowerCase() === cleanOld.toLowerCase())
+    );
+    if (hasInPoolEntries) {
+      const updatedEntries = poolEntries.map((entry) => {
+        const players = (entry.players || []).map((p) =>
+          p.trim().toLowerCase() === cleanOld.toLowerCase() ? cleanNew : p
+        );
+        return {
+          ...entry,
+          players,
+          name: players.length > 1 ? players.join(' / ') : players[0] || entry.name,
+        };
+      });
+      setPoolEntries(updatedEntries);
+      broadcastTournamentChange({ poolEntries: updatedEntries });
+    }
   }
 
   function handleInitializeDraft() {
@@ -1627,31 +1646,44 @@ export default function App() {
     });
   }
 
-  function handleAddPoolEntry(players) {
-    const clean = (players || []).map((p) => String(p || '').trim()).filter(Boolean);
-    if (clean.length === 0) return;
+  function normalizeEntryInput(entryOrPlayers) {
+    const rawPlayers = Array.isArray(entryOrPlayers)
+      ? entryOrPlayers
+      : entryOrPlayers?.players || (entryOrPlayers?.name ? [entryOrPlayers.name] : []);
+    const clean = rawPlayers.map((p) => String(p || '').trim()).filter(Boolean);
+    if (clean.length === 0) return null;
+    const explicitName = !Array.isArray(entryOrPlayers) ? String(entryOrPlayers?.name || '').trim() : '';
+    const displayName = explicitName || (clean.length > 1 ? clean.join(' / ') : clean[0]);
+    return { name: displayName, players: clean };
+  }
+
+  function handleAddPoolEntry(entryOrPlayers) {
+    const normalized = normalizeEntryInput(entryOrPlayers);
+    if (!normalized) return;
     const newEntry = {
       id: `entry_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      players: clean,
+      name: normalized.name,
+      players: normalized.players,
     };
     const updated = [...poolEntries, newEntry];
     setPoolEntries(updated);
-    syncDirectoryNames(clean);
+    syncDirectoryNames(normalized.players);
     broadcastTournamentChange({ poolEntries: updated });
   }
 
-  function handleAddMultiplePoolEntries(entriesPlayersList) {
-    if (!Array.isArray(entriesPlayersList) || entriesPlayersList.length === 0) return 0;
+  function handleAddMultiplePoolEntries(entriesList) {
+    if (!Array.isArray(entriesList) || entriesList.length === 0) return 0;
     const additions = [];
     const allNames = [];
-    entriesPlayersList.forEach((players, idx) => {
-      const clean = (players || []).map((p) => String(p || '').trim()).filter(Boolean);
-      if (clean.length > 0) {
+    entriesList.forEach((item, idx) => {
+      const normalized = normalizeEntryInput(item);
+      if (normalized) {
         additions.push({
           id: `entry_${Date.now()}_${idx}_${Math.random().toString(36).slice(2, 6)}`,
-          players: clean,
+          name: normalized.name,
+          players: normalized.players,
         });
-        allNames.push(...clean);
+        allNames.push(...normalized.players);
       }
     });
     if (additions.length === 0) return 0;
@@ -1660,6 +1692,29 @@ export default function App() {
     syncDirectoryNames(allNames);
     broadcastTournamentChange({ poolEntries: updated });
     return additions.length;
+  }
+
+  function handleAddAllDirectoryToPool(mode = poolDiscipline) {
+    const activeNames = new Set(
+      poolEntries.flatMap((e) => (e.players || []).map((p) => p.trim().toLowerCase()))
+    );
+    const available = savedPlayers.filter((n) => !activeNames.has(n.trim().toLowerCase()));
+    if (available.length === 0) return;
+
+    if (mode === 'singles') {
+      handleAddMultiplePoolEntries(available.map((n) => ({ name: n, players: [n] })));
+    } else {
+      const pairs = [];
+      for (let i = 0; i + 1 < available.length; i += 2) {
+        pairs.push({
+          name: `${available[i]} / ${available[i + 1]}`,
+          players: [available[i], available[i + 1]],
+        });
+      }
+      if (pairs.length > 0) {
+        handleAddMultiplePoolEntries(pairs);
+      }
+    }
   }
 
   function handleRemovePoolEntry(entryId) {
@@ -2284,6 +2339,31 @@ export default function App() {
             onAddMultipleEntries={handleAddMultiplePoolEntries}
             onRemoveEntry={handleRemovePoolEntry}
             savedPlayers={savedPlayers}
+            onAddAllSavedPlayers={() => handleAddAllDirectoryToPool(poolDiscipline)}
+            onRemoveSavedPlayer={handleRemoveSavedPlayer}
+            onAddDirectoryPlayer={handleAddPlayerToDirectory}
+            onRenameDirectoryPlayer={handleRenameDirectoryPlayer}
+            onImportDirectoryNames={(names, addToPool = true) => {
+              const clean = (names || []).map((n) => String(n || '').trim()).filter(Boolean);
+              if (clean.length === 0) return 0;
+              syncDirectoryNames(clean);
+              if (!addToPool) return clean.length;
+              if (poolDiscipline === 'singles') {
+                const existingLower = new Set(
+                  poolEntries.flatMap((e) => (e.players || []).map((p) => p.trim().toLowerCase()))
+                );
+                const toAdd = clean.filter((n) => !existingLower.has(n.toLowerCase()));
+                return handleAddMultiplePoolEntries(toAdd.map((n) => ({ name: n, players: [n] })));
+              }
+              if (clean.length >= 2) {
+                const pairs = [];
+                for (let i = 0; i + 1 < clean.length; i += 2) {
+                  pairs.push({ name: `${clean[i]} / ${clean[i + 1]}`, players: [clean[i], clean[i + 1]] });
+                }
+                return handleAddMultiplePoolEntries(pairs);
+              }
+              return clean.length;
+            }}
             numPools={poolNumPools}
             setNumPools={(v) => {
               setPoolNumPools(v);

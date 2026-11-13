@@ -15,11 +15,14 @@ import {
   KeyRound,
   Award,
   Play,
+  Settings,
+  Check,
 } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
-import { generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
+import { generateDirectoryCSV, generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
 import { getEntryDisplayName } from '../utils/poolTournament';
 import { APP_VERSION } from '../version';
+import { DirectoryModal } from './DirectoryModal';
 
 function parseEntriesFromCSV(text, discipline) {
   const lines = String(text || '')
@@ -66,6 +69,11 @@ export function PoolSetupView({
   onAddMultipleEntries,
   onRemoveEntry,
   savedPlayers = [],
+  onAddAllSavedPlayers,
+  onRemoveSavedPlayer,
+  onAddDirectoryPlayer,
+  onRenameDirectoryPlayer,
+  onImportDirectoryNames,
   numPools = 2,
   setNumPools,
   advancePerPool = 2,
@@ -88,6 +96,8 @@ export function PoolSetupView({
   const [singleName, setSingleName] = useState('');
   const [partner1, setPartner1] = useState('');
   const [partner2, setPartner2] = useState('');
+  const [directoryNameInput, setDirectoryNameInput] = useState('');
+  const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
   const [csvFeedback, setCsvFeedback] = useState(null);
   const csvFileInputRef = useRef(null);
 
@@ -145,6 +155,18 @@ export function PoolSetupView({
     reader.readAsText(file);
     e.target.value = '';
   }
+
+  const activePlayerNamesLower = new Set(
+    entries.flatMap((e) => (e.players || []).map((p) => String(p || '').trim().toLowerCase())).filter(Boolean)
+  );
+  const activePlayerPool = entries
+    .flatMap((e) => e.players || [])
+    .map((p) => String(p || '').trim())
+    .filter(Boolean)
+    .map((name, i) => ({ id: i + 1, name }));
+  const availableSaved = (savedPlayers || []).filter(
+    (name) => !activePlayerNamesLower.has(name.trim().toLowerCase())
+  );
 
   const maxPoolsAllowed = Math.max(1, Math.floor(entries.length / 2));
   const effectivePools = Math.min(numPools, maxPoolsAllowed);
@@ -351,24 +373,154 @@ export function PoolSetupView({
           </div>
         )}
 
-        {/* Quick-Add from Room Directory */}
-        {isAdmin && savedPlayers.length > 0 && (
-          <div className="mt-3 pt-3 border-t border-slate-800/80">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-              Quick-Pick from Room Directory ({discipline === 'doubles' ? 'click 2 names to pair' : 'click to add'})
-            </span>
-            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-              {savedPlayers.map((name) => (
+        {/* Room Directory Tray */}
+        {isAdmin && (
+          <div className="mt-4 pt-3.5 border-t border-slate-800/80">
+            <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <Users size={13} className="text-[#d7f24c] shrink-0" />
+                <span className="text-slate-300 text-xs font-bold uppercase tracking-wider truncate">
+                  Room Directory ({savedPlayers.length})
+                </span>
+                <span className="text-[10px] font-mono font-bold bg-slate-850 text-[#d7f24c] border border-slate-700 px-1.5 py-0.5 rounded-md truncate max-w-[120px]">
+                  {roomId}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                {((discipline === 'singles' && availableSaved.length > 0) ||
+                  (discipline === 'doubles' && availableSaved.length >= 2)) &&
+                  onAddAllSavedPlayers && (
+                    <button
+                      type="button"
+                      onClick={onAddAllSavedPlayers}
+                      className="text-xs font-bold text-[#d7f24c] hover:underline flex items-center gap-1 active:scale-95 transition"
+                    >
+                      <UserPlus size={13} />{' '}
+                      {discipline === 'singles'
+                        ? `+ Add All (${availableSaved.length})`
+                        : `+ Pair All (${Math.floor(availableSaved.length / 2)})`}
+                    </button>
+                  )}
+                {savedPlayers.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const csv = generateDirectoryCSV(savedPlayers, activePlayerPool);
+                      triggerCsvDownload(`${roomId || 'room'}-directory.csv`, csv);
+                    }}
+                    title="Export this room's player directory as CSV"
+                    className="text-xs font-bold text-slate-300 hover:text-[#d7f24c] bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                  >
+                    <Download size={12} className="text-[#d7f24c]" /> Export CSV
+                  </button>
+                )}
                 <button
-                  key={name}
                   type="button"
-                  onClick={() => handleQuickPickDirectory(name)}
-                  className="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-750 border border-slate-700 text-xs text-slate-300 hover:text-white transition"
+                  onClick={() => setIsDirectoryModalOpen(true)}
+                  className="text-xs font-bold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/80 rounded-xl px-2.5 py-1 flex items-center gap-1.5 transition active:scale-95 shadow-sm"
+                  title="Manage room directory players (rename, delete, search, export)"
                 >
-                  + {name}
+                  <Settings size={12} className="text-[#d7f24c]" /> Manage Players
                 </button>
-              ))}
+              </div>
             </div>
+
+            {/* Quick save to room directory */}
+            {onAddDirectoryPlayer && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const trimmed = directoryNameInput.trim();
+                  if (trimmed) {
+                    onAddDirectoryPlayer(trimmed);
+                    setDirectoryNameInput('');
+                  }
+                }}
+                className="flex items-center gap-1.5 mb-2.5"
+              >
+                <input
+                  type="text"
+                  value={directoryNameInput}
+                  onChange={(e) => setDirectoryNameInput(e.target.value)}
+                  placeholder={`Save name to ${roomId || 'room'} directory...`}
+                  className="flex-1 bg-slate-950/70 border border-slate-800 rounded-xl px-2.5 py-1 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+                />
+                <button
+                  type="submit"
+                  disabled={!directoryNameInput.trim()}
+                  className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-[#d7f24c] font-bold text-xs border border-slate-700 disabled:opacity-40 transition shrink-0"
+                >
+                  + Save
+                </button>
+              </form>
+            )}
+
+            {savedPlayers.length > 0 ? (
+              <>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                  {discipline === 'doubles'
+                    ? 'Click 2 players to fill Partner 1 & Partner 2'
+                    : 'Click player to add to Singles draw'}
+                </span>
+                <div className="flex flex-wrap gap-1.5 max-h-44 overflow-y-auto pr-1">
+                  {[...savedPlayers]
+                    .sort((a, b) => {
+                      const aIn = activePlayerNamesLower.has(a.trim().toLowerCase());
+                      const bIn = activePlayerNamesLower.has(b.trim().toLowerCase());
+                      if (aIn === bIn) return a.localeCompare(b);
+                      return aIn ? 1 : -1;
+                    })
+                    .map((name) => {
+                      const lower = name.trim().toLowerCase();
+                      const isInPool = activePlayerNamesLower.has(lower);
+                      const isStagedPartner =
+                        discipline === 'doubles' &&
+                        (partner1.trim().toLowerCase() === lower || partner2.trim().toLowerCase() === lower);
+
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => {
+                            if (discipline === 'singles' && isInPool) return;
+                            handleQuickPickDirectory(name);
+                          }}
+                          className={`inline-flex items-center gap-1 border rounded-full px-2.5 py-1 text-xs transition ${
+                            isStagedPartner
+                              ? 'bg-[#d7f24c]/15 border-[#d7f24c]/50 text-[#d7f24c] font-semibold'
+                              : isInPool
+                                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 shadow-sm'
+                                : 'bg-slate-800/80 hover:bg-slate-750 border-slate-700/70 text-slate-300 hover:text-white active:scale-95'
+                          }`}
+                          title={
+                            isInPool
+                              ? `${name} is already entered in this tournament`
+                              : discipline === 'doubles'
+                                ? `Pick ${name} as partner`
+                                : `Add ${name} to tournament`
+                          }
+                        >
+                          {isInPool ? (
+                            <>
+                              <Check size={11} className="stroke-[3] text-emerald-400" />
+                              <span>{name}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>{name}</span>
+                              <span className="text-[#d7f24c] font-bold text-sm leading-none">+</span>
+                            </>
+                          )}
+                        </button>
+                      );
+                    })}
+                </div>
+              </>
+            ) : (
+              <p className="text-[11px] text-slate-500 italic py-1">
+                No saved names in {roomId || 'this room'} yet. Add names above or import via CSV.
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -629,6 +781,21 @@ export function PoolSetupView({
           <Play size={20} /> Generate Pools &amp; Schedule
         </button>
       )}
+
+      {/* Dedicated Directory Management Modal */}
+      <DirectoryModal
+        isOpen={isDirectoryModalOpen}
+        onClose={() => setIsDirectoryModalOpen(false)}
+        roomId={roomId}
+        savedPlayers={savedPlayers}
+        playerPool={activePlayerPool}
+        onAddDirectoryPlayer={onAddDirectoryPlayer}
+        onAddMultiplePlayers={onImportDirectoryNames}
+        onRenameDirectoryPlayer={onRenameDirectoryPlayer}
+        onRemoveSavedPlayer={onRemoveSavedPlayer}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 }
+
