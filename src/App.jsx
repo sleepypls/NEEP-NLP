@@ -2436,6 +2436,9 @@ export default function App() {
     try {
       localStorage.setItem(`neep_player_login_${roomId || 'default'}`, clean);
     } catch (e) {}
+    if (!isAdmin && clean) {
+      setView(tournamentStyle === 'tournament' ? 'poolPlay' : (bracket ? 'bracket' : 'draft'));
+    }
   }
 
   function handleLogoutPlayer() {
@@ -2444,6 +2447,12 @@ export default function App() {
       localStorage.removeItem(`neep_player_login_${roomId || 'default'}`);
     } catch (e) {}
   }
+
+  useEffect(() => {
+    if (!isAdmin && loggedInPlayerName && ['setup', 'poolSetup', 'leaderboard'].includes(view)) {
+      setView(tournamentStyle === 'tournament' ? 'poolPlay' : (bracket ? 'bracket' : 'draft'));
+    }
+  }, [isAdmin, loggedInPlayerName, view, tournamentStyle, bracket]);
 
   async function handleRequestNotifPermission() {
     if (typeof Notification === 'undefined') return;

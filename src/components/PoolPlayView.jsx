@@ -700,23 +700,37 @@ export function PoolPlayView({
 
                 {/* Standings Table */}
                 <div className="overflow-x-auto bg-slate-950/60 border border-slate-800/80 rounded-2xl">
-                  <table className="w-full text-xs sm:text-sm">
+                  <table className="w-full text-xs">
                     <thead>
-                      <tr className="text-slate-500 text-[11px] uppercase tracking-wider border-b border-slate-800">
-                        <th className="text-left py-2.5 px-3">Pos</th>
-                        <th className="text-left py-2.5 px-3">Entry</th>
-                        <th className="text-right py-2.5 px-2.5">W - L</th>
-                        {poolFormat.bestOf === 3 && (
-                          <th className="text-right py-2.5 px-2.5">Games</th>
-                        )}
-                        <th className="text-right py-2.5 px-2.5">PF</th>
-                        <th className="text-right py-2.5 px-2.5">PA</th>
-                        <th className="text-right py-2.5 px-3">Diff (+/-)</th>
+                      <tr className="text-slate-500 text-[10px] uppercase tracking-wider border-b border-slate-800">
+                        <th className="text-left py-2 px-2.5">Pos</th>
+                        <th className="text-left py-2 px-2.5">Entry</th>
+                        <th className="text-right py-2 px-2">W - L</th>
+                        <th className="text-right py-2 px-2" title="Win Percentage">Win%</th>
+                        <th className="text-right py-2 px-2" title="Games Won - Games Lost">G (W-L)</th>
+                        <th className="text-right py-2 px-2" title="Game Differential (GW − GL)">G+/-</th>
+                        <th className="text-right py-2 px-2" title="Points For (Scored)">PF</th>
+                        <th className="text-right py-2 px-2" title="Points Against (Allowed)">PA</th>
+                        <th className="text-right py-2 px-2" title="Point Differential (PF − PA)">Pt+/-</th>
+                        <th className="text-right py-2 px-2" title="Point Differential per Match">Pt/M</th>
+                        <th className="text-right py-2 px-2.5" title="Points For per Match">PF/M</th>
                       </tr>
                     </thead>
                     <tbody>
                       {standings.map((row, idx) => {
                         const qualifies = idx < advancePerPool;
+                        const winPct =
+                          row.matchesPlayed > 0
+                            ? `${Math.round((row.wins / row.matchesPlayed) * 100)}%`
+                            : '0%';
+                        const ptDiffPerM =
+                          row.matchesPlayed > 0
+                            ? (row.pointDiff / row.matchesPlayed).toFixed(1)
+                            : '0.0';
+                        const pfPerM =
+                          row.matchesPlayed > 0
+                            ? (row.pointsFor / row.matchesPlayed).toFixed(1)
+                            : '0.0';
                         return (
                           <tr
                             key={row.entryId}
@@ -724,7 +738,7 @@ export function PoolPlayView({
                               qualifies ? 'bg-emerald-500/5' : ''
                             }`}
                           >
-                            <td className="py-2.5 px-3 font-mono font-bold">
+                            <td className="py-2 px-2.5 font-mono font-bold">
                               <span
                                 className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[11px] ${
                                   qualifies
@@ -735,25 +749,38 @@ export function PoolPlayView({
                                 {idx + 1}
                               </span>
                             </td>
-                            <td className="py-2.5 px-3 font-semibold text-white">
+                            <td className="py-2 px-2.5 font-semibold text-white whitespace-nowrap">
                               {row.name}
                             </td>
-                            <td className="py-2.5 px-2.5 text-right font-mono text-slate-200 font-bold">
-                              {row.wins} - {row.losses}
+                            <td className="py-2 px-2 text-right font-mono text-slate-200 font-bold whitespace-nowrap">
+                              {row.wins}-{row.losses}
                             </td>
-                            {poolFormat.bestOf === 3 && (
-                              <td className="py-2.5 px-2.5 text-right font-mono text-slate-400">
-                                {row.gamesWon}-{row.gamesLost}
-                              </td>
-                            )}
-                            <td className="py-2.5 px-2.5 text-right font-mono text-slate-400">
+                            <td className="py-2 px-2 text-right font-mono text-slate-300">
+                              {winPct}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono text-slate-400 whitespace-nowrap">
+                              {row.gamesWon}-{row.gamesLost}
+                            </td>
+                            <td
+                              className={`py-2 px-2 text-right font-mono font-semibold ${
+                                row.gameDiff > 0
+                                  ? 'text-emerald-300'
+                                  : row.gameDiff < 0
+                                  ? 'text-red-400'
+                                  : 'text-slate-400'
+                              }`}
+                            >
+                              {row.gameDiff > 0 ? '+' : ''}
+                              {row.gameDiff}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono text-slate-400">
                               {row.pointsFor}
                             </td>
-                            <td className="py-2.5 px-2.5 text-right font-mono text-slate-400">
+                            <td className="py-2 px-2 text-right font-mono text-slate-400">
                               {row.pointsAgainst}
                             </td>
                             <td
-                              className={`py-2.5 px-3 text-right font-mono font-bold ${
+                              className={`py-2 px-2 text-right font-mono font-bold ${
                                 row.pointDiff > 0
                                   ? 'text-[#d7f24c]'
                                   : row.pointDiff < 0
@@ -763,6 +790,13 @@ export function PoolPlayView({
                             >
                               {row.pointDiff > 0 ? '+' : ''}
                               {row.pointDiff}
+                            </td>
+                            <td className="py-2 px-2 text-right font-mono text-slate-300">
+                              {row.pointDiff > 0 ? '+' : ''}
+                              {ptDiffPerM}
+                            </td>
+                            <td className="py-2 px-2.5 text-right font-mono text-slate-400">
+                              {pfPerM}
                             </td>
                           </tr>
                         );
