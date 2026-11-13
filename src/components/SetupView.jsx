@@ -24,6 +24,8 @@ export function SetupView({
   setCourtNames,
   goalScore,
   setGoalScore,
+  winByTwo = true,
+  setWinByTwo,
   dreambreakerScore,
   setDreambreakerScore,
   dreambreakerFormat = 'singles',
@@ -970,6 +972,39 @@ export function SetupView({
           placeholder="Custom score limit (e.g. 11)"
           className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
         />
+        {setWinByTwo && (
+          <div className="pt-2 border-t border-slate-800 space-y-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+              Win Margin Format
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={!isAdmin}
+                onClick={() => setWinByTwo(true)}
+                className={`py-2 rounded-xl text-xs font-bold transition ${
+                  winByTwo
+                    ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                }`}
+              >
+                Win by 2
+              </button>
+              <button
+                type="button"
+                disabled={!isAdmin}
+                onClick={() => setWinByTwo(false)}
+                className={`py-2 rounded-xl text-xs font-bold transition ${
+                  !winByTwo
+                    ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                }`}
+              >
+                Win by 1
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Pre-assign courts per Round 1 matchup */}

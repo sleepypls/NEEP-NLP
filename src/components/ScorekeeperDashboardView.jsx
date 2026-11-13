@@ -22,6 +22,7 @@ import {
 } from '../utils/poolTournament';
 import { getBusyMlpPlayerIds, getMlpGamePlayerIds, roundName } from '../utils/tournament';
 import { getCourtDisplayName } from '../utils/courtNames';
+import { validateGameScore } from '../utils/scoreValidation';
 
 function PoolLiveCourtCard({
   courtNum,
@@ -60,6 +61,22 @@ function PoolLiveCourtCard({
   }, [match.id, match.games, fmt.bestOf]);
 
   const evalRes = evaluatePoolOrKnockoutMatch(games, fmt.bestOf);
+
+  const scoreValidationError = (() => {
+    for (let i = 0; i < games.length; i += 1) {
+      const g = games[i];
+      const aEmpty = g.scoreA === '' || g.scoreA === null || g.scoreA === undefined;
+      const bEmpty = g.scoreB === '' || g.scoreB === null || g.scoreB === undefined;
+      const nA = Number(g.scoreA) || 0;
+      const nB = Number(g.scoreB) || 0;
+      if ((aEmpty && bEmpty) || (nA === 0 && nB === 0)) continue;
+      const res = validateGameScore(nA, nB, fmt.pointsTo, fmt.winByTwo);
+      if (!res.valid) {
+        return games.length > 1 ? `Game ${i + 1}: ${res.error}` : res.error;
+      }
+    }
+    return null;
+  })();
 
   function updateScore(gameIdx, side, val) {
     const clean = val.replace(/\D/g, '');
@@ -192,12 +209,18 @@ function PoolLiveCourtCard({
         ))}
       </div>
 
+      {scoreValidationError && (
+        <div className="text-[11px] font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3 py-1.5">
+          {scoreValidationError}
+        </div>
+      )}
+
       <button
         type="button"
-        disabled={!evalRes.isComplete}
+        disabled={!evalRes.isComplete || Boolean(scoreValidationError)}
         onClick={handleSave}
         className={`w-full py-2.5 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition active:scale-95 ${
-          evalRes.isComplete
+          evalRes.isComplete && !scoreValidationError
             ? 'bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 shadow-lg shadow-[#d7f24c]/15'
             : 'bg-slate-800/70 text-slate-500 cursor-not-allowed'
         }`}
@@ -215,6 +238,8 @@ function MlpLiveCourtCard({
   playersById,
   onSaveGameAt,
   onToggleGameLiveAt,
+  goalScore = 11,
+  winByTwo = true,
 }) {
   const { round, idx, game, gameIndex, matchLabel, teamAName, teamBName, roundLabel } = liveItem;
   const [scoreA, setScoreA] = useState(game.scoreA ? String(game.scoreA) : '');
@@ -252,7 +277,9 @@ function MlpLiveCourtCard({
 
   const numA = Number(scoreA) || 0;
   const numB = Number(scoreB) || 0;
-  const canSave = numA !== numB && (numA > 0 || numB > 0);
+  const hasAnyScore = numA > 0 || numB > 0;
+  const scoreRes = hasAnyScore ? validateGameScore(numA, numB, goalScore, winByTwo) : { valid: false, error: '' };
+  const canSave = hasAnyScore && scoreRes.valid;
 
   return (
     <div className="bg-slate-900 border border-cyan-500/40 rounded-3xl p-4 shadow-xl shadow-cyan-500/5 flex flex-col justify-between gap-3">
@@ -354,6 +381,12 @@ function MlpLiveCourtCard({
         </div>
       </div>
 
+      {hasAnyScore && !scoreRes.valid && (
+        <div className="text-[11px] font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3 py-1.5">
+          {scoreRes.error}
+        </div>
+      )}
+
       <button
         type="button"
         disabled={!canSave}
@@ -391,6 +424,8 @@ export function ScorekeeperDashboardView({
   onSaveMlpGameAt,
   onToggleMlpGameLiveAt,
   onBatchAssignMlpCourtsLive,
+  mlpGoalScore = 11,
+  mlpWinByTwo = true,
   onBack,
 }) {
   const [freeCourtChoices, setFreeCourtChoices] = useState({});
@@ -761,6 +796,8 @@ export function ScorekeeperDashboardView({
                 playersById={playersById}
                 onSaveGameAt={onSaveMlpGameAt}
                 onToggleGameLiveAt={onToggleMlpGameLiveAt}
+                goalScore={mlpGoalScore}
+                winByTwo={mlpWinByTwo}
               />
             );
           }

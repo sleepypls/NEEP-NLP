@@ -33,6 +33,7 @@ import {
 } from '../utils/poolTournament';
 import { triggerCsvDownload } from '../utils/tournament';
 import { getCourtDisplayName } from '../utils/courtNames';
+import { validateGameScore } from '../utils/scoreValidation';
 import { EditPoolMatchModal } from './EditPoolMatchModal';
 import { PoolCourtAssignModal } from './CourtAssignModal';
 import { LiveTimer } from './LiveTimer';
@@ -43,6 +44,7 @@ function MatchScoreEditor({
   entryB,
   bestOf,
   pointsTo,
+  winByTwo = true,
   isCustomFormat,
   numCourts = 2,
   courtNames = {},
@@ -61,6 +63,22 @@ function MatchScoreEditor({
   const evalRes = evaluatePoolOrKnockoutMatch(games, bestOf);
   const nameA = getEntryDisplayName(entryA);
   const nameB = getEntryDisplayName(entryB);
+
+  const scoreValidationError = (() => {
+    for (let i = 0; i < games.length; i += 1) {
+      const g = games[i];
+      const aEmpty = g.scoreA === '' || g.scoreA === null || g.scoreA === undefined;
+      const bEmpty = g.scoreB === '' || g.scoreB === null || g.scoreB === undefined;
+      const nA = Number(g.scoreA) || 0;
+      const nB = Number(g.scoreB) || 0;
+      if ((aEmpty && bEmpty) || (nA === 0 && nB === 0)) continue;
+      const res = validateGameScore(nA, nB, pointsTo, winByTwo);
+      if (!res.valid) {
+        return games.length > 1 ? `Game ${i + 1}: ${res.error}` : res.error;
+      }
+    }
+    return null;
+  })();
 
   function updateScore(gameIdx, side, val) {
     const clean = val.replace(/\D/g, '');
@@ -291,13 +309,18 @@ function MatchScoreEditor({
             ))}
           </div>
 
+          {isAdmin && scoreValidationError && (
+            <div className="text-[11px] font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3 py-1.5 mb-2">
+              {scoreValidationError}
+            </div>
+          )}
           {isAdmin && (
             <button
               type="button"
-              disabled={!evalRes.isComplete}
+              disabled={!evalRes.isComplete || Boolean(scoreValidationError)}
               onClick={() => onSave(games, evalRes.winnerSide === 'A' ? entryA.id : entryB.id)}
               className={`w-full py-2 rounded-xl text-xs font-black transition active:scale-95 ${
-                evalRes.isComplete
+                evalRes.isComplete && !scoreValidationError
                   ? match.saved
                     ? 'bg-slate-800 hover:bg-slate-750 text-[#d7f24c] border border-[#d7f24c]/30'
                     : 'bg-[#d7f24c] hover:bg-[#c6e140] text-slate-950 shadow-md shadow-[#d7f24c]/15'
@@ -915,6 +938,7 @@ export function PoolPlayView({
                                   entryB={entryMap.get(match.entryBId)}
                                   bestOf={fmt.bestOf}
                                   pointsTo={fmt.pointsTo}
+                                  winByTwo={fmt.winByTwo}
                                   isCustomFormat={fmt.isCustom}
                                   numCourts={numCourts}
                                   courtNames={courtNames}
@@ -1091,6 +1115,7 @@ export function PoolPlayView({
                                 entryB={entryMap.get(m.entryBId)}
                                 bestOf={matchFmt.bestOf}
                                 pointsTo={matchFmt.pointsTo}
+                                winByTwo={matchFmt.winByTwo}
                                 isCustomFormat={matchFmt.isCustom}
                                 numCourts={numCourts}
                                 courtNames={courtNames}
@@ -1177,6 +1202,7 @@ export function PoolPlayView({
                       entryB={entryMap.get(knockout.bronzeMatch.entryBId)}
                       bestOf={bronzeFmt.bestOf}
                       pointsTo={bronzeFmt.pointsTo}
+                      winByTwo={bronzeFmt.winByTwo}
                       isCustomFormat={bronzeFmt.isCustom}
                       numCourts={numCourts}
                       courtNames={courtNames}

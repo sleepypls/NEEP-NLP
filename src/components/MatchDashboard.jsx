@@ -22,6 +22,7 @@ import { generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament'
 import { MlpCourtAssignModal } from './CourtAssignModal';
 import { LiveTimer } from './LiveTimer';
 import { getCourtDisplayName } from '../utils/courtNames';
+import { validateGameScore } from '../utils/scoreValidation';
 
 function TeamDot({ color, className = '' }) {
   return (
@@ -49,10 +50,13 @@ function GameRow({
   onShuffleGame,
   onRevertGame,
   isAdmin,
+  goalScore = 11,
+  winByTwo = true,
 }) {
   const [scoreA, setScoreA] = useState(game.saved ? String(game.scoreA) : (game.scoreA === 0 ? '' : String(game.scoreA)));
   const [scoreB, setScoreB] = useState(game.saved ? String(game.scoreB) : (game.scoreB === 0 ? '' : String(game.scoreB)));
   const [isEditing, setIsEditing] = useState(false);
+  const [scoreError, setScoreError] = useState('');
 
   useEffect(() => {
     setScoreA(game.saved ? String(game.scoreA) : (game.scoreA === 0 ? '' : String(game.scoreA)));
@@ -70,6 +74,7 @@ function GameRow({
   }
 
   function handleScoreChange(val, setter) {
+    setScoreError('');
     if (val === '') {
       setter('');
     } else {
@@ -84,7 +89,15 @@ function GameRow({
   }
 
   function handleSaveClick() {
-    onSave(parseScore(scoreA), parseScore(scoreB));
+    const a = parseScore(scoreA);
+    const b = parseScore(scoreB);
+    const res = validateGameScore(a, b, goalScore, winByTwo);
+    if (!res.valid) {
+      setScoreError(res.error);
+      return;
+    }
+    setScoreError('');
+    onSave(a, b);
     setIsEditing(false);
   }
 
@@ -281,6 +294,11 @@ function GameRow({
 
           {isAdmin && (
             <>
+              {scoreError && (
+                <div className="mb-2.5 text-[11px] font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl px-3 py-1.5">
+                  {scoreError}
+                </div>
+              )}
               {!game.saved && (
                 <button
                   onClick={handleSaveClick}
@@ -351,6 +369,8 @@ export function MatchDashboard({
   onGoToDreambreaker,
   onGoToBracket,
   isAdmin,
+  goalScore = 11,
+  winByTwo = true,
 }) {
   const [expandedId, setExpandedId] = useState(null);
   const [isCourtAssignOpen, setIsCourtAssignOpen] = useState(false);
@@ -535,6 +555,8 @@ export function MatchDashboard({
           onShuffleGame={onShuffleGame}
           onRevertGame={onRevertGame}
           isAdmin={isAdmin}
+          goalScore={goalScore}
+          winByTwo={winByTwo}
         />
       ))}
 

@@ -14,3 +14,4 @@ export function getCourtDisplayName(courtNumber, courtNames) {
   }
   return `Court ${courtNumber}`;
 }
+

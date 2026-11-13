@@ -22,6 +22,7 @@ import {
   resizeGamesForBestOf,
 } from '../utils/poolTournament';
 import { getCourtDisplayName } from '../utils/courtNames';
+import { validateGameScore } from '../utils/scoreValidation';
 
 function playNotificationChime() {
   try {
@@ -79,6 +80,19 @@ function PoolMatchSelfScoreRow({
   function handleSubmit(e) {
     e.preventDefault();
     setErrorMsg('');
+    const pointsTo = format?.pointsTo || 11;
+    const winByTwo = format?.winByTwo !== false;
+    for (let i = 0; i < draftGames.length; i += 1) {
+      const g = draftGames[i];
+      const nA = Number(g.scoreA) || 0;
+      const nB = Number(g.scoreB) || 0;
+      if (nA === 0 && nB === 0) continue;
+      const res = validateGameScore(nA, nB, pointsTo, winByTwo);
+      if (!res.valid) {
+        setErrorMsg(draftGames.length > 1 ? `Game ${i + 1}: ${res.error}` : res.error);
+        return;
+      }
+    }
     const evalRes = evaluatePoolOrKnockoutMatch(draftGames, bestOf);
     if (!evalRes.winnerSide) {
       setErrorMsg(
@@ -348,6 +362,8 @@ function MlpGameSelfScoreRow({
   onApprovePending,
   onRejectPending,
   courtNames,
+  goalScore = 11,
+  winByTwo = true,
 }) {
   const { game, mySide, matchLabel, gameIndex, namesA, namesB } = item;
   const [scoreA, setScoreA] = useState(
@@ -374,8 +390,9 @@ function MlpGameSelfScoreRow({
     }
     const nA = Number(scoreA);
     const nB = Number(scoreB);
-    if (Number.isNaN(nA) || Number.isNaN(nB) || nA < 0 || nB < 0 || nA === nB) {
-      setErrorMsg('Scores must be valid non-tied numbers.');
+    const res = validateGameScore(nA, nB, goalScore, winByTwo);
+    if (!res.valid) {
+      setErrorMsg(res.error);
       return;
     }
     onSubmitPending(item, {
@@ -794,6 +811,8 @@ export function PlayerPortalBanner({
   activePlayerTab = 'current',
   onChangePlayerTab,
   courtNames = {},
+  mlpGoalScore = 11,
+  mlpWinByTwo = true,
 }) {
   const [alertBanner, setAlertBanner] = useState(null);
   const seenAlertsRef = useRef(new Set());
@@ -1087,6 +1106,8 @@ export function PlayerPortalBanner({
         onApprovePending={onApproveMlpPendingScore}
         onRejectPending={onRejectMlpPendingScore}
         courtNames={courtNames}
+        goalScore={mlpGoalScore}
+        winByTwo={mlpWinByTwo}
       />
     );
 

@@ -99,6 +99,7 @@ const SYSTEM_DEFAULT_CONFIG = {
   numTeams: 4,
   numCourts: 2,
   goalScore: 11,
+  winByTwo: true,
   dreambreakerScore: 21,
   dreambreakerFormat: 'singles',
   allowUneven: true,
@@ -111,6 +112,7 @@ function sanitizeConfigObject(cfg = {}) {
     numTeams: Number(cfg.numTeams) >= 2 && Number(cfg.numTeams) <= 8 ? Number(cfg.numTeams) : 4,
     numCourts: Number(cfg.numCourts) >= 1 && Number(cfg.numCourts) <= 50 ? Number(cfg.numCourts) : 2,
     goalScore: Number(cfg.goalScore) >= 1 ? Number(cfg.goalScore) : 11,
+    winByTwo: cfg.winByTwo !== undefined ? Boolean(cfg.winByTwo) : true,
     dreambreakerScore: Number(cfg.dreambreakerScore) >= 1 ? Number(cfg.dreambreakerScore) : 21,
     dreambreakerFormat: cfg.dreambreakerFormat === 'doubles' ? 'doubles' : 'singles',
     allowUneven: cfg.allowUneven !== undefined ? Boolean(cfg.allowUneven) : true,
@@ -327,6 +329,13 @@ export default function App() {
   const [numCourts, setNumCourts] = useState(() => initialSaved?.numCourts || initialDefaultCfg.numCourts || 2);
   const [customCourtNames, setCustomCourtNames] = useState(() => initialSaved?.customCourtNames || {});
   const [goalScore, setGoalScore] = useState(() => initialSaved?.goalScore || initialDefaultCfg.goalScore || 11);
+  const [winByTwo, setWinByTwo] = useState(() =>
+    initialSaved?.winByTwo !== undefined
+      ? Boolean(initialSaved.winByTwo)
+      : initialDefaultCfg.winByTwo !== undefined
+        ? Boolean(initialDefaultCfg.winByTwo)
+        : true
+  );
   const [dreambreakerScore, setDreambreakerScore] = useState(() => initialSaved?.dreambreakerScore || initialDefaultCfg.dreambreakerScore || 21);
   const [dreambreakerFormat, setDreambreakerFormat] = useState(() => initialSaved?.dreambreakerFormat || initialDefaultCfg.dreambreakerFormat || 'singles');
   const [allowUneven, setAllowUneven] = useState(() => (initialSaved?.allowUneven !== undefined ? initialSaved.allowUneven : initialDefaultCfg.allowUneven));
@@ -532,6 +541,7 @@ export default function App() {
           if (cloudTourn.customCourtNames !== undefined) setCustomCourtNames(cloudTourn.customCourtNames);
           if (cloudTourn.poolCourtNames !== undefined) setPoolCourtNames(cloudTourn.poolCourtNames);
           if (cloudTourn.goalScore) setGoalScore(cloudTourn.goalScore);
+          if (cloudTourn.winByTwo !== undefined) setWinByTwo(Boolean(cloudTourn.winByTwo));
           if (cloudTourn.dreambreakerScore) setDreambreakerScore(cloudTourn.dreambreakerScore);
           if (cloudTourn.dreambreakerFormat) setDreambreakerFormat(cloudTourn.dreambreakerFormat);
           if (cloudTourn.allowUneven !== undefined) setAllowUneven(cloudTourn.allowUneven);
@@ -685,7 +695,7 @@ export default function App() {
           poolCourtNames,
           poolTournament,
           isTournamentLocked,
-          view, playerPool, nextPlayerId, numTeams, numCourts, customCourtNames, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
+          view, playerPool, nextPlayerId, numTeams, numCourts, customCourtNames, goalScore, winByTwo, dreambreakerScore, dreambreakerFormat, allowUneven,
           captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig,
           teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         })
@@ -693,7 +703,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
-  }, [roomId, adminPin, isTournamentLocked, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolTiebreakerRules, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolNumCourts, poolCourtNames, poolTournament, view, playerPool, nextPlayerId, numTeams, numCourts, customCourtNames, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+  }, [roomId, adminPin, isTournamentLocked, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolTiebreakerRules, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolNumCourts, poolCourtNames, poolTournament, view, playerPool, nextPlayerId, numTeams, numCourts, customCourtNames, goalScore, winByTwo, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
 
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
@@ -735,7 +745,7 @@ export default function App() {
         poolNumCourts,
         poolCourtNames,
         poolTournament,
-        view, playerPool, nextPlayerId, numTeams, numCourts, customCourtNames, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
+        view, playerPool, nextPlayerId, numTeams, numCourts, customCourtNames, goalScore, winByTwo, dreambreakerScore, dreambreakerFormat, allowUneven,
         captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig,
         teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         ...updates,
@@ -1572,6 +1582,11 @@ export default function App() {
     setGoalScore(val);
     broadcastTournamentChange({ goalScore: val });
   }
+  function handleUpdateWinByTwo(val) {
+    const next = Boolean(val);
+    setWinByTwo(next);
+    broadcastTournamentChange({ winByTwo: next });
+  }
   function handleUpdateAllowUneven(val) {
     setAllowUneven(val);
     broadcastTournamentChange({ allowUneven: val });
@@ -1614,6 +1629,7 @@ export default function App() {
       numTeams,
       numCourts,
       goalScore,
+      winByTwo,
       dreambreakerScore,
       dreambreakerFormat,
       allowUneven,
@@ -1668,6 +1684,7 @@ export default function App() {
     setNumTeams(clean.numTeams);
     setNumCourts(clean.numCourts);
     setGoalScore(clean.goalScore);
+    setWinByTwo(clean.winByTwo);
     setDreambreakerScore(clean.dreambreakerScore);
     setDreambreakerFormat(clean.dreambreakerFormat);
     setAllowUneven(clean.allowUneven);
@@ -1677,6 +1694,7 @@ export default function App() {
       numTeams: clean.numTeams,
       numCourts: clean.numCourts,
       goalScore: clean.goalScore,
+      winByTwo: clean.winByTwo,
       dreambreakerScore: clean.dreambreakerScore,
       dreambreakerFormat: clean.dreambreakerFormat,
       allowUneven: clean.allowUneven,
@@ -2764,6 +2782,7 @@ export default function App() {
         setNumTeams(defCfg.numTeams);
         setNumCourts(defCfg.numCourts || 2);
         setGoalScore(defCfg.goalScore);
+        setWinByTwo(defCfg.winByTwo !== undefined ? Boolean(defCfg.winByTwo) : true);
         setDreambreakerScore(defCfg.dreambreakerScore);
         setDreambreakerFormat(defCfg.dreambreakerFormat);
         setAllowUneven(defCfg.allowUneven);
@@ -2794,6 +2813,7 @@ export default function App() {
           numTeams: defCfg.numTeams,
           numCourts: defCfg.numCourts || 2,
           goalScore: defCfg.goalScore,
+          winByTwo: defCfg.winByTwo !== undefined ? Boolean(defCfg.winByTwo) : true,
           dreambreakerScore: defCfg.dreambreakerScore,
           dreambreakerFormat: defCfg.dreambreakerFormat,
           allowUneven: defCfg.allowUneven,
@@ -3030,6 +3050,8 @@ export default function App() {
               ? poolTournament?.courtNames || poolCourtNames
               : customCourtNames
           }
+          mlpGoalScore={goalScore}
+          mlpWinByTwo={winByTwo}
         />
       )}
 
@@ -3047,6 +3069,8 @@ export default function App() {
               ? poolTournament?.courtNames || poolCourtNames
               : customCourtNames
           }
+          mlpGoalScore={goalScore}
+          mlpWinByTwo={winByTwo}
         />
       )}
 
@@ -3074,6 +3098,8 @@ export default function App() {
             }}
             goalScore={goalScore}
             setGoalScore={handleUpdateGoalScore}
+            winByTwo={winByTwo}
+            setWinByTwo={handleUpdateWinByTwo}
             dreambreakerScore={dreambreakerScore}
             setDreambreakerScore={handleUpdateDreambreakerScore}
             dreambreakerFormat={dreambreakerFormat}
@@ -3124,6 +3150,7 @@ export default function App() {
                 teams: nextTeams,
                 numCourts,
                 goalScore,
+                winByTwo,
                 dreambreakerScore,
                 dreambreakerFormat,
                 customTeamNames,
@@ -3188,6 +3215,8 @@ export default function App() {
             numCourts={numCourts}
             courtNames={customCourtNames}
             onSetGameCourt={handleSetGameCourt}
+            goalScore={goalScore}
+            winByTwo={winByTwo}
             onBatchAssignCourtsLive={handleBatchAssignMlpCourtsAndLive}
             onOpenEditMatchup={(game) => setEditingMatchupGame(game)}
             onShuffleGame={handleShuffleSingleGame}
@@ -3423,6 +3452,8 @@ export default function App() {
             onSaveMlpGameAt={handleSaveGameAt}
             onToggleMlpGameLiveAt={handleToggleGameInProgressAt}
             onBatchAssignMlpCourtsLive={handleBatchAssignMlpCourtsAndLive}
+            mlpGoalScore={goalScore}
+            mlpWinByTwo={winByTwo}
             onBack={() =>
               setView(tournamentStyle === 'tournament' ? 'poolPlay' : 'bracket')
             }

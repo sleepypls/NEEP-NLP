@@ -1398,6 +1398,32 @@ export function PoolSetupView({
                 />
                 <span className="text-xs font-semibold text-slate-400">pts</span>
               </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={!isAdmin}
+                  onClick={() => setPoolFormat({ ...poolFormat, winByTwo: true })}
+                  className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                    poolFormat.winByTwo !== false
+                      ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/40'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  }`}
+                >
+                  Win by 2
+                </button>
+                <button
+                  type="button"
+                  disabled={!isAdmin}
+                  onClick={() => setPoolFormat({ ...poolFormat, winByTwo: false })}
+                  className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                    poolFormat.winByTwo === false
+                      ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/40'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+                  }`}
+                >
+                  Win by 1
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1477,6 +1503,32 @@ export function PoolSetupView({
                 className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-center text-white font-mono font-bold text-xs focus:outline-none focus:ring-2 focus:ring-amber-400 disabled:opacity-60"
               />
               <span className="text-xs font-semibold text-slate-400">pts</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                disabled={!isAdmin}
+                onClick={() => setKnockoutFormat({ ...knockoutFormat, winByTwo: true })}
+                className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                  knockoutFormat.winByTwo !== false
+                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}
+              >
+                Win by 2
+              </button>
+              <button
+                type="button"
+                disabled={!isAdmin}
+                onClick={() => setKnockoutFormat({ ...knockoutFormat, winByTwo: false })}
+                className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                  knockoutFormat.winByTwo === false
+                    ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700'
+                }`}
+              >
+                Win by 1
+              </button>
             </div>
           </div>
 

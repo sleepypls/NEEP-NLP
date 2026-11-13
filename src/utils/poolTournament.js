@@ -41,15 +41,23 @@ export function getEffectiveMatchFormat(
   match,
   { isKnockout = false, totalRounds = 1, roundIdx = 0, isBronze = false } = {}
 ) {
+  const koFmt = tournament?.knockoutFormat || { bestOf: 3, pointsTo: 11, winByTwo: true };
+  const poolFmt = tournament?.poolFormat || { bestOf: 1, pointsTo: 15, winByTwo: true };
+
   if (match && match.customFormat && match.customFormat.bestOf) {
     return {
       bestOf: Number(match.customFormat.bestOf) || 1,
       pointsTo: Number(match.customFormat.pointsTo) || 11,
+      winByTwo:
+        match.customFormat.winByTwo !== undefined
+          ? match.customFormat.winByTwo !== false
+          : isKnockout
+            ? koFmt.winByTwo !== false
+            : poolFmt.winByTwo !== false,
       isCustom: true,
     };
   }
 
-  const koFmt = tournament?.knockoutFormat || { bestOf: 3, pointsTo: 11 };
   if (isKnockout) {
     if (koFmt.useRoundFormats && koFmt.roundFormats) {
       const roundKey = getKnockoutRoundKey(totalRounds, roundIdx, isBronze);
@@ -58,6 +66,7 @@ export function getEffectiveMatchFormat(
         return {
           bestOf: Number(rf.bestOf) || 1,
           pointsTo: Number(rf.pointsTo) || Number(koFmt.pointsTo) || 11,
+          winByTwo: rf.winByTwo !== undefined ? rf.winByTwo !== false : koFmt.winByTwo !== false,
           isCustom: false,
           isRoundSpecific: true,
         };
@@ -66,14 +75,15 @@ export function getEffectiveMatchFormat(
     return {
       bestOf: Number(koFmt.bestOf) || 3,
       pointsTo: Number(koFmt.pointsTo) || 11,
+      winByTwo: koFmt.winByTwo !== false,
       isCustom: false,
     };
   }
 
-  const poolFmt = tournament?.poolFormat || { bestOf: 1, pointsTo: 15 };
   return {
     bestOf: Number(poolFmt.bestOf) || 1,
     pointsTo: Number(poolFmt.pointsTo) || 11,
+    winByTwo: poolFmt.winByTwo !== false,
     isCustom: false,
   };
 }
