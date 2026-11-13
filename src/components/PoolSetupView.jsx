@@ -99,6 +99,8 @@ export function PoolSetupView({
   setKnockoutFormat,
   includeBronze = true,
   setIncludeBronze,
+  numCourts = 2,
+  setNumCourts,
   roomId,
   setRoomId,
   adminPin,
@@ -149,6 +151,7 @@ export function PoolSetupView({
       poolFormat,
       knockoutFormat,
       includeBronze,
+      numCourts,
     };
     const next = [snap, ...savedPresets.filter((p) => p.id !== snap.id)];
     setSavedPresets(next);
@@ -170,6 +173,7 @@ export function PoolSetupView({
     if (cfg.poolFormat && setPoolFormat) setPoolFormat(cfg.poolFormat);
     if (cfg.knockoutFormat && setKnockoutFormat) setKnockoutFormat(cfg.knockoutFormat);
     if (cfg.includeBronze !== undefined && setIncludeBronze) setIncludeBronze(cfg.includeBronze);
+    if (cfg.numCourts && setNumCourts) setNumCourts(cfg.numCourts);
     showConfigToast(`Applied "${cfg.name || 'config'}"`);
   }
 
@@ -186,6 +190,7 @@ export function PoolSetupView({
       poolFormat,
       knockoutFormat,
       includeBronze,
+      numCourts,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -1220,6 +1225,52 @@ export function PoolSetupView({
             </span>
           </div>
         </label>
+
+        {/* Number of Courts */}
+        {setNumCourts && (
+          <div className="pt-3 border-t border-slate-800 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-200">Number of Courts</span>
+              <span className="text-[11px] font-mono text-slate-400">
+                Assign Court 1–{Math.max(1, Number(numCourts) || 2)} to matchups
+              </span>
+            </div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {[1, 2, 3, 4, 6, 8].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={!isAdmin}
+                  onClick={() => setNumCourts(n)}
+                  className={`py-1.5 rounded-xl text-xs font-bold transition ${
+                    Number(numCourts) === n
+                      ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              disabled={!isAdmin}
+              value={numCourts === '' ? '' : numCourts}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                setNumCourts(val === '' ? '' : Math.min(50, Number(val)));
+              }}
+              onBlur={() => {
+                if (!numCourts || Number(numCourts) < 1) setNumCourts(2);
+              }}
+              placeholder="Custom number of courts (e.g. 6)"
+              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
+            />
+          </div>
+        )}
       </div>
 
       {/* Saved Configuration Presets Card (from MLP Style App) */}

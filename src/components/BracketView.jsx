@@ -60,16 +60,29 @@ function MatchCard({ match, teams, onOpen }) {
         </p>
       )}
       {match.status === 'in_progress' && (
-        <div className="flex items-center justify-between px-2 mt-1">
+        <div className="flex items-center justify-between px-2 mt-1 gap-1.5 flex-wrap">
           <p className="text-cyan-400 text-[10px] font-bold flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
             MATCH IN PROGRESS
           </p>
-          {match.games && match.games.filter((g) => g.inProgress).length > 0 && (
-            <span className="text-cyan-300 text-[10px] font-mono bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">
-              {match.games.filter((g) => g.inProgress).length} active court{match.games.filter((g) => g.inProgress).length === 1 ? '' : 's'}
-            </span>
-          )}
+          <div className="flex items-center gap-1 flex-wrap">
+            {match.games &&
+              Array.from(new Set(match.games.filter((g) => !g.saved && g.court).map((g) => g.court)))
+                .sort((a, b) => a - b)
+                .map((ct) => (
+                  <span
+                    key={ct}
+                    className="text-[#d7f24c] text-[10px] font-mono font-bold bg-[#d7f24c]/10 border border-[#d7f24c]/30 px-1.5 py-0.5 rounded-full"
+                  >
+                    Ct {ct}
+                  </span>
+                ))}
+            {match.games && match.games.filter((g) => g.inProgress).length > 0 && (
+              <span className="text-cyan-300 text-[10px] font-mono bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full">
+                {match.games.filter((g) => g.inProgress).length} active
+              </span>
+            )}
+          </div>
         </div>
       )}
     </button>

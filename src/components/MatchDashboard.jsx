@@ -39,6 +39,8 @@ function GameRow({
   onToggle,
   onSave,
   onToggleInProgress,
+  numCourts = 2,
+  onSetGameCourt,
   onOpenEditMatchup,
   onShuffleGame,
   onRevertGame,
@@ -106,6 +108,12 @@ function GameRow({
               Game {index + 1}
             </p>
 
+            {game.court && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30">
+                Court {game.court}
+              </span>
+            )}
+
             {game.inProgress && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse">
                 <Play size={10} className="fill-current" /> IN PROGRESS
@@ -153,19 +161,36 @@ function GameRow({
           {/* Game Management Controls (In Progress, Edit Matchup, Shuffle) */}
           {isAdmin && !game.saved && (
             <div className="flex items-center justify-between gap-2 mb-3 pb-3 border-b border-slate-800/80 flex-wrap">
-              {/* In Progress Toggle */}
-              <button
-                type="button"
-                onClick={() => onToggleInProgress(game.id)}
-                className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1.5 active:scale-95 ${
-                  game.inProgress
-                    ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20 font-black'
-                    : 'bg-slate-800 hover:bg-slate-750 text-cyan-400 border border-cyan-500/30'
-                }`}
-              >
-                {game.inProgress ? <Pause size={13} /> : <Play size={13} className="fill-current" />}
-                <span>{game.inProgress ? 'Pause / Finish In-Progress' : 'Mark In Progress'}</span>
-              </button>
+              {/* In Progress Toggle + Court Selector */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => onToggleInProgress(game.id)}
+                  className={`py-1.5 px-3 rounded-xl text-xs font-bold transition flex items-center gap-1.5 active:scale-95 ${
+                    game.inProgress
+                      ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20 font-black'
+                      : 'bg-slate-800 hover:bg-slate-750 text-cyan-400 border border-cyan-500/30'
+                  }`}
+                >
+                  {game.inProgress ? <Pause size={13} /> : <Play size={13} className="fill-current" />}
+                  <span>{game.inProgress ? 'Pause / Finish In-Progress' : 'Mark In Progress'}</span>
+                </button>
+                {onSetGameCourt && (
+                  <select
+                    value={game.court || ''}
+                    onChange={(e) => onSetGameCourt(game.id, e.target.value ? Number(e.target.value) : null)}
+                    aria-label="Assign Court"
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-bold text-[#d7f24c] focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+                  >
+                    <option value="">Court —</option>
+                    {Array.from({ length: Math.max(1, Number(numCourts) || 2) }, (_, i) => i + 1).map((c) => (
+                      <option key={c} value={c}>
+                        Court {c}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
 
               {/* Matchup Actions */}
               <div className="flex items-center gap-1.5">
@@ -307,6 +332,8 @@ export function MatchDashboard({
   roomId = '',
   onSaveGame,
   onToggleInProgress,
+  numCourts = 2,
+  onSetGameCourt,
   onOpenEditMatchup,
   onShuffleGame,
   onRandomizeUpcoming,
@@ -480,6 +507,8 @@ export function MatchDashboard({
           onToggle={() => setExpandedId(expandedId === g.id ? null : g.id)}
           onSave={(a, b) => onSaveGame(g.id, a, b)}
           onToggleInProgress={onToggleInProgress}
+          numCourts={numCourts}
+          onSetGameCourt={onSetGameCourt}
           onOpenEditMatchup={onOpenEditMatchup}
           onShuffleGame={onShuffleGame}
           onRevertGame={onRevertGame}

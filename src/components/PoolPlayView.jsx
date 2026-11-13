@@ -37,6 +37,8 @@ function MatchScoreEditor({
   bestOf,
   pointsTo,
   isCustomFormat,
+  numCourts = 2,
+  onSetCourt,
   onSave,
   onToggleLive,
   onEditMatchup,
@@ -94,6 +96,11 @@ function MatchScoreEditor({
               {match.seedLabelA || 'TBD'} vs {match.seedLabelB || 'TBD'}
             </span>
           )}
+          {match.court && (
+            <span className="text-[10px] font-mono font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/30 px-2 py-0.5 rounded-md">
+              Court {match.court}
+            </span>
+          )}
           {isCustomFormat && (
             <span className="text-[10px] font-mono font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-md">
               {bestOf > 1 ? `Bo${bestOf}` : '1G'} &bull; {pointsTo}pts
@@ -113,6 +120,24 @@ function MatchScoreEditor({
 
         {isAdmin && (
           <div className="flex items-center gap-1.5 shrink-0">
+            {onSetCourt && entryA && entryB && (
+              <select
+                value={match.court || ''}
+                onChange={(e) => onSetCourt(e.target.value ? Number(e.target.value) : null)}
+                aria-label="Assign Court"
+                className="bg-slate-800 border border-slate-700 rounded-lg px-1.5 py-1 text-[11px] font-bold text-[#d7f24c] focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+              >
+                <option value="">Ct —</option>
+                {Array.from(
+                  { length: Math.max(Number(numCourts) || 2, Number(match.court) || 0, 1) },
+                  (_, i) => i + 1
+                ).map((c) => (
+                  <option key={c} value={c}>
+                    Ct {c}
+                  </option>
+                ))}
+              </select>
+            )}
             {onEditMatchup && (
               <button
                 type="button"
@@ -281,13 +306,16 @@ function MatchScoreEditor({
 
 export function PoolPlayView({
   tournament,
+  numCourts = 2,
   roomId,
   onSavePoolMatch,
   onTogglePoolMatchLive,
+  onSetPoolMatchCourt,
   onEditPoolMatch,
   onGenerateKnockout,
   onSaveKnockoutMatch,
   onToggleKnockoutMatchLive,
+  onSetKnockoutMatchCourt,
   onEditKnockoutMatch,
   onOpenSetup,
   isAdmin,
@@ -640,6 +668,12 @@ export function PoolPlayView({
                           bestOf={fmt.bestOf}
                           pointsTo={fmt.pointsTo}
                           isCustomFormat={fmt.isCustom}
+                          numCourts={numCourts}
+                          onSetCourt={
+                            onSetPoolMatchCourt
+                              ? (ct) => onSetPoolMatchCourt(pool.id, match.id, ct)
+                              : undefined
+                          }
                           isAdmin={isAdmin}
                           onToggleLive={() => onTogglePoolMatchLive(pool.id, match.id)}
                           onEditMatchup={() =>
@@ -801,6 +835,12 @@ export function PoolPlayView({
                             bestOf={matchFmt.bestOf}
                             pointsTo={matchFmt.pointsTo}
                             isCustomFormat={matchFmt.isCustom}
+                            numCourts={numCourts}
+                            onSetCourt={
+                              onSetKnockoutMatchCourt
+                                ? (ct) => onSetKnockoutMatchCourt(rIdx, m.matchIdx, false, ct)
+                                : undefined
+                            }
                             isAdmin={isAdmin}
                             onToggleLive={() => onToggleKnockoutMatchLive(rIdx, m.matchIdx, false)}
                             onEditMatchup={() =>
@@ -857,6 +897,12 @@ export function PoolPlayView({
                       bestOf={bronzeFmt.bestOf}
                       pointsTo={bronzeFmt.pointsTo}
                       isCustomFormat={bronzeFmt.isCustom}
+                      numCourts={numCourts}
+                      onSetCourt={
+                        onSetKnockoutMatchCourt
+                          ? (ct) => onSetKnockoutMatchCourt(0, 0, true, ct)
+                          : undefined
+                      }
                       isAdmin={isAdmin}
                       onToggleLive={() => onToggleKnockoutMatchLive(0, 0, true)}
                       onEditMatchup={() =>
@@ -1034,6 +1080,7 @@ export function PoolPlayView({
         stageLabel={editingMatchCtx?.stageLabel}
         defaultFormat={editingMatchCtx?.defaultFormat || { bestOf: 1, pointsTo: 11 }}
         allowBye={Boolean(editingMatchCtx?.allowBye)}
+        numCourts={numCourts}
         isAdmin={isAdmin}
         onSave={(payload) => {
           if (!editingMatchCtx) return;

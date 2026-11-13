@@ -85,6 +85,7 @@ const GLOBAL_PRESETS_KEY = 'neep_config_presets_v1';
 
 const SYSTEM_DEFAULT_CONFIG = {
   numTeams: 4,
+  numCourts: 2,
   goalScore: 11,
   dreambreakerScore: 21,
   dreambreakerFormat: 'singles',
@@ -96,6 +97,7 @@ const SYSTEM_DEFAULT_CONFIG = {
 function sanitizeConfigObject(cfg = {}) {
   return {
     numTeams: Number(cfg.numTeams) >= 2 && Number(cfg.numTeams) <= 8 ? Number(cfg.numTeams) : 4,
+    numCourts: Number(cfg.numCourts) >= 1 && Number(cfg.numCourts) <= 50 ? Number(cfg.numCourts) : 2,
     goalScore: Number(cfg.goalScore) >= 1 ? Number(cfg.goalScore) : 11,
     dreambreakerScore: Number(cfg.dreambreakerScore) >= 1 ? Number(cfg.dreambreakerScore) : 21,
     dreambreakerFormat: cfg.dreambreakerFormat === 'doubles' ? 'doubles' : 'singles',
@@ -268,10 +270,12 @@ export default function App() {
   const [poolMatchFormat, setPoolMatchFormat] = useState(() => initialSaved?.poolMatchFormat || { bestOf: 1, pointsTo: 11 });
   const [knockoutMatchFormat, setKnockoutMatchFormat] = useState(() => initialSaved?.knockoutMatchFormat || { bestOf: 3, pointsTo: 11 });
   const [poolIncludeBronze, setPoolIncludeBronze] = useState(() => (initialSaved?.poolIncludeBronze !== undefined ? initialSaved.poolIncludeBronze : true));
+  const [poolNumCourts, setPoolNumCourts] = useState(() => initialSaved?.poolNumCourts || 2);
   const [poolTournament, setPoolTournament] = useState(() => initialSaved?.poolTournament || null);
   const [playerPool, setPlayerPool] = useState(() => initialSaved?.playerPool || []);
   const [nextPlayerId, setNextPlayerId] = useState(() => initialSaved?.nextPlayerId || (initialSaved?.playerPool?.length ? Math.max(...initialSaved.playerPool.map((p) => p.id)) + 1 : 1));
   const [numTeams, setNumTeams] = useState(() => initialSaved?.numTeams || initialDefaultCfg.numTeams || 4);
+  const [numCourts, setNumCourts] = useState(() => initialSaved?.numCourts || initialDefaultCfg.numCourts || 2);
   const [goalScore, setGoalScore] = useState(() => initialSaved?.goalScore || initialDefaultCfg.goalScore || 11);
   const [dreambreakerScore, setDreambreakerScore] = useState(() => initialSaved?.dreambreakerScore || initialDefaultCfg.dreambreakerScore || 21);
   const [dreambreakerFormat, setDreambreakerFormat] = useState(() => initialSaved?.dreambreakerFormat || initialDefaultCfg.dreambreakerFormat || 'singles');
@@ -471,6 +475,7 @@ export default function App() {
           if (cloudTourn.poolMatchFormat) setPoolMatchFormat(cloudTourn.poolMatchFormat);
           if (cloudTourn.knockoutMatchFormat) setKnockoutMatchFormat(cloudTourn.knockoutMatchFormat);
           if (cloudTourn.poolIncludeBronze !== undefined) setPoolIncludeBronze(cloudTourn.poolIncludeBronze);
+          if (cloudTourn.poolNumCourts) setPoolNumCourts(cloudTourn.poolNumCourts);
           if (cloudTourn.poolTournament !== undefined) {
             setPoolTournament(cloudTourn.poolTournament);
             if (cloudTourn.poolTournament) {
@@ -483,6 +488,7 @@ export default function App() {
           if (cloudTourn.playerPool) setPlayerPool(cloudTourn.playerPool);
           if (cloudTourn.nextPlayerId) setNextPlayerId(cloudTourn.nextPlayerId);
           if (cloudTourn.numTeams) setNumTeams(cloudTourn.numTeams);
+          if (cloudTourn.numCourts) setNumCourts(cloudTourn.numCourts);
           if (cloudTourn.goalScore) setGoalScore(cloudTourn.goalScore);
           if (cloudTourn.dreambreakerScore) setDreambreakerScore(cloudTourn.dreambreakerScore);
           if (cloudTourn.dreambreakerFormat) setDreambreakerFormat(cloudTourn.dreambreakerFormat);
@@ -621,8 +627,9 @@ export default function App() {
           poolMatchFormat,
           knockoutMatchFormat,
           poolIncludeBronze,
+          poolNumCourts,
           poolTournament,
-          view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
+          view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
           captainMode, selectedCaptainIds, matchupConfig,
           teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         })
@@ -630,7 +637,7 @@ export default function App() {
     } catch (e) {
       // ignore
     }
-  }, [roomId, adminPin, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolTournament, view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+  }, [roomId, adminPin, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolNumCourts, poolTournament, view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
 
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
@@ -667,8 +674,9 @@ export default function App() {
         poolMatchFormat,
         knockoutMatchFormat,
         poolIncludeBronze,
+        poolNumCourts,
         poolTournament,
-        view, playerPool, nextPlayerId, numTeams, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
+        view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
         captainMode, selectedCaptainIds, matchupConfig,
         teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         ...updates,
@@ -1019,6 +1027,21 @@ export default function App() {
     broadcastTournamentChange({ bracket: nb });
   }
 
+  function handleSetGameCourt(gameId, court) {
+    if (!activePath || !bracket) return;
+    const { round, idx } = activePath;
+    const match = bracket.rounds[round][idx];
+    if (!match.games) return;
+    const cleanCourt = court ? Number(court) : null;
+    const updatedGames = match.games.map((g) =>
+      g.id === gameId ? { ...g, court: cleanCourt } : g
+    );
+    const nb = JSON.parse(JSON.stringify(bracket));
+    nb.rounds[round][idx].games = updatedGames;
+    setBracket(nb);
+    broadcastTournamentChange({ bracket: nb });
+  }
+
   function handleUpdateGameMatchup(gameId, pairA, pairB, slotPair) {
     if (!activePath || !bracket) return;
     const { round, idx } = activePath;
@@ -1328,6 +1351,10 @@ export default function App() {
     setNumTeams(val);
     broadcastTournamentChange({ numTeams: val });
   }
+  function handleUpdateNumCourts(val) {
+    setNumCourts(val);
+    broadcastTournamentChange({ numCourts: val });
+  }
   function handleUpdateGoalScore(val) {
     setGoalScore(val);
     broadcastTournamentChange({ goalScore: val });
@@ -1372,6 +1399,7 @@ export default function App() {
   function getCurrentConfigSnapshot() {
     return sanitizeConfigObject({
       numTeams,
+      numCourts,
       goalScore,
       dreambreakerScore,
       dreambreakerFormat,
@@ -1425,6 +1453,7 @@ export default function App() {
     if (!cfg) return;
     const clean = sanitizeConfigObject(cfg);
     setNumTeams(clean.numTeams);
+    setNumCourts(clean.numCourts);
     setGoalScore(clean.goalScore);
     setDreambreakerScore(clean.dreambreakerScore);
     setDreambreakerFormat(clean.dreambreakerFormat);
@@ -1433,6 +1462,7 @@ export default function App() {
     setMatchupConfig(clean.matchupConfig);
     broadcastTournamentChange({
       numTeams: clean.numTeams,
+      numCourts: clean.numCourts,
       goalScore: clean.goalScore,
       dreambreakerScore: clean.dreambreakerScore,
       dreambreakerFormat: clean.dreambreakerFormat,
@@ -1774,19 +1804,22 @@ export default function App() {
 
   function handleStartPoolTournament() {
     if (poolEntries.length < 2) return;
-    const built = generatePoolsAndSchedule({
-      entries: poolEntries,
-      discipline: poolDiscipline,
-      structure: poolStructure,
-      numPools: poolNumPools,
-      poolFormat: poolMatchFormat,
-      knockoutFormat: knockoutMatchFormat,
-      advancePerPool: poolAdvancePerPool,
-      knockoutFillMode: poolKnockoutFillMode,
-      targetBracketSize: poolTargetBracketSize,
-      includeBronze: poolIncludeBronze,
-      seedingMode: poolSeedingMode,
-    });
+    const built = {
+      ...generatePoolsAndSchedule({
+        entries: poolEntries,
+        discipline: poolDiscipline,
+        structure: poolStructure,
+        numPools: poolNumPools,
+        poolFormat: poolMatchFormat,
+        knockoutFormat: knockoutMatchFormat,
+        advancePerPool: poolAdvancePerPool,
+        knockoutFillMode: poolKnockoutFillMode,
+        targetBracketSize: poolTargetBracketSize,
+        includeBronze: poolIncludeBronze,
+        seedingMode: poolSeedingMode,
+      }),
+      numCourts: poolNumCourts,
+    };
     setPoolTournament(built);
     setView('poolPlay');
     broadcastTournamentChange({
@@ -1849,6 +1882,7 @@ export default function App() {
       targetBracketSize: poolTargetBracketSize,
       includeBronze: poolIncludeBronze,
       seedingMode: poolSeedingMode,
+      numCourts: poolNumCourts,
       pools: nextPools,
       knockout: nextKnockout,
     };
@@ -1905,7 +1939,26 @@ export default function App() {
     broadcastTournamentChange({ poolTournament: updated });
   }
 
-  function handleEditPoolMatch(poolId, matchId, { entryAId, entryBId, customFormat }) {
+  function handleSetPoolMatchCourt(poolId, matchId, court) {
+    if (!poolTournament) return;
+    const cleanCourt = court ? Number(court) : null;
+    const updated = {
+      ...poolTournament,
+      pools: poolTournament.pools.map((pool) => {
+        if (pool.id !== poolId) return pool;
+        return {
+          ...pool,
+          matches: pool.matches.map((m) =>
+            m.id === matchId ? { ...m, court: cleanCourt } : m
+          ),
+        };
+      }),
+    };
+    setPoolTournament(updated);
+    broadcastTournamentChange({ poolTournament: updated });
+  }
+
+  function handleEditPoolMatch(poolId, matchId, { entryAId, entryBId, customFormat, court }) {
     if (!poolTournament) return;
     const updated = {
       ...poolTournament,
@@ -1922,6 +1975,7 @@ export default function App() {
               entryAId,
               entryBId,
               customFormat: customFormat || null,
+              court: court !== undefined ? (court ? Number(court) : null) : (m.court || null),
               games: entrantsChanged
                 ? resizeGamesForBestOf([], nextBestOf)
                 : resizeGamesForBestOf(m.games, nextBestOf),
@@ -2021,7 +2075,21 @@ export default function App() {
     broadcastTournamentChange({ poolTournament: updated });
   }
 
-  function handleEditKnockoutMatch(roundIdx, matchIdx, isBronze, { entryAId, entryBId, customFormat }) {
+  function handleSetKnockoutMatchCourt(roundIdx, matchIdx, isBronze, court) {
+    if (!poolTournament || !poolTournament.knockout) return;
+    const cleanCourt = court ? Number(court) : null;
+    const updatedKnockout = JSON.parse(JSON.stringify(poolTournament.knockout));
+    if (isBronze && updatedKnockout.bronzeMatch) {
+      updatedKnockout.bronzeMatch.court = cleanCourt;
+    } else if (updatedKnockout.rounds[roundIdx]?.[matchIdx]) {
+      updatedKnockout.rounds[roundIdx][matchIdx].court = cleanCourt;
+    }
+    const updated = { ...poolTournament, knockout: updatedKnockout };
+    setPoolTournament(updated);
+    broadcastTournamentChange({ poolTournament: updated });
+  }
+
+  function handleEditKnockoutMatch(roundIdx, matchIdx, isBronze, { entryAId, entryBId, customFormat, court }) {
     if (!poolTournament || !poolTournament.knockout) return;
     let updatedKnockout = JSON.parse(JSON.stringify(poolTournament.knockout));
     const totalRounds = updatedKnockout.rounds.length;
@@ -2040,6 +2108,7 @@ export default function App() {
         entryAId: entryAId || null,
         entryBId: entryBId || null,
         customFormat: customFormat || null,
+        court: court !== undefined ? (court ? Number(court) : null) : (bm.court || null),
         games: entrantsChanged
           ? resizeGamesForBestOf([], fmt.bestOf)
           : resizeGamesForBestOf(bm.games, fmt.bestOf),
@@ -2068,6 +2137,7 @@ export default function App() {
         entryBId: entryBId || null,
         isBye: isNowBye,
         customFormat: customFormat || null,
+        court: court !== undefined ? (court ? Number(court) : null) : (m.court || null),
         games: entrantsChanged
           ? resizeGamesForBestOf([], fmt.bestOf)
           : resizeGamesForBestOf(m.games, fmt.bestOf),
@@ -2419,6 +2489,8 @@ export default function App() {
             onRenameDirectoryPlayer={handleRenameDirectoryPlayer}
             numTeams={numTeams}
             setNumTeams={handleUpdateNumTeams}
+            numCourts={numCourts}
+            setNumCourts={handleUpdateNumCourts}
             goalScore={goalScore}
             setGoalScore={handleUpdateGoalScore}
             dreambreakerScore={dreambreakerScore}
@@ -2489,6 +2561,8 @@ export default function App() {
             roomId={roomId}
             onSaveGame={handleSaveGame}
             onToggleInProgress={handleToggleGameInProgress}
+            numCourts={numCourts}
+            onSetGameCourt={handleSetGameCourt}
             onOpenEditMatchup={(game) => setEditingMatchupGame(game)}
             onShuffleGame={handleShuffleSingleGame}
             onRevertGame={handleRevertSingleGame}
@@ -2635,6 +2709,11 @@ export default function App() {
               setPoolIncludeBronze(v);
               broadcastTournamentChange({ poolIncludeBronze: v });
             }}
+            numCourts={poolNumCourts}
+            setNumCourts={(v) => {
+              setPoolNumCourts(v);
+              broadcastTournamentChange({ poolNumCourts: v });
+            }}
             roomId={roomId}
             setRoomId={(newId) => handleSwitchRoom(newId, adminPin)}
             adminPin={adminPin}
@@ -2649,13 +2728,16 @@ export default function App() {
         {view === 'poolPlay' && (
           <PoolPlayView
             tournament={poolTournament}
+            numCourts={poolTournament?.numCourts || poolNumCourts}
             roomId={roomId}
             onSavePoolMatch={handleSavePoolMatch}
             onTogglePoolMatchLive={handleTogglePoolMatchLive}
+            onSetPoolMatchCourt={handleSetPoolMatchCourt}
             onEditPoolMatch={handleEditPoolMatch}
             onGenerateKnockout={handleGeneratePoolKnockout}
             onSaveKnockoutMatch={handleSaveKnockoutMatch}
             onToggleKnockoutMatchLive={handleToggleKnockoutMatchLive}
+            onSetKnockoutMatchCourt={handleSetKnockoutMatchCourt}
             onEditKnockoutMatch={handleEditKnockoutMatch}
             onOpenSetup={() => setView('poolSetup')}
             isAdmin={isAdmin}

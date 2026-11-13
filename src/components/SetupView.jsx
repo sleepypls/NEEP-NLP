@@ -18,6 +18,8 @@ export function SetupView({
   onRenameDirectoryPlayer,
   numTeams,
   setNumTeams,
+  numCourts = 2,
+  setNumCourts,
   goalScore,
   setGoalScore,
   dreambreakerScore,
@@ -64,6 +66,7 @@ export function SetupView({
       name: presetNameInput.trim() || `${roomId || 'tournament'}-config`,
       exportedAt: new Date().toISOString(),
       numTeams,
+      numCourts,
       goalScore,
       dreambreakerScore,
       dreambreakerFormat,
@@ -686,6 +689,52 @@ export function SetupView({
           className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
         />
       </div>
+
+      {/* Number of Courts */}
+      {setNumCourts && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+          <label className="text-slate-300 text-sm font-semibold mb-1 block">
+            Number of Courts
+          </label>
+          <p className="text-slate-500 text-xs mb-2.5">
+            Set how many courts are available so scorekeepers can assign court numbers to each game.
+          </p>
+          <div className="grid grid-cols-6 gap-1.5 mb-2">
+            {[1, 2, 3, 4, 6, 8].map((n) => (
+              <button
+                key={n}
+                type="button"
+                disabled={!isAdmin}
+                onClick={() => setNumCourts(n)}
+                className={`py-2 rounded-xl text-xs font-bold transition ${
+                  Number(numCourts) === n
+                    ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
+                    : 'bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <input
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            disabled={!isAdmin}
+            value={numCourts === '' ? '' : numCourts}
+            onFocus={(e) => e.target.select()}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '');
+              setNumCourts(val === '' ? '' : Math.min(50, Number(val)));
+            }}
+            onBlur={() => {
+              if (!numCourts || Number(numCourts) < 1) setNumCourts(2);
+            }}
+            placeholder="Custom number of courts (e.g. 4)"
+            className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
+          />
+        </div>
+      )}
 
       {/* Dreambreaker Score Limit & Format */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
