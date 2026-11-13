@@ -33,6 +33,7 @@ import {
   generateBracket,
   advanceWinner,
   distributeCourtsToMatches,
+  redistributeFreedCourtsToOngoingMatches,
   computeAllStats,
   randomizePendingMatchups,
   revertPendingMatchups,
@@ -285,6 +286,8 @@ export default function App() {
   const [allowUneven, setAllowUneven] = useState(() => (initialSaved?.allowUneven !== undefined ? initialSaved.allowUneven : initialDefaultCfg.allowUneven));
   const [captainMode, setCaptainMode] = useState(() => initialSaved?.captainMode || initialDefaultCfg.captainMode || 'random');
   const [selectedCaptainIds, setSelectedCaptainIds] = useState(() => initialSaved?.selectedCaptainIds || []);
+  const [customTeamNames, setCustomTeamNames] = useState(() => initialSaved?.customTeamNames || []);
+  const [matchupCourtsConfig, setMatchupCourtsConfig] = useState(() => initialSaved?.matchupCourtsConfig || {});
   const [matchupConfig, setMatchupConfig] = useState(() => initialSaved?.matchupConfig || initialDefaultCfg.matchupConfig || { preset: 'adjacent', customSlotPairs: [] });
 
   const [teams, setTeams] = useState(() => initialSaved?.teams || []);
@@ -498,6 +501,8 @@ export default function App() {
           if (cloudTourn.allowUneven !== undefined) setAllowUneven(cloudTourn.allowUneven);
           if (cloudTourn.captainMode !== undefined) setCaptainMode(cloudTourn.captainMode);
           if (cloudTourn.selectedCaptainIds !== undefined) setSelectedCaptainIds(cloudTourn.selectedCaptainIds);
+          if (cloudTourn.customTeamNames !== undefined) setCustomTeamNames(cloudTourn.customTeamNames);
+          if (cloudTourn.matchupCourtsConfig !== undefined) setMatchupCourtsConfig(cloudTourn.matchupCourtsConfig);
           if (cloudTourn.matchupConfig !== undefined) setMatchupConfig(cloudTourn.matchupConfig);
           if (cloudTourn.teams) setTeams(cloudTourn.teams);
           if (cloudTourn.playersById) setPlayersById(cloudTourn.playersById);
@@ -633,14 +638,14 @@ export default function App() {
           poolNumCourts,
           poolTournament,
           view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
-          captainMode, selectedCaptainIds, matchupConfig,
+          captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig,
           teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         })
       );
     } catch (e) {
       // ignore
     }
-  }, [roomId, adminPin, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolNumCourts, poolTournament, view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
+  }, [roomId, adminPin, tournamentStyle, poolDiscipline, poolStructure, poolEntries, poolNumPools, poolAdvancePerPool, poolKnockoutFillMode, poolTargetBracketSize, poolSeedingMode, poolMatchFormat, knockoutMatchFormat, poolIncludeBronze, poolNumCourts, poolTournament, view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven, captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig, teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath]);
 
 
   function syncTournamentStats(currentBracket, currentTeams, currentPlayers) {
@@ -680,7 +685,7 @@ export default function App() {
         poolNumCourts,
         poolTournament,
         view, playerPool, nextPlayerId, numTeams, numCourts, goalScore, dreambreakerScore, dreambreakerFormat, allowUneven,
-        captainMode, selectedCaptainIds, matchupConfig,
+        captainMode, selectedCaptainIds, customTeamNames, matchupCourtsConfig, matchupConfig,
         teams, playersById, remainingPool, pickSequence, pickPointer, sittingOut, bracket, activePath,
         ...updates,
       });
@@ -870,7 +875,13 @@ export default function App() {
 
   function handleInitializeDraft() {
     const captainsToUse = captainMode === 'manual' ? selectedCaptainIds : [];
-    const result = initializeDraftState(playerPool, numTeams, allowUneven, captainsToUse);
+    const result = initializeDraftState(
+      playerPool,
+      numTeams,
+      allowUneven,
+      captainsToUse,
+      customTeamNames
+    );
     setTeams(result.teams);
     setRemainingPool(result.remainingPool);
     setPickSequence(result.pickSequence);
@@ -910,6 +921,14 @@ export default function App() {
     });
   }
 
+  function handleRenameTeam(teamId, newName) {
+    const clean = String(newName || '').trim();
+    if (!clean) return;
+    const updatedTeams = teams.map((t) => (t.id === teamId ? { ...t, name: clean } : t));
+    setTeams(updatedTeams);
+    broadcastTournamentChange({ teams: updatedTeams });
+  }
+
   function handleGenerateBracket() {
     const rawBracket = generateBracket(teams);
     const newBracket = distributeCourtsToMatches(
@@ -917,7 +936,8 @@ export default function App() {
       teams,
       numCourts,
       goalScore,
-      matchupConfig
+      matchupConfig,
+      matchupCourtsConfig
     );
     setBracket(newBracket);
     setView('bracket');
@@ -1045,12 +1065,16 @@ export default function App() {
         const winnerId = gamesWonA > gamesWonB ? match.teamAId : match.teamBId;
         m.status = 'complete';
         m.winnerId = winnerId;
-        nb = distributeCourtsToMatches(
-          advanceWinner(nb, round, idx, winnerId),
-          teams,
-          numCourts,
-          goalScore,
-          matchupConfig
+        nb = redistributeFreedCourtsToOngoingMatches(
+          distributeCourtsToMatches(
+            advanceWinner(nb, round, idx, winnerId),
+            teams,
+            numCourts,
+            goalScore,
+            matchupConfig,
+            matchupCourtsConfig
+          ),
+          numCourts
         );
       }
     } else {
@@ -1428,7 +1452,17 @@ export default function App() {
       const winnerId = newScoreA > newScoreB ? match.teamAId : match.teamBId;
       m.dreambreaker.completed = true;
       m.dreambreaker.winnerId = winnerId;
-      nb = advanceWinner(nb, round, idx, winnerId);
+      nb = redistributeFreedCourtsToOngoingMatches(
+        distributeCourtsToMatches(
+          advanceWinner(nb, round, idx, winnerId),
+          teams,
+          numCourts,
+          goalScore,
+          matchupConfig,
+          matchupCourtsConfig
+        ),
+        numCourts
+      );
     }
 
     setBracket(nb);
@@ -2673,6 +2707,16 @@ export default function App() {
             setCaptainMode={handleUpdateCaptainMode}
             selectedCaptainIds={selectedCaptainIds}
             setSelectedCaptainIds={handleUpdateSelectedCaptainIds}
+            customTeamNames={customTeamNames}
+            setCustomTeamNames={(val) => {
+              setCustomTeamNames(val);
+              broadcastTournamentChange({ customTeamNames: val });
+            }}
+            matchupCourtsConfig={matchupCourtsConfig}
+            setMatchupCourtsConfig={(val) => {
+              setMatchupCourtsConfig(val);
+              broadcastTournamentChange({ matchupCourtsConfig: val });
+            }}
             matchupConfig={matchupConfig}
             setMatchupConfig={handleUpdateMatchupConfig}
             savedDefaultConfig={savedDefaultConfig}
@@ -2700,6 +2744,7 @@ export default function App() {
             sittingOut={sittingOut}
             onDraftPlayer={draftPlayer}
             onReorderDraftPosition={handleReorderDraftPosition}
+            onRenameTeam={handleRenameTeam}
             onGenerateBracket={handleGenerateBracket}
             isAdmin={isAdmin}
           />
@@ -3002,6 +3047,7 @@ export default function App() {
         savedPlayers={savedPlayers}
         onSubstitutePlayer={handleSubstitutePlayer}
         onRenamePlayer={handleRenamePlayer}
+        onRenameTeam={handleRenameTeam}
         onReorderDraftPosition={handleReorderDraftPosition}
         isAdmin={isAdmin}
         initialTeamId={rosterModalTeamId}

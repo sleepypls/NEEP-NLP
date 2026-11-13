@@ -39,6 +39,18 @@ function MatchCard({
           : 'border-slate-850 opacity-60 cursor-default'
       }`}
     >
+      {match.matchNumber && (
+        <div className="flex items-center justify-between px-2 mb-1.5">
+          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 bg-slate-800/80 border border-slate-700/70 px-2 py-0.5 rounded-md">
+            Matchup #{match.matchNumber}
+          </span>
+          {assignedCourts.length > 0 && !isComplete && (
+            <span className="text-[10px] font-mono font-bold text-[#d7f24c]">
+              {assignedCourts.map((c) => `Ct ${c}`).join(', ')}
+            </span>
+          )}
+        </div>
+      )}
       {[
         { team: teamA, score: match.gamesWonA, id: match.teamAId },
         { team: teamB, score: match.gamesWonB, id: match.teamBId, isByeRow: match.isBye && !teamB },

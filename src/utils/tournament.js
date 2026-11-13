@@ -899,7 +899,13 @@ export function generateLeaderboardCSV({ globalStats = {}, partnershipStats = {}
   return lines.join('\r\n');
 }
 
-export function initializeDraftState(playerPool, numTeams, allowUneven = true, selectedCaptainIds = []) {
+export function initializeDraftState(
+  playerPool,
+  numTeams,
+  allowUneven = true,
+  selectedCaptainIds = [],
+  customTeamNames = []
+) {
   const teams = [];
   const draftPlayers = [...playerPool];
   const sittingOut = [];
@@ -953,8 +959,9 @@ export function initializeDraftState(playerPool, numTeams, allowUneven = true, s
 
   for (let i = 0; i < numTeams; i++) {
     const player = captains[i];
+    const customName = Array.isArray(customTeamNames) ? String(customTeamNames[i] || '').trim() : '';
     teams[i].captainId = player.id;
-    teams[i].name = `Team ${player.name}`;
+    teams[i].name = customName || `Team ${player.name}`;
     teams[i].draftOrder.push(player.id);
   }
 
@@ -998,6 +1005,7 @@ export function generateBracket(teamsInput) {
     slots[i] = order[i].id;
   }
 
+  let matchNumberCounter = 1;
   const round0 = [];
   for (let i = 0; i < bracketSize; i += 2) {
     const teamAId = slots[i];
@@ -1005,6 +1013,7 @@ export function generateBracket(teamsInput) {
     const isBye = teamAId !== null && teamBId === null;
     round0.push({
       id: `r0-m${i / 2}`,
+      matchNumber: matchNumberCounter++,
       teamAId,
       teamBId,
       winnerId: isBye ? teamAId : null,
@@ -1024,6 +1033,7 @@ export function generateBracket(teamsInput) {
     for (let m = 0; m < prevMatches / 2; m++) {
       matches.push({
         id: `r${r}-m${m}`,
+        matchNumber: matchNumberCounter++,
         teamAId: null,
         teamBId: null,
         winnerId: null,
@@ -1081,7 +1091,8 @@ export function distributeCourtsToMatches(
   teams = [],
   numCourts = 2,
   goalScore = 11,
-  matchupConfig = { preset: 'adjacent', customSlotPairs: [] }
+  matchupConfig = { preset: 'adjacent', customSlotPairs: [] },
+  matchupCourtsConfig = {}
 ) {
   if (!bracket || !Array.isArray(bracket.rounds)) return bracket;
   const nb = JSON.parse(JSON.stringify(bracket));
@@ -1115,7 +1126,13 @@ export function distributeCourtsToMatches(
 
     const usedInitialCourts = new Set();
     activeMatches.forEach((m, idx) => {
-      m.assignedCourts = buckets[idx] || [1];
+      const configured =
+        m.matchNumber &&
+        Array.isArray(matchupCourtsConfig?.[m.matchNumber]) &&
+        matchupCourtsConfig[m.matchNumber].length > 0
+          ? matchupCourtsConfig[m.matchNumber].filter((c) => Number(c) >= 1 && Number(c) <= totalCourts)
+          : null;
+      m.assignedCourts = configured && configured.length > 0 ? configured : (buckets[idx] || [1]);
       if (!m.games) {
         const teamA = teamMap.get(m.teamAId);
         const teamB = teamMap.get(m.teamBId);
@@ -1137,6 +1154,53 @@ export function distributeCourtsToMatches(
             cIdx++;
           }
         });
+      }
+    });
+  });
+
+  return nb;
+}
+
+/**
+ * When a matchup finishes in a round, opens up its assigned courts to any
+ * ongoing/ready matchups still playing in that same round.
+ */
+export function redistributeFreedCourtsToOngoingMatches(bracket, numCourts = 2) {
+  if (!bracket || !Array.isArray(bracket.rounds)) return bracket;
+  const nb = JSON.parse(JSON.stringify(bracket));
+  const totalCourts = Math.max(1, Number(numCourts) || 2);
+
+  nb.rounds.forEach((round) => {
+    const ongoing = round.filter(
+      (m) => m.teamAId !== null && m.teamBId !== null && !m.isBye && m.status !== 'complete'
+    );
+    const completed = round.filter((m) => m.status === 'complete' && !m.isBye);
+    if (ongoing.length === 0 || completed.length === 0) return;
+
+    // Collect courts currently held by ongoing matches or actively live games
+    const claimed = new Set();
+    ongoing.forEach((m) => {
+      (m.assignedCourts || []).forEach((c) => claimed.add(Number(c)));
+      (m.games || []).forEach((g) => {
+        if (g.inProgress && !g.saved && g.court) claimed.add(Number(g.court));
+      });
+    });
+
+    const freedCourts = [];
+    for (let c = 1; c <= totalCourts; c++) {
+      if (!claimed.has(c)) freedCourts.push(c);
+    }
+    if (freedCourts.length === 0) return;
+
+    // Distribute freed courts round-robin to ongoing matchups
+    freedCourts.forEach((c, idx) => {
+      const target = ongoing[idx % ongoing.length];
+      target.assignedCourts = Array.from(new Set([...(target.assignedCourts || []), c])).sort(
+        (a, b) => a - b
+      );
+      if (Array.isArray(target.games)) {
+        const unassignedGame = target.games.find((g) => !g.saved && !g.inProgress && !g.court);
+        if (unassignedGame) unassignedGame.court = c;
       }
     });
   });

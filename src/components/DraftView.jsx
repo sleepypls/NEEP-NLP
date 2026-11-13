@@ -1,5 +1,5 @@
-import React from 'react';
-import { UserCheck, Swords, ShieldAlert, Crown, ChevronUp, ChevronDown } from 'lucide-react';
+import React, { useState } from 'react';
+import { UserCheck, Swords, ShieldAlert, Crown, ChevronUp, ChevronDown, Pencil, Check } from 'lucide-react';
 
 export function DraftView({
   teams,
@@ -10,9 +10,12 @@ export function DraftView({
   sittingOut,
   onDraftPlayer,
   onReorderDraftPosition,
+  onRenameTeam,
   onGenerateBracket,
   isAdmin,
 }) {
+  const [editingTeamId, setEditingTeamId] = useState(null);
+  const [teamNameDraft, setTeamNameDraft] = useState('');
   const currentTeamIdx = pickPointer < pickSequence.length ? pickSequence[pickPointer] : null;
   const currentTeam = currentTeamIdx !== null ? teams[currentTeamIdx] : null;
   const isDraftComplete = pickPointer >= pickSequence.length;
@@ -83,9 +86,54 @@ export function DraftView({
             }`}
             style={{ borderColor: team.color.accent }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-bold text-white text-sm truncate">{team.name}</span>
-              <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              {editingTeamId === team.id && isAdmin ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (teamNameDraft.trim() && onRenameTeam) {
+                      onRenameTeam(team.id, teamNameDraft.trim());
+                    }
+                    setEditingTeamId(null);
+                  }}
+                  className="flex items-center gap-1 flex-1 min-w-0"
+                >
+                  <input
+                    type="text"
+                    autoFocus
+                    value={teamNameDraft}
+                    onChange={(e) => setTeamNameDraft(e.target.value)}
+                    onBlur={() => {
+                      if (teamNameDraft.trim() && onRenameTeam) {
+                        onRenameTeam(team.id, teamNameDraft.trim());
+                      }
+                      setEditingTeamId(null);
+                    }}
+                    className="w-full bg-slate-800 border border-[#d7f24c] rounded-lg px-2 py-0.5 text-white text-xs font-bold focus:outline-none"
+                  />
+                  <button type="submit" className="text-[#d7f24c] p-0.5 shrink-0">
+                    <Check size={14} />
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="font-bold text-white text-sm truncate">{team.name}</span>
+                  {isAdmin && onRenameTeam && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTeamId(team.id);
+                        setTeamNameDraft(team.name);
+                      }}
+                      className="text-slate-500 hover:text-[#d7f24c] p-0.5 rounded transition shrink-0"
+                      title="Rename team"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
+                </div>
+              )}
+              <span className="text-xs font-mono font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full shrink-0">
                 {team.draftOrder.length} players
               </span>
             </div>

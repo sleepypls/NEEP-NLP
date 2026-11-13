@@ -9,6 +9,7 @@ export function RosterModal({
   savedPlayers = [],
   onSubstitutePlayer,
   onRenamePlayer,
+  onRenameTeam,
   onReorderDraftPosition,
   isAdmin,
   initialTeamId = null,
@@ -18,6 +19,8 @@ export function RosterModal({
   const [subName, setSubName] = useState('');
   const [editingPlayerId, setEditingPlayerId] = useState(null);
   const [editName, setEditName] = useState('');
+  const [isEditingTeamName, setIsEditingTeamName] = useState(false);
+  const [teamNameInput, setTeamNameInput] = useState('');
 
   if (!isOpen) return null;
 
@@ -117,13 +120,55 @@ export function RosterModal({
           {activeTeam && (
             <>
               <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   <span
                     className="w-3 h-3 rounded-full shrink-0"
                     style={{ backgroundColor: activeTeam.color?.accent || '#64748b' }}
                   />
-                  <span className="font-bold text-white text-base">{activeTeam.name}</span>
-                  <span className="text-xs text-slate-500 font-medium">({activeTeam.draftOrder.length} players)</span>
+                  {isEditingTeamName && isAdmin ? (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (teamNameInput.trim() && onRenameTeam) {
+                          onRenameTeam(activeTeam.id, teamNameInput.trim());
+                        }
+                        setIsEditingTeamName(false);
+                      }}
+                      className="flex items-center gap-1.5 flex-1 min-w-0"
+                    >
+                      <input
+                        type="text"
+                        autoFocus
+                        value={teamNameInput}
+                        onChange={(e) => setTeamNameInput(e.target.value)}
+                        className="flex-1 bg-slate-800 border border-[#d7f24c] rounded-lg px-2.5 py-1 text-white text-sm font-bold focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="px-2 py-1 rounded-lg bg-[#d7f24c] text-slate-950 text-xs font-bold"
+                      >
+                        <Check size={13} />
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="font-bold text-white text-base truncate">{activeTeam.name}</span>
+                      {isAdmin && onRenameTeam && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsEditingTeamName(true);
+                            setTeamNameInput(activeTeam.name);
+                          }}
+                          className="text-slate-400 hover:text-[#d7f24c] p-1 rounded transition shrink-0"
+                          title="Rename team"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      )}
+                      <span className="text-xs text-slate-500 font-medium shrink-0">({activeTeam.draftOrder.length} players)</span>
+                    </>
+                  )}
                 </div>
               </div>
 

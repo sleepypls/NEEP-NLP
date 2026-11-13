@@ -32,6 +32,10 @@ export function SetupView({
   setCaptainMode,
   selectedCaptainIds = [],
   setSelectedCaptainIds,
+  customTeamNames = [],
+  setCustomTeamNames,
+  matchupCourtsConfig = {},
+  setMatchupCourtsConfig,
   matchupConfig = { preset: 'adjacent', customSlotPairs: [] },
   setMatchupConfig,
   savedDefaultConfig = null,
@@ -765,6 +769,122 @@ export function SetupView({
             placeholder="Custom number of courts (e.g. 4)"
             className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
           />
+
+          {/* Pre-assign courts per Round 1 matchup */}
+          {setMatchupCourtsConfig && Math.floor(numTeams / 2) >= 1 && (
+            <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold text-slate-300">
+                  Pre-Assign Courts by Matchup (Round 1)
+                </span>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const mCount = Math.floor(numTeams / 2);
+                      const cCount = Math.max(1, Number(numCourts) || 2);
+                      const next = {};
+                      if (cCount >= mCount) {
+                        const base = Math.floor(cCount / mCount);
+                        const extra = cCount % mCount;
+                        let cursor = 1;
+                        for (let i = 0; i < mCount; i++) {
+                          const size = base + (i < extra ? 1 : 0);
+                          next[i + 1] = [];
+                          for (let j = 0; j < size; j++) next[i + 1].push(cursor++);
+                        }
+                      } else {
+                        for (let i = 0; i < mCount; i++) {
+                          next[i + 1] = [(i % cCount) + 1];
+                        }
+                      }
+                      setMatchupCourtsConfig(next);
+                    }}
+                    className="text-[11px] font-bold text-[#d7f24c] hover:underline"
+                  >
+                    Auto-Split Evenly
+                  </button>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Leave blank to auto-split evenly, or tap courts below to assign them to each matchup.
+              </p>
+              <div className="space-y-1.5">
+                {Array.from({ length: Math.floor(numTeams / 2) }, (_, i) => i + 1).map((matchNum) => {
+                  const assigned = Array.isArray(matchupCourtsConfig?.[matchNum])
+                    ? matchupCourtsConfig[matchNum]
+                    : [];
+                  return (
+                    <div
+                      key={matchNum}
+                      className="flex items-center justify-between gap-2 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2"
+                    >
+                      <span className="text-xs font-mono font-bold text-white shrink-0">
+                        Matchup #{matchNum}
+                      </span>
+                      <div className="flex items-center gap-1 flex-wrap justify-end">
+                        {Array.from({ length: Math.max(1, Number(numCourts) || 2) }, (_, cIdx) => cIdx + 1).map((ct) => {
+                          const active = assigned.includes(ct);
+                          return (
+                            <button
+                              key={ct}
+                              type="button"
+                              disabled={!isAdmin}
+                              onClick={() => {
+                                const nextArr = active
+                                  ? assigned.filter((x) => x !== ct)
+                                  : [...assigned, ct].sort((a, b) => a - b);
+                                setMatchupCourtsConfig({
+                                  ...(matchupCourtsConfig || {}),
+                                  [matchNum]: nextArr,
+                                });
+                              }}
+                              className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-bold border transition ${
+                                active
+                                  ? 'bg-[#d7f24c] text-slate-950 border-[#d7f24c]'
+                                  : 'bg-slate-800 text-slate-400 hover:text-white border-slate-700'
+                              }`}
+                            >
+                              C{ct}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Custom Team Names (Optional) */}
+      {setCustomTeamNames && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+          <label className="text-slate-300 text-sm font-semibold mb-1 block">
+            Custom Team Names <span className="text-slate-500 text-xs font-normal">(Optional)</span>
+          </label>
+          <p className="text-slate-500 text-xs mb-3">
+            Leave blank to default each team name to its Captain&apos;s name.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {Array.from({ length: numTeams }, (_, i) => (
+              <input
+                key={i}
+                type="text"
+                disabled={!isAdmin}
+                value={customTeamNames[i] || ''}
+                onChange={(e) => {
+                  const next = [...(customTeamNames || [])];
+                  next[i] = e.target.value;
+                  setCustomTeamNames(next);
+                }}
+                placeholder={`Team ${i + 1} (Defaults to Captain)`}
+                className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white text-xs placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-[#d7f24c] disabled:opacity-60"
+              />
+            ))}
+          </div>
         </div>
       )}
 

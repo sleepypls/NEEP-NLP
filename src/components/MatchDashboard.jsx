@@ -474,6 +474,7 @@ export function MatchDashboard({
           </div>
         </div>
         <p className="text-slate-500 text-[11px] sm:text-xs text-center">
+          {match.matchNumber ? `Matchup #${match.matchNumber} • ` : ''}
           Regulation &mdash; first to win the most of {match.games.length} games
         </p>
       </div>

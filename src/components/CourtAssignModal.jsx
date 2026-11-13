@@ -291,7 +291,7 @@ export function MlpCourtAssignModal({
         if (m.isBye || !m.games || m.status === 'complete') return;
         const tA = teamMap.get(m.teamAId) || 'Team A';
         const tB = teamMap.get(m.teamBId) || 'Team B';
-        const matchLabel = `${tA} vs ${tB}`;
+        const matchLabel = `${m.matchNumber ? `#${m.matchNumber} ` : ''}${tA} vs ${tB}`;
         m.games.forEach((g, gIdx) => {
           if (!g.saved && !g.inProgress) {
             eligibleGames.push({
