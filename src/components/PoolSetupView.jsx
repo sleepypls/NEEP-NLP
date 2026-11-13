@@ -390,9 +390,9 @@ export function PoolSetupView({
   ) : null;
 
   return (
-    <div className="max-w-lg lg:max-w-6xl mx-auto px-4 lg:px-6 py-6 pb-24 animate-in fade-in duration-200">
+    <div className="max-w-lg lg:max-w-6xl mx-auto px-4 lg:px-6 py-4 pb-20 animate-in fade-in duration-200">
       {/* Hero Banner */}
-      <div className="flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-900/95 to-emerald-950/30 border border-slate-800 rounded-3xl p-4 mb-6 shadow-xl">
+      <div className="flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-900/95 to-emerald-950/30 border border-slate-800 rounded-3xl p-3.5 mb-4 shadow-xl">
         <div className="w-14 h-16 flex-shrink-0 flex items-center justify-center filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
           <img src="/logo.png" alt="NEEP-NLP Logo" className="w-full h-full object-contain" />
         </div>
@@ -431,7 +431,7 @@ export function PoolSetupView({
       </p>
 
       {/* Setup Configuration Tabs */}
-      <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-5 shadow-lg overflow-x-auto">
+      <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-3.5 shadow-lg overflow-x-auto">
         {[
           { id: 'entries', label: '1. Players & Entries' },
           { id: 'structure', label: '2. Tournament Config' },
@@ -453,10 +453,10 @@ export function PoolSetupView({
         ))}
       </div>
 
-      <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
-        <div className={activeTab === 'entries' ? 'lg:col-span-12 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start' : 'hidden'}>
+      <div className="lg:grid lg:grid-cols-12 lg:gap-4 lg:items-start">
+        <div className={activeTab === 'entries' ? 'lg:col-span-12 lg:grid lg:grid-cols-12 lg:gap-4 lg:items-start' : 'hidden'}>
           {/* Players & Entries Card (Left side on desktop to match MLP SetupView) */}
-      <div className={`${isAdmin ? 'lg:col-span-6' : 'lg:col-span-12'} bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4`}>
+      <div className={`${isAdmin ? 'lg:col-span-6' : 'lg:col-span-12'} bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 lg:mb-0 shadow-xl space-y-3`}>
         <div>
           <div className="flex items-center justify-between gap-2 mb-2">
             <label className="text-slate-200 text-sm font-bold">
@@ -708,7 +708,7 @@ export function PoolSetupView({
 
         {/* Room Directory Card (Right side on desktop to match MLP SetupView) */}
         {isAdmin && (
-          <div className="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+          <div className="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 lg:mb-0 shadow-xl">
             <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 min-w-0">
                 <Users size={13} className="text-[#d7f24c] shrink-0" />
@@ -946,7 +946,7 @@ export function PoolSetupView({
         </div>
         <div className={activeTab === 'entries' ? 'hidden' : 'lg:col-span-12'}>
           {/* Pool & Knockout Rules Card */}
-      <div className={activeTab === 'structure' || activeTab === 'scoring' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 mb-4 shadow-xl space-y-4' : 'hidden'}>
+      <div className={activeTab === 'structure' || activeTab === 'scoring' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 shadow-xl space-y-3' : 'hidden'}>
         <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
           <Trophy size={16} className="text-amber-400" />{' '}
           {activeTab === 'scoring'

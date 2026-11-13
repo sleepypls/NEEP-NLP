@@ -188,9 +188,9 @@ export function SetupView({
   }
 
   return (
-    <div className="max-w-lg lg:max-w-6xl mx-auto px-4 lg:px-6 py-6 pb-24 animate-in fade-in duration-200">
+    <div className="max-w-lg lg:max-w-6xl mx-auto px-4 lg:px-6 py-4 pb-20 animate-in fade-in duration-200">
       {/* Club Hero Card */}
-      <div className="flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-900/95 to-blue-950/40 border border-slate-800 rounded-3xl p-4 mb-6 shadow-xl relative overflow-hidden">
+      <div className="flex items-center gap-4 bg-gradient-to-r from-slate-900 via-slate-900/95 to-blue-950/40 border border-slate-800 rounded-3xl p-3.5 mb-4 shadow-xl relative overflow-hidden">
         <div className="w-14 h-16 flex-shrink-0 flex items-center justify-center filter drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
           <img src="/logo.png" alt="NEEP-NLP Score Tracker Logo" className="w-full h-full object-contain" />
         </div>
@@ -255,7 +255,7 @@ export function SetupView({
       )}
 
       {/* Setup Configuration Tabs */}
-      <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-5 shadow-lg overflow-x-auto">
+      <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-3.5 shadow-lg overflow-x-auto">
         {[
           { id: 'players', label: '1. Players' },
           { id: 'teams', label: '2. Teams' },
@@ -277,10 +277,10 @@ export function SetupView({
         ))}
       </div>
 
-      <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
-        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'hidden' : activeTab === 'players' ? 'lg:col-span-12 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start' : 'lg:col-span-6'}>
+      <div className="lg:grid lg:grid-cols-12 lg:gap-4 lg:items-start">
+        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'hidden' : activeTab === 'players' ? 'lg:col-span-12 lg:grid lg:grid-cols-12 lg:gap-4 lg:items-start' : 'lg:col-span-6'}>
           {/* Player Pool Card (Left side on desktop) */}
-      <div className={activeTab === 'players' ? `${isAdmin ? 'lg:col-span-6' : 'lg:col-span-12'} bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl` : 'hidden'}>
+      <div className={activeTab === 'players' ? `${isAdmin ? 'lg:col-span-6' : 'lg:col-span-12'} bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 lg:mb-0 shadow-xl` : 'hidden'}>
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <div>
             <label className="text-slate-200 text-sm font-bold block">
@@ -404,7 +404,7 @@ export function SetupView({
 
         {/* Saved Players Tray (Per-Room Directory — Right side on desktop) */}
         {isAdmin && (
-          <div className={activeTab === 'players' ? 'lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+          <div className={activeTab === 'players' ? 'lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 lg:mb-0 shadow-xl' : 'hidden'}>
             <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 min-w-0">
                 <Users size={13} className="text-[#d7f24c] shrink-0" />
@@ -678,10 +678,10 @@ export function SetupView({
       </div>
 
         </div>
-        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'lg:col-span-12 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start' : activeTab === 'players' ? 'hidden' : 'lg:col-span-6'}>
+        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'lg:col-span-12 lg:columns-2 lg:gap-4' : activeTab === 'players' ? 'hidden' : 'lg:col-span-6'}>
           {/* Number of Courts (Tab 3: Matchup Config) */}
           {setNumCourts && (
-            <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-2' : 'hidden'}>
+            <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 break-inside-avoid shadow-xl space-y-2' : 'hidden'}>
               <div className="flex items-center justify-between gap-2">
                 <label className="text-slate-200 text-sm font-bold">Number of Courts</label>
                 <span className="text-[11px] font-mono text-slate-400">
@@ -729,7 +729,7 @@ export function SetupView({
           )}
 
           {/* Number of Teams (Tab 2: Teams) */}
-      <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+      <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 break-inside-avoid shadow-xl' : 'hidden'}>
         <label className="text-slate-300 text-sm font-semibold mb-2 block">Number of Teams</label>
         <select
           disabled={!isAdmin}
@@ -748,7 +748,7 @@ export function SetupView({
       </div>
 
       {/* Captain Selection Card */}
-      <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+      <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 break-inside-avoid shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-2">
           <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
             <Crown size={16} className="text-amber-400" /> Captain Selection
@@ -866,7 +866,7 @@ export function SetupView({
       </div>
 
       {/* Goal Score Limit */}
-      <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+      <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 break-inside-avoid shadow-xl' : 'hidden'}>
         <label className="text-slate-300 text-sm font-semibold mb-2 block">Regulation Goal Score Limit</label>
         <div className="flex gap-2 mb-2">
           {[11, 15, 21].map((preset) => (
@@ -906,7 +906,7 @@ export function SetupView({
 
       {/* Pre-assign courts per Round 1 matchup */}
       {setMatchupCourtsConfig && Math.floor(numTeams / 2) >= 1 && (
-        <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+        <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 break-inside-avoid shadow-xl' : 'hidden'}>
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-bold text-slate-300">
@@ -995,7 +995,7 @@ export function SetupView({
 
       {/* Custom Team Names (Optional) */}
       {setCustomTeamNames && (
-        <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+        <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 break-inside-avoid shadow-xl' : 'hidden'}>
           <label className="text-slate-300 text-sm font-semibold mb-1 block">
             Custom Team Names <span className="text-slate-500 text-xs font-normal">(Optional)</span>
           </label>
@@ -1023,7 +1023,7 @@ export function SetupView({
       )}
 
       {/* Dreambreaker Score Limit & Format */}
-      <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+      <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 break-inside-avoid shadow-xl' : 'hidden'}>
         <label className="text-slate-300 text-sm font-semibold mb-1 flex items-center justify-between">
           <span className="flex items-center gap-1.5"><Zap size={14} className="text-amber-400" /> Dreambreaker Format &amp; Score Limit</span>
           <span className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">Tiebreaker</span>
@@ -1099,7 +1099,7 @@ export function SetupView({
       </div>
 
       {/* Partner Matchup Configuration Card */}
-      <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+      <div className={activeTab === 'courts' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 break-inside-avoid shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-1">
           <label className="text-slate-200 text-sm font-bold flex items-center gap-1.5">
             <ArrowRightLeft size={16} className="text-[#d7f24c]" /> Partner Matchup Configuration
@@ -1260,7 +1260,7 @@ export function SetupView({
       </div>
 
       {/* Uneven Teams Toggle */}
-      <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+      <div className={activeTab === 'teams' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-3 break-inside-avoid shadow-xl' : 'hidden'}>
         <label className="flex items-start gap-3 cursor-pointer select-none">
           <input
             type="checkbox"
