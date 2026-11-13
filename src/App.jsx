@@ -502,7 +502,11 @@ export default function App() {
           if (cloudTourn.poolTournament !== undefined) {
             setPoolTournament(cloudTourn.poolTournament);
             if (cloudTourn.poolTournament) {
-              setView((curr) => (curr === 'poolSetup' || curr === 'setup' ? 'poolPlay' : curr));
+              setView((curr) =>
+                curr === 'poolSetup' || curr === 'setup' || (!isAdmin && curr === 'draft')
+                  ? 'poolPlay'
+                  : curr
+              );
             }
           }
           if (cloudTourn.tournamentStyle === 'tournament' && !cloudTourn.poolTournament) {
@@ -530,8 +534,8 @@ export default function App() {
           if (cloudTourn.bracket !== undefined) {
             setBracket(cloudTourn.bracket);
             if (cloudTourn.bracket) {
-              // Spectator smart routing: if spectator arrives and bracket exists while still on setup, route to bracket!
-              setView((curr) => (curr === 'setup' ? 'bracket' : curr));
+              // Spectator/player smart routing: if bracket exists while still on setup or draft, route to bracket!
+              setView((curr) => (curr === 'setup' || curr === 'draft' ? 'bracket' : curr));
             }
           }
           if (cloudTourn.adminPin) setAdminPin(cloudTourn.adminPin);
@@ -2437,7 +2441,13 @@ export default function App() {
       localStorage.setItem(`neep_player_login_${roomId || 'default'}`, clean);
     } catch (e) {}
     if (!isAdmin && clean) {
-      setView(tournamentStyle === 'tournament' ? 'poolPlay' : (bracket ? 'bracket' : 'draft'));
+      if (tournamentStyle === 'tournament' && poolTournament) {
+        setView('poolPlay');
+      } else if (bracket) {
+        setView('bracket');
+      } else if (tournamentStyle !== 'tournament' && teams.length > 0) {
+        setView('draft');
+      }
     }
   }
 
@@ -2449,10 +2459,21 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (!isAdmin && loggedInPlayerName && ['setup', 'poolSetup', 'leaderboard'].includes(view)) {
-      setView(tournamentStyle === 'tournament' ? 'poolPlay' : (bracket ? 'bracket' : 'draft'));
+    if (!isAdmin && loggedInPlayerName) {
+      if (tournamentStyle === 'tournament' && poolTournament && view !== 'poolPlay') {
+        setView('poolPlay');
+      } else if (tournamentStyle !== 'tournament' && bracket && view !== 'bracket') {
+        setView('bracket');
+      } else if (
+        tournamentStyle !== 'tournament' &&
+        !bracket &&
+        teams.length > 0 &&
+        ['setup', 'poolSetup', 'leaderboard'].includes(view)
+      ) {
+        setView('draft');
+      }
     }
-  }, [isAdmin, loggedInPlayerName, view, tournamentStyle, bracket]);
+  }, [isAdmin, loggedInPlayerName, view, tournamentStyle, poolTournament, bracket, teams.length]);
 
   async function handleRequestNotifPermission() {
     if (typeof Notification === 'undefined') return;
