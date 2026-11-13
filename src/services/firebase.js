@@ -6,6 +6,7 @@ import {
   onSnapshot,
   getDoc,
   collection,
+  collectionGroup,
   getDocs,
   deleteDoc,
 } from 'firebase/firestore';
@@ -261,13 +262,33 @@ export async function saveTournamentToCloud(clubId = DEFAULT_CLUB_ID, tournament
   if (!db || !tournamentState) return false;
 
   try {
+    const now = new Date().toISOString();
     const tournamentDocRef = doc(db, 'clubs', clubId, 'tournaments', 'active');
     const prepared = encodeStateForFirestore(tournamentState);
     const sanitized = sanitizeForFirestore({
       ...prepared,
-      updatedAt: new Date().toISOString(),
+      roomId: clubId,
+      updatedAt: now,
     });
     await setDoc(tournamentDocRef, sanitized, { merge: true });
+
+    // Also store lightweight room metadata on the parent club doc & admin registry for room discovery
+    const roomSummary = sanitizeForFirestore({
+      roomId: clubId,
+      adminPin: tournamentState.adminPin || '1234',
+      view: tournamentState.view || 'setup',
+      playerCount: Array.isArray(tournamentState.playerPool) ? tournamentState.playerPool.length : 0,
+      numTeams: tournamentState.numTeams || 4,
+      hasBracket: Boolean(tournamentState.bracket),
+      updatedAt: now,
+    });
+    setDoc(doc(db, 'clubs', clubId), roomSummary, { merge: true }).catch(() => {});
+    setDoc(
+      doc(db, 'clubs', '_admin_registry', 'data', 'rooms'),
+      { rooms: { [clubId]: roomSummary }, updatedAt: now },
+      { merge: true }
+    ).catch(() => {});
+
     return true;
   } catch (err) {
     console.error('[Firebase] Error saving tournament to cloud:', err);
@@ -415,4 +436,424 @@ export async function wipeAllDatabaseData(additionalRoomIds = []) {
   } catch (e) {}
 
   return Array.from(roomIdsToClear);
+}
+
+// ---------------- Super Admin Room Management ----------------
+
+export async function fetchAllRoomsForAdmin() {
+  const db = getDb();
+  const roomsById = new Map();
+  let cloudPermissionError = false;
+
+  function upsertEntry(rid, partial) {
+    if (!rid || rid === '_admin_registry' || rid === 'neep-main' || rid === DEFAULT_CLUB_ID) return;
+    const cleanId = String(rid).trim().toUpperCase();
+    if (!cleanId) return;
+    const existing = roomsById.get(cleanId) || {
+      roomId: cleanId,
+      adminPin: '1234',
+      view: 'setup',
+      playerCount: 0,
+      directoryCount: 0,
+      numTeams: 4,
+      goalScore: 11,
+      dreambreakerScore: 21,
+      dreambreakerFormat: 'singles',
+      hasBracket: false,
+      updatedAt: null,
+      source: 'local',
+    };
+    const nextSource =
+      existing.source && partial.source && existing.source !== partial.source
+        ? 'both'
+        : partial.source || existing.source;
+
+    roomsById.set(cleanId, {
+      ...existing,
+      ...partial,
+      roomId: cleanId,
+      source: nextSource,
+    });
+  }
+
+  // 1. Scan localStorage for any rooms on this device
+  try {
+    const savedHistoryRaw = localStorage.getItem('neep_saved_rooms_v1');
+    if (savedHistoryRaw) {
+      const parsedHistory = JSON.parse(savedHistoryRaw);
+      if (Array.isArray(parsedHistory)) {
+        parsedHistory.forEach((h) => {
+          if (h?.roomId) {
+            upsertEntry(h.roomId, {
+              adminPin: h.adminPin || '1234',
+              updatedAt: h.updatedAt ? new Date(h.updatedAt).toISOString() : null,
+              source: 'local',
+            });
+          }
+        });
+      }
+    }
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+
+      const tournMatch = k.match(/^neep_tourn_(.+)_v1$/);
+      if (tournMatch && tournMatch[1]) {
+        const rid = tournMatch[1];
+        try {
+          const tData = JSON.parse(localStorage.getItem(k) || '{}');
+          upsertEntry(rid, {
+            adminPin: tData.adminPin || '1234',
+            view: tData.view || 'setup',
+            playerCount: Array.isArray(tData.playerPool) ? tData.playerPool.length : 0,
+            numTeams: tData.numTeams || 4,
+            goalScore: tData.goalScore || 11,
+            dreambreakerScore: tData.dreambreakerScore || 21,
+            dreambreakerFormat: tData.dreambreakerFormat || 'singles',
+            hasBracket: Boolean(tData.bracket),
+            updatedAt: tData.updatedAt || null,
+            source: 'local',
+          });
+        } catch (e) {}
+      }
+
+      const playersMatch = k.match(/^neep_players_(.+)_v1$/);
+      if (playersMatch && playersMatch[1]) {
+        const rid = playersMatch[1];
+        try {
+          const pList = JSON.parse(localStorage.getItem(k) || '[]');
+          if (Array.isArray(pList)) {
+            upsertEntry(rid, {
+              directoryCount: pList.length,
+              source: 'local',
+            });
+          }
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
+
+  // 2. Scan Firestore cloud registry, top-level clubs collection, and tournaments collectionGroup
+  if (db) {
+    try {
+      const regSnap = await getDoc(doc(db, 'clubs', '_admin_registry', 'data', 'rooms'));
+      if (regSnap.exists()) {
+        const regRooms = regSnap.data()?.rooms || {};
+        Object.entries(regRooms).forEach(([rid, summary]) => {
+          if (summary && typeof summary === 'object') {
+            upsertEntry(rid, {
+              adminPin: summary.adminPin || '1234',
+              view: summary.view || 'setup',
+              playerCount: summary.playerCount ?? 0,
+              numTeams: summary.numTeams || 4,
+              hasBracket: Boolean(summary.hasBracket),
+              updatedAt: summary.updatedAt || null,
+              source: 'cloud',
+            });
+          }
+        });
+      }
+    } catch (err) {
+      if (String(err?.message || '').toLowerCase().includes('permission')) {
+        cloudPermissionError = true;
+      }
+    }
+
+    try {
+      const clubsSnap = await getDocs(collection(db, 'clubs'));
+      clubsSnap.forEach((docSnap) => {
+        if (docSnap.id && docSnap.id !== '_admin_registry') {
+          const d = docSnap.data() || {};
+          upsertEntry(docSnap.id, {
+            adminPin: d.adminPin || '1234',
+            view: d.view || 'setup',
+            playerCount: d.playerCount ?? 0,
+            numTeams: d.numTeams || 4,
+            hasBracket: Boolean(d.hasBracket),
+            updatedAt: d.updatedAt || null,
+            source: 'cloud',
+          });
+        }
+      });
+    } catch (err) {
+      if (String(err?.message || '').toLowerCase().includes('permission')) {
+        cloudPermissionError = true;
+      }
+    }
+
+    try {
+      const cgSnap = await getDocs(collectionGroup(db, 'tournaments'));
+      cgSnap.forEach((docSnap) => {
+        const d = docSnap.data() || {};
+        const pathParts = docSnap.ref.path.split('/');
+        const ridFromPath = pathParts.length >= 2 ? pathParts[1] : d.roomId;
+        if (ridFromPath && ridFromPath !== '_admin_registry') {
+          upsertEntry(ridFromPath, {
+            adminPin: d.adminPin || '1234',
+            view: d.view || 'setup',
+            playerCount: Array.isArray(d.playerPool) ? d.playerPool.length : 0,
+            numTeams: d.numTeams || 4,
+            goalScore: d.goalScore || 11,
+            dreambreakerScore: d.dreambreakerScore || 21,
+            dreambreakerFormat: d.dreambreakerFormat || 'singles',
+            hasBracket: Boolean(d.bracket),
+            updatedAt: d.updatedAt || null,
+            source: 'cloud',
+          });
+        }
+      });
+    } catch (err) {
+      // ignore if collectionGroup index or permissions not configured
+    }
+  }
+
+  const roomsList = Array.from(roomsById.values()).sort((a, b) => {
+    const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+    const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+    if (tB !== tA) return tB - tA;
+    return a.roomId.localeCompare(b.roomId);
+  });
+
+  return { rooms: roomsList, cloudPermissionError };
+}
+
+export async function fetchSingleRoomForAdmin(roomId) {
+  const cleanId = String(roomId || '').trim().toUpperCase();
+  if (!cleanId) return null;
+
+  let found = null;
+
+  // Check local first
+  try {
+    const raw = localStorage.getItem(`neep_tourn_${cleanId}_v1`);
+    const playersRaw = localStorage.getItem(`neep_players_${cleanId}_v1`);
+    const pList = playersRaw ? JSON.parse(playersRaw) : [];
+    if (raw) {
+      const tData = JSON.parse(raw);
+      found = {
+        roomId: cleanId,
+        adminPin: tData.adminPin || '1234',
+        view: tData.view || 'setup',
+        playerCount: Array.isArray(tData.playerPool) ? tData.playerPool.length : 0,
+        directoryCount: Array.isArray(pList) ? pList.length : 0,
+        numTeams: tData.numTeams || 4,
+        goalScore: tData.goalScore || 11,
+        dreambreakerScore: tData.dreambreakerScore || 21,
+        dreambreakerFormat: tData.dreambreakerFormat || 'singles',
+        hasBracket: Boolean(tData.bracket),
+        updatedAt: tData.updatedAt || null,
+        source: 'local',
+      };
+    }
+  } catch (e) {}
+
+  // Check cloud
+  const db = getDb();
+  if (db) {
+    try {
+      const snap = await getDoc(doc(db, 'clubs', cleanId, 'tournaments', 'active'));
+      if (snap.exists()) {
+        const d = decodeStateFromFirestore(snap.data());
+        let dirCount = found?.directoryCount || 0;
+        try {
+          const pSnap = await getDoc(doc(db, 'clubs', cleanId, 'data', 'players'));
+          if (pSnap.exists() && Array.isArray(pSnap.data()?.roster)) {
+            dirCount = pSnap.data().roster.length;
+          }
+        } catch (e) {}
+
+        found = {
+          roomId: cleanId,
+          adminPin: d.adminPin || found?.adminPin || '1234',
+          view: d.view || 'setup',
+          playerCount: Array.isArray(d.playerPool) ? d.playerPool.length : 0,
+          directoryCount: dirCount,
+          numTeams: d.numTeams || 4,
+          goalScore: d.goalScore || 11,
+          dreambreakerScore: d.dreambreakerScore || 21,
+          dreambreakerFormat: d.dreambreakerFormat || 'singles',
+          hasBracket: Boolean(d.bracket),
+          updatedAt: d.updatedAt || null,
+          source: found ? 'both' : 'cloud',
+        };
+      }
+    } catch (e) {}
+  }
+
+  return found;
+}
+
+export async function adminResetRoomPin(roomId, newPin) {
+  const cleanId = String(roomId || '').trim().toUpperCase();
+  const cleanPin = String(newPin || '').replace(/\D/g, '').slice(0, 8);
+  if (!cleanId || !cleanPin) return false;
+
+  const now = new Date().toISOString();
+
+  // 1. Update local tournament storage
+  try {
+    const key = `neep_tourn_${cleanId}_v1`;
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : { roomId: cleanId, view: 'setup' };
+    parsed.adminPin = cleanPin;
+    parsed.updatedAt = now;
+    localStorage.setItem(key, JSON.stringify(parsed));
+  } catch (e) {}
+
+  // 2. Update saved rooms history on this device
+  try {
+    const histKey = 'neep_saved_rooms_v1';
+    const rawHist = localStorage.getItem(histKey);
+    const list = rawHist ? JSON.parse(rawHist) : [];
+    if (Array.isArray(list)) {
+      const idx = list.findIndex((r) => r.roomId === cleanId);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], adminPin: cleanPin, isAdmin: true, updatedAt: Date.now() };
+      } else {
+        list.unshift({ roomId: cleanId, adminPin: cleanPin, isAdmin: true, updatedAt: Date.now() });
+      }
+      localStorage.setItem(histKey, JSON.stringify(list));
+    }
+  } catch (e) {}
+
+  // 3. Update Firestore cloud documents
+  const db = getDb();
+  if (db) {
+    try {
+      await setDoc(
+        doc(db, 'clubs', cleanId, 'tournaments', 'active'),
+        { roomId: cleanId, adminPin: cleanPin, updatedAt: now },
+        { merge: true }
+      );
+    } catch (e) {}
+    try {
+      await setDoc(
+        doc(db, 'clubs', cleanId),
+        { roomId: cleanId, adminPin: cleanPin, updatedAt: now },
+        { merge: true }
+      );
+    } catch (e) {}
+    try {
+      await setDoc(
+        doc(db, 'clubs', '_admin_registry', 'data', 'rooms'),
+        { rooms: { [cleanId]: { roomId: cleanId, adminPin: cleanPin, updatedAt: now } }, updatedAt: now },
+        { merge: true }
+      );
+    } catch (e) {}
+  }
+
+  return true;
+}
+
+export async function adminResetRoomBracket(roomId) {
+  const cleanId = String(roomId || '').trim().toUpperCase();
+  if (!cleanId) return false;
+  const now = new Date().toISOString();
+
+  try {
+    const key = `neep_tourn_${cleanId}_v1`;
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const resetState = {
+        ...parsed,
+        view: 'setup',
+        teams: [],
+        playersById: {},
+        remainingPool: [],
+        pickSequence: [],
+        pickPointer: 0,
+        sittingOut: [],
+        bracket: null,
+        activePath: null,
+        updatedAt: now,
+      };
+      localStorage.setItem(key, JSON.stringify(resetState));
+    }
+  } catch (e) {}
+
+  const db = getDb();
+  if (db) {
+    try {
+      await setDoc(
+        doc(db, 'clubs', cleanId, 'tournaments', 'active'),
+        {
+          view: 'setup',
+          teams: [],
+          playersById: {},
+          remainingPool: [],
+          pickSequence: [],
+          pickPointer: 0,
+          sittingOut: [],
+          bracket: null,
+          activePath: null,
+          updatedAt: now,
+        },
+        { merge: true }
+      );
+      await setDoc(
+        doc(db, 'clubs', cleanId),
+        { view: 'setup', hasBracket: false, updatedAt: now },
+        { merge: true }
+      );
+      await setDoc(
+        doc(db, 'clubs', '_admin_registry', 'data', 'rooms'),
+        { rooms: { [cleanId]: { roomId: cleanId, view: 'setup', hasBracket: false, updatedAt: now } }, updatedAt: now },
+        { merge: true }
+      );
+    } catch (e) {}
+  }
+
+  return true;
+}
+
+export async function adminDeleteRoom(roomId) {
+  const cleanId = String(roomId || '').trim().toUpperCase();
+  if (!cleanId) return false;
+
+  // 1. Remove local keys
+  try {
+    localStorage.removeItem(`neep_tourn_${cleanId}_v1`);
+    localStorage.removeItem(`neep_stats_${cleanId}_v1`);
+    localStorage.removeItem(`neep_pairs_${cleanId}_v1`);
+    localStorage.removeItem(`neep_players_${cleanId}_v1`);
+    localStorage.removeItem(`neep_config_${cleanId}_v1`);
+
+    const histKey = 'neep_saved_rooms_v1';
+    const rawHist = localStorage.getItem(histKey);
+    if (rawHist) {
+      const parsed = JSON.parse(rawHist);
+      if (Array.isArray(parsed)) {
+        localStorage.setItem(
+          histKey,
+          JSON.stringify(parsed.filter((r) => r.roomId !== cleanId))
+        );
+      }
+    }
+    if (localStorage.getItem('neep_current_room') === cleanId) {
+      localStorage.removeItem('neep_current_room');
+    }
+  } catch (e) {}
+
+  // 2. Remove Firestore docs
+  const db = getDb();
+  if (db) {
+    try { await deleteDoc(doc(db, 'clubs', cleanId, 'tournaments', 'active')); } catch (e) {}
+    try { await deleteDoc(doc(db, 'clubs', cleanId, 'data', 'players')); } catch (e) {}
+    try { await deleteDoc(doc(db, 'clubs', cleanId, 'data', 'stats')); } catch (e) {}
+    try { await deleteDoc(doc(db, 'clubs', cleanId, 'data', 'config')); } catch (e) {}
+    try { await deleteDoc(doc(db, 'clubs', cleanId)); } catch (e) {}
+    try {
+      const regRef = doc(db, 'clubs', '_admin_registry', 'data', 'rooms');
+      const regSnap = await getDoc(regRef);
+      if (regSnap.exists()) {
+        const roomsMap = { ...(regSnap.data()?.rooms || {}) };
+        delete roomsMap[cleanId];
+        await setDoc(regRef, { rooms: roomsMap, updatedAt: new Date().toISOString() });
+      }
+    } catch (e) {}
+  }
+
+  return true;
 }

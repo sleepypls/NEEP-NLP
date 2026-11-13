@@ -11,6 +11,7 @@ export function LandingView({
   onResumeRecentRoom,
   onRemoveSavedRoom,
   onOpenCloudConfig,
+  onOpenAdminPortal,
   isCloudActive,
 }) {
   const [joinRoomId, setJoinRoomId] = useState('');
@@ -69,17 +70,30 @@ export function LandingView({
             </div>
           </div>
 
-          <button
-            onClick={onOpenCloudConfig}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
-              isCloudActive
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
-            }`}
-          >
-            <Cloud size={13} />
-            <span>{isCloudActive ? 'Cloud Online' : 'Local Mode'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenAdminPortal && (
+              <button
+                type="button"
+                onClick={onOpenAdminPortal}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-[#d7f24c] border border-slate-800 transition"
+                title="Open Super Admin Room Manager"
+              >
+                <ShieldCheck size={13} className="text-[#d7f24c]" />
+                <span>Admin Portal</span>
+              </button>
+            )}
+            <button
+              onClick={onOpenCloudConfig}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
+                isCloudActive
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'
+              }`}
+            >
+              <Cloud size={13} />
+              <span>{isCloudActive ? 'Cloud Online' : 'Local Mode'}</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -314,8 +328,20 @@ export function LandingView({
       </main>
 
       {/* Minimal Footer */}
-      <footer className="border-t border-slate-900 py-4 px-4 text-center text-xs text-slate-400">
-        NEEP-NLP Score Tracker ({APP_VERSION}) · Isolated Private Sessions & Real-time Cloud Sync
+      <footer className="border-t border-slate-900 py-4 px-4 text-center text-xs text-slate-400 flex items-center justify-center gap-3 flex-wrap">
+        <span>NEEP-NLP Score Tracker ({APP_VERSION}) &middot; Real-time Cloud Sync</span>
+        {onOpenAdminPortal && (
+          <>
+            <span>&middot;</span>
+            <button
+              type="button"
+              onClick={onOpenAdminPortal}
+              className="text-[#d7f24c] hover:underline font-bold inline-flex items-center gap-1"
+            >
+              <ShieldCheck size={12} /> Admin Portal
+            </button>
+          </>
+        )}
       </footer>
     </div>
   );

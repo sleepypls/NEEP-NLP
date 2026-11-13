@@ -14,6 +14,7 @@ import { EditMatchupModal } from './components/EditMatchupModal';
 import { RosterModal } from './components/RosterModal';
 import { LandingView } from './components/LandingView';
 import { RoomCreatedModal } from './components/RoomCreatedModal';
+import { AdminPortalView } from './components/AdminPortalView';
 
 import {
   generateGames,
@@ -228,14 +229,19 @@ export default function App() {
   });
 
   const [view, setView] = useState(() => {
-    if (!initialRoomId) return 'landing';
     try {
       const params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'admin' || params.get('admin') === '1') {
+        return 'adminPortal';
+      }
+      if (!initialRoomId) return 'landing';
       const mode = params.get('mode');
       if (mode === 'spectator' && initialSaved?.bracket) {
         return 'bracket';
       }
-    } catch (e) {}
+    } catch (e) {
+      if (!initialRoomId) return 'landing';
+    }
     return initialSaved?.view || 'setup';
   });
   const [playerPool, setPlayerPool] = useState(() => initialSaved?.playerPool || []);
@@ -344,18 +350,38 @@ export default function App() {
   }, []);
   useEffect(() => {
     try {
+      if (view === 'adminPortal') {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('room');
+        url.searchParams.delete('pin');
+        url.searchParams.delete('mode');
+        url.searchParams.set('view', 'admin');
+        window.history.replaceState({}, '', url.toString());
+        return;
+      }
       if (view === 'landing' || !roomId) {
         const url = new URL(window.location.href);
-        if (url.searchParams.has('room')) {
+        let changed = false;
+        if (url.searchParams.has('room') || url.searchParams.has('view') || url.searchParams.has('admin')) {
           url.searchParams.delete('room');
           url.searchParams.delete('pin');
           url.searchParams.delete('mode');
+          url.searchParams.delete('view');
+          url.searchParams.delete('admin');
+          changed = true;
+        }
+        if (changed) {
           window.history.replaceState({}, '', url.toString());
         }
         return;
       }
       const url = new URL(window.location.href);
       let changed = false;
+      if (url.searchParams.has('view') || url.searchParams.has('admin')) {
+        url.searchParams.delete('view');
+        url.searchParams.delete('admin');
+        changed = true;
+      }
       if (url.searchParams.get('room') !== roomId) {
         url.searchParams.set('room', roomId);
         changed = true;
@@ -372,7 +398,7 @@ export default function App() {
 
   // 2. Load Stats & Setup Cloud Listeners for Active Room
   useEffect(() => {
-    if (!roomId || view === 'landing') return;
+    if (!roomId || view === 'landing' || view === 'adminPortal') return;
 
     try {
       localStorage.setItem('neep_current_room', roomId);
@@ -1673,6 +1699,66 @@ export default function App() {
   const activeTeamA = activeMatch ? teams.find((t) => t.id === activeMatch.teamAId) : null;
   const activeTeamB = activeMatch ? teams.find((t) => t.id === activeMatch.teamBId) : null;
 
+  if (view === 'adminPortal') {
+    return (
+      <>
+        <AdminPortalView
+          onBackToLanding={() => {
+            setView('landing');
+            setRoomId(null);
+          }}
+          onOpenRoomAsAdmin={(targetRoomId, targetPin) => {
+            handleSwitchRoom(targetRoomId, targetPin);
+          }}
+          onOpenRoomAsSpectator={(targetRoomId) => {
+            handleSwitchRoom(targetRoomId, '');
+          }}
+          onCreateCustomRoom={(customId, customPin) => {
+            handleCreatePrivateRoom(customId, customPin);
+          }}
+          onPinUpdatedForRoom={(updatedRoomId, updatedPin) => {
+            if (roomId === updatedRoomId) {
+              setAdminPin(updatedPin);
+            }
+            setSavedRoomsHistory(loadSavedRoomsHistory());
+          }}
+          onRoomDeleted={(deletedRoomId) => {
+            if (roomId === deletedRoomId) {
+              setRoomId(null);
+            }
+            setSavedRoomsHistory(loadSavedRoomsHistory());
+          }}
+          onWipeAllDatabase={async () => {
+            await wipeAllDatabaseData(roomId ? [roomId] : []);
+            setGlobalStats({});
+            setPartnershipStats({});
+            setPriorStats({});
+            setPriorPartnershipStats({});
+            setSavedPlayers([]);
+            setPlayerPool([]);
+            setTeams([]);
+            setPlayersById({});
+            setRemainingPool([]);
+            setPickSequence([]);
+            setPickPointer(0);
+            setSittingOut([]);
+            setBracket(null);
+            setActivePath(null);
+            setSavedRoomsHistory([]);
+            setRoomId(null);
+          }}
+          isCloudActive={isCloudEnabled()}
+          onOpenCloudConfig={() => setIsCloudConfigOpen(true)}
+        />
+        <CloudConfigModal
+          isOpen={isCloudConfigOpen}
+          onClose={() => setIsCloudConfigOpen(false)}
+          currentRoomId={roomId}
+        />
+      </>
+    );
+  }
+
   if (view === 'landing' || !roomId) {
     return (
       <>
@@ -1684,6 +1770,7 @@ export default function App() {
           onResumeRecentRoom={handleResumeRecentRoom}
           onRemoveSavedRoom={handleRemoveSavedRoom}
           onOpenCloudConfig={() => setIsCloudConfigOpen(true)}
+          onOpenAdminPortal={() => setView('adminPortal')}
           isCloudActive={isCloudEnabled()}
         />
         <CloudConfigModal
@@ -1882,6 +1969,10 @@ export default function App() {
         onSwitchRoom={handleSwitchRoom}
         onCreatePrivateRoom={handleCreatePrivateRoom}
         onExitToLanding={handleExitToLanding}
+        onOpenAdminPortal={() => {
+          setIsRoomModalOpen(false);
+          setView('adminPortal');
+        }}
       />
       <RoomCreatedModal
         isOpen={Boolean(newlyCreatedRoomInfo)}

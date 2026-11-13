@@ -13,6 +13,7 @@ export function RoomModal({
   onSwitchRoom,
   onCreatePrivateRoom,
   onExitToLanding,
+  onOpenAdminPortal,
 }) {
   const [joinInput, setJoinInput] = useState('');
   const [joinPin, setJoinPin] = useState('');
@@ -227,19 +228,31 @@ export function RoomModal({
           </button>
         </form>
 
-        {onExitToLanding && (
-          <div className="mt-4 pt-3 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onExitToLanding();
-              }}
-              className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-750 flex items-center justify-center gap-2 transition active:scale-95"
-            >
-              <LogOut size={14} />
-              <span>Leave Room & Return to Home</span>
-            </button>
+        {(onExitToLanding || onOpenAdminPortal) && (
+          <div className="mt-4 pt-3 border-t border-slate-800 space-y-2">
+            {onOpenAdminPortal && (
+              <button
+                type="button"
+                onClick={onOpenAdminPortal}
+                className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-slate-850 hover:bg-slate-800 text-[#d7f24c] border border-slate-750 flex items-center justify-center gap-2 transition active:scale-95"
+              >
+                <ShieldCheck size={14} />
+                <span>Manage All Rooms (Admin Portal)</span>
+              </button>
+            )}
+            {onExitToLanding && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onExitToLanding();
+                }}
+                className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-slate-850 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-750 flex items-center justify-center gap-2 transition active:scale-95"
+              >
+                <LogOut size={14} />
+                <span>Leave Room & Return to Home</span>
+              </button>
+            )}
           </div>
         )}
       </div>
