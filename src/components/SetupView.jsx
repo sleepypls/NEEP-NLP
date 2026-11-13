@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings, Upload, Download, Bookmark, Save, RotateCcw, QrCode } from 'lucide-react';
+import { UserPlus, Users, X, Shuffle, Zap, ShieldAlert, Crown, Check, Lock, Sparkles, KeyRound, ArrowRightLeft, Plus, Trash2, Pencil, Settings, Upload, Download, Bookmark, Save, RotateCcw, QrCode, Search } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
 import { getDefaultSlotPairs, parsePlayersFromCSV, generateDirectoryCSV, generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
 import { APP_VERSION } from '../version';
@@ -57,6 +57,7 @@ export function SetupView({
   const [activeTab, setActiveTab] = useState('players');
   const [nameInput, setNameInput] = useState('');
   const [directoryNameInput, setDirectoryNameInput] = useState('');
+  const [directorySearch, setDirectorySearch] = useState('');
   const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
   const [directoryOpenWithQr, setDirectoryOpenWithQr] = useState(false);
   const [csvFeedback, setCsvFeedback] = useState(null);
@@ -275,13 +276,18 @@ export function SetupView({
       </div>
 
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
-        <div className={activeTab === 'courts' ? 'hidden' : 'lg:col-span-6'}>
+        <div className={activeTab === 'courts' ? 'hidden' : activeTab === 'players' ? 'lg:col-span-7' : 'lg:col-span-6'}>
           {/* Player Pool Card */}
       <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
-          <label className="text-slate-300 text-sm font-semibold">
-            Player Pool ({playerPool.length})
-          </label>
+          <div>
+            <label className="text-slate-200 text-sm font-bold block">
+              Player Pool ({playerPool.length})
+            </label>
+            <p className="text-[11px] text-slate-400">
+              Type a player name below or tap names in your Room Directory.
+            </p>
+          </div>
           {isAdmin && (
             <div className="flex items-center gap-1.5">
               <input
@@ -354,14 +360,14 @@ export function SetupView({
             No players yet. Add at least {numTeams * 2} to start a draft.
           </p>
         ) : (
-          <div className="max-h-64 overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
+          <div className="max-h-[380px] lg:max-h-[440px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
             <table className="w-full text-left border-collapse text-xs">
               <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
                 <tr>
-                  <th className="py-2 px-3 font-bold w-12">#</th>
-                  <th className="py-2 px-3 font-bold">Player</th>
-                  {captainMode === 'manual' && <th className="py-2 px-3 font-bold w-24 text-center">Role</th>}
-                  {isAdmin && <th className="py-2 px-3 font-bold text-right w-16">Action</th>}
+                  <th className="py-1.5 px-3 font-bold w-12">#</th>
+                  <th className="py-1.5 px-3 font-bold">Player</th>
+                  {captainMode === 'manual' && <th className="py-1.5 px-3 font-bold w-24 text-center">Role</th>}
+                  {isAdmin && <th className="py-1.5 px-3 font-bold text-right w-16">Action</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70">
@@ -369,10 +375,10 @@ export function SetupView({
                   const isCaptain = captainMode === 'manual' && selectedCaptainIds.includes(p.id);
                   return (
                     <tr key={p.id} className="hover:bg-slate-900/60 transition">
-                      <td className="py-2 px-3 font-mono text-slate-400">{idx + 1}</td>
-                      <td className="py-2 px-3 font-semibold text-white">{p.name}</td>
+                      <td className="py-1.5 px-3 font-mono text-slate-400">{idx + 1}</td>
+                      <td className="py-1.5 px-3 font-semibold text-white">{p.name}</td>
                       {captainMode === 'manual' && (
-                        <td className="py-2 px-3 text-center">
+                        <td className="py-1.5 px-3 text-center">
                           {isCaptain ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full">
                               <Crown size={10} className="fill-current" /> Captain
@@ -383,7 +389,7 @@ export function SetupView({
                         </td>
                       )}
                       {isAdmin && (
-                        <td className="py-2 px-3 text-right">
+                        <td className="py-1.5 px-3 text-right">
                           <button
                             type="button"
                             onClick={() => removePlayer(p.id)}
@@ -492,71 +498,105 @@ export function SetupView({
 
             {/* List of saved names in this room (Table View) */}
             {savedPlayers.length > 0 ? (
-              <>
-                <div className="max-h-52 overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
-                      <tr>
-                        <th className="py-2 px-3 font-bold">Player</th>
-                        <th className="py-2 px-3 font-bold text-center w-24">Status</th>
-                        <th className="py-2 px-3 font-bold text-right w-24">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/70">
-                      {[...savedPlayers]
-                        .sort((a, b) => {
-                          const aIn = playerPool.some((p) => p.name.trim().toLowerCase() === a.trim().toLowerCase());
-                          const bIn = playerPool.some((p) => p.name.trim().toLowerCase() === b.trim().toLowerCase());
-                          if (aIn === bIn) return a.localeCompare(b);
-                          return aIn ? 1 : -1;
-                        })
-                        .map((name) => {
-                          const isInPool = playerPool.some(
-                            (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
-                          );
-
-                          return (
-                            <tr key={name} className="hover:bg-slate-900/60 transition">
-                              <td className="py-2 px-3 font-semibold text-white">{name}</td>
-                              <td className="py-2 px-3 text-center">
-                                {isInPool ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                                    <Check size={10} className="stroke-[3]" /> In Pool
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] font-medium text-slate-500">Available</span>
-                                )}
-                              </td>
-                              <td className="py-2 px-3 text-right">
-                                {isInPool ? (
-                                  <span className="text-[11px] text-slate-500 italic">Added</span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => onAddSavedPlayer(name)}
-                                    className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 text-[#d7f24c] border border-[#d7f24c]/40 transition active:scale-95"
-                                    title={`Add ${name} to tournament pool`}
-                                  >
-                                    + Add
-                                  </button>
-                                )}
+              (() => {
+                const q = directorySearch.trim().toLowerCase();
+                const filteredSaved = [...savedPlayers]
+                  .filter((name) => !q || name.toLowerCase().includes(q))
+                  .sort((a, b) => {
+                    const aIn = playerPool.some((p) => p.name.trim().toLowerCase() === a.trim().toLowerCase());
+                    const bIn = playerPool.some((p) => p.name.trim().toLowerCase() === b.trim().toLowerCase());
+                    if (aIn === bIn) return a.localeCompare(b);
+                    return aIn ? 1 : -1;
+                  });
+                return (
+                  <>
+                    <div className="relative mb-2">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={directorySearch}
+                        onChange={(e) => setDirectorySearch(e.target.value)}
+                        placeholder={`Search directory (${savedPlayers.length})...`}
+                        className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-8 pr-7 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+                      />
+                      {directorySearch && (
+                        <button
+                          type="button"
+                          onClick={() => setDirectorySearch('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                          title="Clear search"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-[360px] lg:max-h-[420px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                          <tr>
+                            <th className="py-1.5 px-3 font-bold">Player</th>
+                            <th className="py-1.5 px-3 font-bold text-center w-24">Status</th>
+                            <th className="py-1.5 px-3 font-bold text-right w-24">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/70">
+                          {filteredSaved.length === 0 ? (
+                            <tr>
+                              <td colSpan={3} className="py-4 px-3 text-center text-xs text-slate-500 italic">
+                                No directory players match &ldquo;{directorySearch}&rdquo;.
                               </td>
                             </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-                {availableSaved.length === 0 ? (
-                  <div className="text-[11px] text-emerald-400/90 font-medium flex items-center gap-1.5 mt-2">
-                    <Check size={12} className="stroke-[3]" /> All {savedPlayers.length} directory players are in the tournament pool
-                  </div>
-                ) : (
-                  <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-2">
-                    <Users size={11} className="text-[#d7f24c]" /> {savedPlayers.length - availableSaved.length} in tournament • {availableSaved.length} available to add
-                  </div>
-                )}
-              </>
+                          ) : (
+                            filteredSaved.map((name) => {
+                              const isInPool = playerPool.some(
+                                (p) => p.name.trim().toLowerCase() === name.trim().toLowerCase()
+                              );
+
+                              return (
+                                <tr key={name} className="hover:bg-slate-900/60 transition">
+                                  <td className="py-1.5 px-3 font-semibold text-white">{name}</td>
+                                  <td className="py-1.5 px-3 text-center">
+                                    {isInPool ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                        <Check size={10} className="stroke-[3]" /> In Pool
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-medium text-slate-500">Available</span>
+                                    )}
+                                  </td>
+                                  <td className="py-1.5 px-3 text-right">
+                                    {isInPool ? (
+                                      <span className="text-[11px] text-slate-500 italic">Added</span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => onAddSavedPlayer(name)}
+                                        className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 text-[#d7f24c] border border-[#d7f24c]/40 transition active:scale-95"
+                                        title={`Add ${name} to tournament pool`}
+                                      >
+                                        + Add
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {availableSaved.length === 0 ? (
+                      <div className="text-[11px] text-emerald-400/90 font-medium flex items-center gap-1.5 mt-2">
+                        <Check size={12} className="stroke-[3]" /> All {savedPlayers.length} directory players are in the tournament pool
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-2">
+                        <Users size={11} className="text-[#d7f24c]" /> {savedPlayers.length - availableSaved.length} in tournament • {availableSaved.length} available to add
+                      </div>
+                    )}
+                  </>
+                );
+              })()
             ) : (
               <p className="text-[11px] text-slate-500 italic">
                 No saved players in this room directory yet. Players added above or saved here will appear in this directory.
@@ -628,7 +668,7 @@ export function SetupView({
       </div>
 
         </div>
-        <div className={activeTab === 'courts' ? 'lg:col-span-12 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start' : 'lg:col-span-6'}>
+        <div className={activeTab === 'courts' ? 'lg:col-span-12 lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start' : activeTab === 'players' ? 'lg:col-span-5' : 'lg:col-span-6'}>
           {/* Number of Teams */}
       <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
         <label className="text-slate-300 text-sm font-semibold mb-2 block">Number of Teams</label>

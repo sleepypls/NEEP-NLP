@@ -23,6 +23,7 @@ import {
   Bookmark,
   Save,
   QrCode,
+  Search,
 } from 'lucide-react';
 import { generateRoomId, generatePin, sanitizeRoomId } from '../utils/room';
 import { generateDirectoryCSV, generateSampleDirectoryCSV, triggerCsvDownload } from '../utils/tournament';
@@ -124,6 +125,7 @@ export function PoolSetupView({
   const [partner1, setPartner1] = useState('');
   const [partner2, setPartner2] = useState('');
   const [directoryNameInput, setDirectoryNameInput] = useState('');
+  const [directorySearch, setDirectorySearch] = useState('');
   const [isDirectoryModalOpen, setIsDirectoryModalOpen] = useState(false);
   const [directoryOpenWithQr, setDirectoryOpenWithQr] = useState(false);
   const [csvFeedback, setCsvFeedback] = useState(null);
@@ -452,8 +454,8 @@ export function PoolSetupView({
 
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
         <div className={activeTab === 'entries' ? 'lg:col-span-12 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start' : 'hidden'}>
-          {/* Discipline & Structure Card */}
-      <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4">
+          {/* Discipline & Structure Card (Right side on desktop to match MLP SetupView) */}
+      <div className="lg:col-span-5 lg:order-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4">
         <div>
           <div className="flex items-center justify-between gap-2 mb-2">
             <label className="text-slate-200 text-sm font-bold">
@@ -539,8 +541,8 @@ export function PoolSetupView({
         {numberOfCourtsControl}
       </div>
 
-      {/* Simplified Entries Manager Card */}
-      <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
+      {/* Simplified Entries Manager Card (Left side on desktop to match MLP SetupView) */}
+      <div className="lg:col-span-7 lg:order-1 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
         <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
           <div>
             <label className="text-slate-200 text-sm font-bold block">
@@ -686,28 +688,28 @@ export function PoolSetupView({
             No {discipline === 'doubles' ? 'teams' : 'players'} added yet. Add at least {isKnockoutOnly ? 2 : 3} to start.
           </p>
         ) : (
-          <div className="max-h-64 overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
+          <div className="max-h-[380px] lg:max-h-[440px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
             <table className="w-full text-left border-collapse text-xs">
               <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
                 <tr>
-                  <th className="py-2 px-3 font-bold w-14">Seed</th>
-                  <th className="py-2 px-3 font-bold">
+                  <th className="py-1.5 px-3 font-bold w-14">Seed</th>
+                  <th className="py-1.5 px-3 font-bold">
                     {discipline === 'doubles' ? 'Doubles Team' : 'Player'}
                   </th>
-                  {isAdmin && <th className="py-2 px-3 font-bold text-right">Actions</th>}
+                  {isAdmin && <th className="py-1.5 px-3 font-bold text-right">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70">
                 {entries.map((entry, idx) => (
                   <tr key={entry.id} className="hover:bg-slate-900/60 transition">
-                    <td className="py-2 px-3 font-mono font-bold text-[#d7f24c]">
+                    <td className="py-1.5 px-3 font-mono font-bold text-[#d7f24c]">
                       #{idx + 1}
                     </td>
-                    <td className="py-2 px-3 font-semibold text-white">
+                    <td className="py-1.5 px-3 font-semibold text-white">
                       {getEntryDisplayName(entry)}
                     </td>
                     {isAdmin && (
-                      <td className="py-2 px-3 text-right">
+                      <td className="py-1.5 px-3 text-right">
                         <div className="inline-flex items-center gap-0.5">
                           {onMoveEntry && idx > 0 && (
                             <button
@@ -844,76 +846,121 @@ export function PoolSetupView({
             )}
 
             {savedPlayers.length > 0 ? (
-              <>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
-                  {discipline === 'doubles'
-                    ? 'Click 2 players to fill Partner 1 & Partner 2'
-                    : 'Click player to add to Singles draw'}
-                </span>
-                <div className="max-h-52 overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
-                      <tr>
-                        <th className="py-2 px-3 font-bold">Player</th>
-                        <th className="py-2 px-3 font-bold text-center w-24">Status</th>
-                        <th className="py-2 px-3 font-bold text-right w-28">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/70">
-                      {[...savedPlayers]
-                        .sort((a, b) => {
-                          const aIn = activePlayerNamesLower.has(a.trim().toLowerCase());
-                          const bIn = activePlayerNamesLower.has(b.trim().toLowerCase());
-                          if (aIn === bIn) return a.localeCompare(b);
-                          return aIn ? 1 : -1;
-                        })
-                        .map((name) => {
-                          const lower = name.trim().toLowerCase();
-                          const isInPool = activePlayerNamesLower.has(lower);
-                          const isStagedPartner =
-                            discipline === 'doubles' &&
-                            (partner1.trim().toLowerCase() === lower || partner2.trim().toLowerCase() === lower);
-
-                          return (
-                            <tr key={name} className="hover:bg-slate-900/60 transition">
-                              <td className="py-2 px-3 font-semibold text-white">{name}</td>
-                              <td className="py-2 px-3 text-center">
-                                {isStagedPartner ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/40 px-2 py-0.5 rounded-full">
-                                    Staged
-                                  </span>
-                                ) : isInPool ? (
-                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                                    <Check size={10} className="stroke-[3]" /> Entered
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] font-medium text-slate-500">Available</span>
-                                )}
-                              </td>
-                              <td className="py-2 px-3 text-right">
-                                {isInPool && discipline === 'singles' ? (
-                                  <span className="text-[11px] text-slate-500 italic">In Draw</span>
-                                ) : (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleQuickPickDirectory(name)}
-                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition active:scale-95 ${
-                                      isStagedPartner
-                                        ? 'bg-slate-800 text-slate-400 border border-slate-700'
-                                        : 'bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 text-[#d7f24c] border border-[#d7f24c]/40'
-                                    }`}
-                                  >
-                                    {discipline === 'doubles' ? '+ Partner' : '+ Add'}
-                                  </button>
-                                )}
+              (() => {
+                const q = directorySearch.trim().toLowerCase();
+                const filteredSaved = [...savedPlayers]
+                  .filter((name) => !q || name.toLowerCase().includes(q))
+                  .sort((a, b) => {
+                    const aIn = activePlayerNamesLower.has(a.trim().toLowerCase());
+                    const bIn = activePlayerNamesLower.has(b.trim().toLowerCase());
+                    if (aIn === bIn) return a.localeCompare(b);
+                    return aIn ? 1 : -1;
+                  });
+                return (
+                  <>
+                    <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {discipline === 'doubles'
+                          ? 'Click 2 players to fill Partner 1 & Partner 2'
+                          : 'Click player to add to Singles draw'}
+                      </span>
+                    </div>
+                    <div className="relative mb-2">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={directorySearch}
+                        onChange={(e) => setDirectorySearch(e.target.value)}
+                        placeholder={`Search directory (${savedPlayers.length})...`}
+                        className="w-full bg-slate-950/70 border border-slate-800 rounded-xl pl-8 pr-7 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-[#d7f24c]"
+                      />
+                      {directorySearch && (
+                        <button
+                          type="button"
+                          onClick={() => setDirectorySearch('')}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                          title="Clear search"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-[360px] lg:max-h-[420px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead className="sticky top-0 bg-slate-900/95 backdrop-blur border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                          <tr>
+                            <th className="py-1.5 px-3 font-bold">Player</th>
+                            <th className="py-1.5 px-3 font-bold text-center w-24">Status</th>
+                            <th className="py-1.5 px-3 font-bold text-right w-28">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/70">
+                          {filteredSaved.length === 0 ? (
+                            <tr>
+                              <td colSpan={3} className="py-4 px-3 text-center text-xs text-slate-500 italic">
+                                No directory players match &ldquo;{directorySearch}&rdquo;.
                               </td>
                             </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+                          ) : (
+                            filteredSaved.map((name) => {
+                              const lower = name.trim().toLowerCase();
+                              const isInPool = activePlayerNamesLower.has(lower);
+                              const isStagedPartner =
+                                discipline === 'doubles' &&
+                                (partner1.trim().toLowerCase() === lower || partner2.trim().toLowerCase() === lower);
+
+                              return (
+                                <tr key={name} className="hover:bg-slate-900/60 transition">
+                                  <td className="py-1.5 px-3 font-semibold text-white">{name}</td>
+                                  <td className="py-1.5 px-3 text-center">
+                                    {isStagedPartner ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-[#d7f24c]/15 text-[#d7f24c] border border-[#d7f24c]/40 px-2 py-0.5 rounded-full">
+                                        Staged
+                                      </span>
+                                    ) : isInPool ? (
+                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                                        <Check size={10} className="stroke-[3]" /> Entered
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-medium text-slate-500">Available</span>
+                                    )}
+                                  </td>
+                                  <td className="py-1.5 px-3 text-right">
+                                    {isInPool && discipline === 'singles' ? (
+                                      <span className="text-[11px] text-slate-500 italic">In Draw</span>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleQuickPickDirectory(name)}
+                                        className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold transition active:scale-95 ${
+                                          isStagedPartner
+                                            ? 'bg-slate-800 text-slate-400 border border-slate-700'
+                                            : 'bg-[#d7f24c]/15 hover:bg-[#d7f24c]/25 text-[#d7f24c] border border-[#d7f24c]/40'
+                                        }`}
+                                      >
+                                        {discipline === 'doubles' ? '+ Partner' : '+ Add'}
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    {availableSaved.length === 0 ? (
+                      <div className="text-[11px] text-emerald-400/90 font-medium flex items-center gap-1.5 mt-2">
+                        <Check size={12} className="stroke-[3]" /> All {savedPlayers.length} directory players are entered
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-2">
+                        <Users size={11} className="text-[#d7f24c]" /> {savedPlayers.length - availableSaved.length} entered • {availableSaved.length} available to add
+                      </div>
+                    )}
+                  </>
+                );
+              })()
             ) : (
               <p className="text-[11px] text-slate-500 italic py-1">
                 No saved names in {roomId || 'this room'} yet. Add names above or import via CSV.
