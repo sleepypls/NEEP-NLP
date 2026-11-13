@@ -278,9 +278,9 @@ export function SetupView({
       </div>
 
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
-        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'hidden' : activeTab === 'players' ? 'lg:col-span-12' : 'lg:col-span-6'}>
-          {/* Player Pool Card */}
-      <div className={activeTab === 'players' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
+        <div className={activeTab === 'courts' || activeTab === 'teams' ? 'hidden' : activeTab === 'players' ? 'lg:col-span-12 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start' : 'lg:col-span-6'}>
+          {/* Player Pool Card (Left side on desktop) */}
+      <div className={activeTab === 'players' ? `${isAdmin ? 'lg:col-span-6' : 'lg:col-span-12'} bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl` : 'hidden'}>
         <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
           <div>
             <label className="text-slate-200 text-sm font-bold block">
@@ -363,7 +363,7 @@ export function SetupView({
           </p>
         ) : (
           <div className="max-h-[380px] lg:max-h-[440px] overflow-y-auto bg-slate-950/60 border border-slate-800 rounded-2xl p-2.5">
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {playerPool.map((p, idx) => {
                 const isCaptain = captainMode === 'manual' && selectedCaptainIds.includes(p.id);
                 return (
@@ -400,10 +400,11 @@ export function SetupView({
             </div>
           </div>
         )}
+      </div>
 
-        {/* Saved Players Tray (Per-Room Directory) */}
+        {/* Saved Players Tray (Per-Room Directory — Right side on desktop) */}
         {isAdmin && (
-          <div className="mt-4 pt-3.5 border-t border-slate-800/80">
+          <div className={activeTab === 'players' ? 'lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>
             <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 min-w-0">
                 <Users size={13} className="text-[#d7f24c] shrink-0" />
@@ -614,7 +615,6 @@ export function SetupView({
             )}
           </div>
         )}
-      </div>
 
       {/* Session & Privacy Card */}
       <div className={activeTab === 'presets' ? 'bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl' : 'hidden'}>

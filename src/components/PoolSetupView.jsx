@@ -434,7 +434,7 @@ export function PoolSetupView({
       <div className="flex bg-slate-900 border border-slate-800 rounded-2xl p-1 mb-5 shadow-lg overflow-x-auto">
         {[
           { id: 'entries', label: '1. Players & Entries' },
-          { id: 'structure', label: isKnockoutOnly ? '2. Bracket & Courts' : '2. Pools & Bracket' },
+          { id: 'structure', label: '2. Tournament Config' },
           { id: 'scoring', label: '3. Scoring Formats' },
           { id: 'presets', label: '4. Room & Presets' },
         ].map((tab) => (
@@ -455,8 +455,8 @@ export function PoolSetupView({
 
       <div className="lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start">
         <div className={activeTab === 'entries' ? 'lg:col-span-12 lg:grid lg:grid-cols-12 lg:gap-6 lg:items-start' : 'hidden'}>
-          {/* Discipline & Structure Card (Right side on desktop to match MLP SetupView) */}
-      <div className="lg:col-span-5 lg:order-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4">
+          {/* Players & Entries Card (Left side on desktop to match MLP SetupView) */}
+      <div className={`${isAdmin ? 'lg:col-span-6' : 'lg:col-span-12'} bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl space-y-4`}>
         <div>
           <div className="flex items-center justify-between gap-2 mb-2">
             <label className="text-slate-200 text-sm font-bold">
@@ -473,7 +473,7 @@ export function PoolSetupView({
               type="button"
               disabled={!isAdmin}
               onClick={() => handleSwitchDiscipline('singles')}
-              className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
                 discipline === 'singles'
                   ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
@@ -485,7 +485,7 @@ export function PoolSetupView({
               type="button"
               disabled={!isAdmin}
               onClick={() => handleSwitchDiscipline('doubles')}
-              className={`py-2.5 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+              className={`py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
                 discipline === 'doubles'
                   ? 'bg-[#d7f24c] text-slate-950 shadow-md shadow-[#d7f24c]/20'
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
@@ -497,53 +497,6 @@ export function PoolSetupView({
         </div>
 
         <div className="pt-3 border-t border-slate-800">
-          <label className="text-slate-200 text-sm font-bold block mb-2">
-            Tournament Structure
-          </label>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              disabled={!isAdmin}
-              onClick={() => setStructure && setStructure('pools_knockout')}
-              className={`py-2.5 px-3 rounded-xl text-xs font-bold transition text-left ${
-                !isKnockoutOnly
-                  ? 'bg-emerald-400 text-slate-950 shadow-md shadow-emerald-400/20'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <Swords size={13} /> Pools + Knockout
-              </span>
-              <span className="block text-[10px] font-normal opacity-80 mt-0.5">
-                Round-robin groups into bracket
-              </span>
-            </button>
-            <button
-              type="button"
-              disabled={!isAdmin}
-              onClick={() => setStructure && setStructure('knockout_only')}
-              className={`py-2.5 px-3 rounded-xl text-xs font-bold transition text-left ${
-                isKnockoutOnly
-                  ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
-                  : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
-              }`}
-            >
-              <span className="flex items-center gap-1.5">
-                <Trophy size={13} /> Knockout Only
-              </span>
-              <span className="block text-[10px] font-normal opacity-80 mt-0.5">
-                Direct elimination (no pools)
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* Number of Courts */}
-        {numberOfCourtsControl}
-      </div>
-
-      {/* Simplified Entries Manager Card (Left side on desktop to match MLP SetupView) */}
-      <div className="lg:col-span-7 lg:order-1 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
         <div className="flex items-center justify-between mb-1.5 gap-2 flex-wrap">
           <div>
             <label className="text-slate-200 text-sm font-bold block">
@@ -694,7 +647,7 @@ export function PoolSetupView({
               className={`grid gap-2 ${
                 discipline === 'doubles'
                   ? 'grid-cols-1 sm:grid-cols-2'
-                  : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                  : 'grid-cols-2 sm:grid-cols-3'
               }`}
             >
               {entries.map((entry, idx) => {
@@ -750,10 +703,12 @@ export function PoolSetupView({
             </div>
           </div>
         )}
+        </div>
+      </div>
 
-        {/* Room Directory Tray */}
+        {/* Room Directory Card (Right side on desktop to match MLP SetupView) */}
         {isAdmin && (
-          <div className="mt-4 pt-3.5 border-t border-slate-800/80">
+          <div className="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 mb-4 shadow-xl">
             <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
               <div className="flex items-center gap-1.5 min-w-0">
                 <Users size={13} className="text-[#d7f24c] shrink-0" />
@@ -987,7 +942,6 @@ export function PoolSetupView({
             )}
           </div>
         )}
-      </div>
 
         </div>
         <div className={activeTab === 'entries' ? 'hidden' : 'lg:col-span-12'}>
@@ -997,10 +951,56 @@ export function PoolSetupView({
           <Trophy size={16} className="text-amber-400" />{' '}
           {activeTab === 'scoring'
             ? 'Match Scoring Formats & Bronze Medal'
-            : isKnockoutOnly
-              ? 'Knockout Bracket & Courts'
-              : 'Pool & Knockout Structure'}
+            : 'Tournament Config'}
         </label>
+
+        {activeTab === 'structure' && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-slate-200 text-xs font-bold uppercase tracking-wider block mb-2">
+                Tournament Structure
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={!isAdmin}
+                  onClick={() => setStructure && setStructure('pools_knockout')}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold transition text-left ${
+                    !isKnockoutOnly
+                      ? 'bg-emerald-400 text-slate-950 shadow-md shadow-emerald-400/20'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Swords size={13} /> Pools + Knockout
+                  </span>
+                  <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                    Round-robin groups into bracket
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  disabled={!isAdmin}
+                  onClick={() => setStructure && setStructure('knockout_only')}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold transition text-left ${
+                    isKnockoutOnly
+                      ? 'bg-amber-400 text-slate-950 shadow-md shadow-amber-400/20'
+                      : 'bg-slate-800 text-slate-300 hover:bg-slate-750 border border-slate-700'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Trophy size={13} /> Knockout Only
+                  </span>
+                  <span className="block text-[10px] font-normal opacity-80 mt-0.5">
+                    Direct elimination (no pools)
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {numberOfCourtsControl}
+          </div>
+        )}
 
         {!isKnockoutOnly && activeTab === 'structure' && (
           <div className="space-y-3">
