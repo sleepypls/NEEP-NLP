@@ -11,6 +11,7 @@ import {
   ShieldAlert,
   Swords,
   Trophy,
+  CheckCircle2,
 } from 'lucide-react';
 import { LiveTimer } from './LiveTimer';
 import {
@@ -594,6 +595,183 @@ function MlpGameSelfScoreRow({
   );
 }
 
+function CompletedMatchCard({ item, isTournament }) {
+  if (isTournament) {
+    const { match, mySide, stage, nameA, nameB } = item;
+    const games = Array.isArray(match.games) ? match.games : [];
+    const evalRes = evaluatePoolOrKnockoutMatch(games);
+    const hasWinner = Boolean(match.winnerId);
+    const didWin = hasWinner
+      ? (mySide === 'A' && match.winnerId === match.entryAId) ||
+        (mySide === 'B' && match.winnerId === match.entryBId)
+      : mySide === 'A'
+        ? evalRes.winsA > evalRes.winsB
+        : evalRes.winsB > evalRes.winsA;
+    const isTie = !hasWinner && evalRes.winsA === evalRes.winsB;
+
+    return (
+      <div className="rounded-2xl p-3.5 border bg-slate-950/75 border-slate-800 space-y-2.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-black bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+              <CheckCircle2 size={10} className="text-emerald-400" /> Final
+            </span>
+            {match.court && (
+              <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">
+                Court {match.court}
+              </span>
+            )}
+            <span className="text-[11px] font-bold text-slate-300">{stage}</span>
+          </div>
+          {!isTie && (
+            <span
+              className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                didWin
+                  ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35'
+                  : 'bg-slate-800/80 text-slate-400 border-slate-700'
+              }`}
+            >
+              {didWin ? 'WON' : 'LOST'}
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          {[
+            { side: 'A', name: nameA },
+            { side: 'B', name: nameB },
+          ].map(({ side, name }) => {
+            const isMine = mySide === side;
+            const sideWon =
+              (hasWinner && match.winnerId === (side === 'A' ? match.entryAId : match.entryBId)) ||
+              (!hasWinner && (side === 'A' ? evalRes.winsA > evalRes.winsB : evalRes.winsB > evalRes.winsA));
+            return (
+              <div
+                key={side}
+                className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border ${
+                  sideWon
+                    ? 'bg-emerald-500/10 border-emerald-500/30'
+                    : 'bg-slate-900/70 border-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {isMine && (
+                    <span className="text-[9px] font-black uppercase bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded shrink-0">
+                      YOU
+                    </span>
+                  )}
+                  <span
+                    className={`text-xs sm:text-sm font-bold truncate ${
+                      sideWon ? 'text-white' : 'text-slate-300'
+                    }`}
+                  >
+                    {name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {games.map((g, idx) => (
+                    <span
+                      key={idx}
+                      className={`min-w-[1.75rem] text-center font-mono text-xs font-black rounded-lg px-1.5 py-1 border ${
+                        sideWon
+                          ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
+                          : 'bg-slate-950 border-slate-800 text-slate-300'
+                      }`}
+                    >
+                      {side === 'A' ? (g.scoreA ?? 0) : (g.scoreB ?? 0)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const { game, gameIndex, mySide, matchLabel, namesA, namesB } = item;
+  const sA = Number(game.scoreA ?? 0);
+  const sB = Number(game.scoreB ?? 0);
+  const didWin = mySide === 'A' ? sA > sB : sB > sA;
+  const isTie = sA === sB;
+
+  return (
+    <div className="rounded-2xl p-3.5 border bg-slate-950/75 border-slate-800 space-y-2.5">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] font-black bg-slate-800 text-slate-300 border border-slate-700 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+            <CheckCircle2 size={10} className="text-emerald-400" /> Final
+          </span>
+          {game.court && (
+            <span className="text-[10px] font-mono font-bold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">
+              Court {game.court}
+            </span>
+          )}
+          <span className="text-[11px] font-bold text-slate-300">
+            {matchLabel} &bull; Game {gameIndex + 1}
+          </span>
+        </div>
+        {!isTie && (
+          <span
+            className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+              didWin
+                ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/35'
+                : 'bg-slate-800/80 text-slate-400 border-slate-700'
+            }`}
+          >
+            {didWin ? 'WON' : 'LOST'}
+          </span>
+        )}
+      </div>
+
+      <div className="space-y-1.5">
+        {[
+          { side: 'A', names: namesA, score: sA, oppScore: sB },
+          { side: 'B', names: namesB, score: sB, oppScore: sA },
+        ].map(({ side, names, score, oppScore }) => {
+          const isMine = mySide === side;
+          const sideWon = score > oppScore;
+          return (
+            <div
+              key={side}
+              className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border ${
+                sideWon
+                  ? 'bg-emerald-500/10 border-emerald-500/30'
+                  : 'bg-slate-900/70 border-slate-800'
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {isMine && (
+                  <span className="text-[9px] font-black uppercase bg-[#d7f24c] text-slate-950 px-1.5 py-0.5 rounded shrink-0">
+                    YOU
+                  </span>
+                )}
+                <span
+                  className={`text-xs sm:text-sm font-bold truncate ${
+                    sideWon ? 'text-white' : 'text-slate-300'
+                  }`}
+                >
+                  {names}
+                </span>
+              </div>
+              <span
+                className={`min-w-[2.25rem] text-center font-mono text-sm font-black rounded-lg px-2 py-1 border shrink-0 ${
+                  sideWon
+                    ? 'bg-slate-950 border-emerald-500/40 text-emerald-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-300'
+                }`}
+              >
+                {score}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function PlayerPortalBanner({
   loggedInPlayerName,
   onOpenPlayerLogin,
@@ -618,7 +796,9 @@ export function PlayerPortalBanner({
 
   const targetLower = normalizeName(loggedInPlayerName);
   const myPoolMatches = [];
+  const myCompletedPoolMatches = [];
   const myMlpGames = [];
+  const myCompletedMlpGames = [];
 
   if (targetLower && tournamentStyle === 'tournament' && poolTournament) {
     const entryMap = new Map((poolTournament.entries || []).map((e) => [e.id, e]));
@@ -632,14 +812,14 @@ export function PlayerPortalBanner({
 
     (poolTournament.pools || []).forEach((pool) => {
       (pool.matches || []).forEach((m) => {
-        if (m.saved || !m.entryAId || !m.entryBId) return;
+        if (!m.entryAId || !m.entryBId) return;
         const eA = entryMap.get(m.entryAId);
         const eB = entryMap.get(m.entryBId);
         const inA = entryHasPlayer(eA);
         const inB = entryHasPlayer(eB);
         if (!inA && !inB) return;
         const roundNum = Number(m.round) || 1;
-        myPoolMatches.push({
+        const item = {
           key: `pool:${pool.id}:${m.id}`,
           type: 'pool',
           poolId: pool.id,
@@ -651,7 +831,12 @@ export function PlayerPortalBanner({
           nameA: getEntryDisplayName(eA),
           nameB: getEntryDisplayName(eB),
           format: getEffectiveMatchFormat(poolTournament, m, { isKnockout: false }),
-        });
+        };
+        if (m.saved) {
+          myCompletedPoolMatches.push(item);
+        } else {
+          myPoolMatches.push(item);
+        }
       });
     });
 
@@ -661,13 +846,13 @@ export function PlayerPortalBanner({
       ko.rounds.forEach((round, rIdx) => {
         const rLabel = getKnockoutRoundLabel(totalR, rIdx);
         round.forEach((m, mIdx) => {
-          if (m.isBye || m.saved || !m.entryAId || !m.entryBId) return;
+          if (m.isBye || !m.entryAId || !m.entryBId) return;
           const eA = entryMap.get(m.entryAId);
           const eB = entryMap.get(m.entryBId);
           const inA = entryHasPlayer(eA);
           const inB = entryHasPlayer(eB);
           if (!inA && !inB) return;
-          myPoolMatches.push({
+          const item = {
             key: `ko:${rIdx}:${mIdx}`,
             type: 'knockout',
             roundIdx: rIdx,
@@ -686,12 +871,17 @@ export function PlayerPortalBanner({
               roundIdx: rIdx,
               isBronze: false,
             }),
-          });
+          };
+          if (m.saved) {
+            myCompletedPoolMatches.push(item);
+          } else {
+            myPoolMatches.push(item);
+          }
         });
       });
     }
 
-    if (ko?.bronzeMatch && !ko.bronzeMatch.saved && ko.bronzeMatch.entryAId && ko.bronzeMatch.entryBId) {
+    if (ko?.bronzeMatch && ko.bronzeMatch.entryAId && ko.bronzeMatch.entryBId) {
       const bm = ko.bronzeMatch;
       const eA = entryMap.get(bm.entryAId);
       const eB = entryMap.get(bm.entryBId);
@@ -699,7 +889,7 @@ export function PlayerPortalBanner({
       const inB = entryHasPlayer(eB);
       if (inA || inB) {
         const totalR = ko.rounds?.length || 1;
-        myPoolMatches.push({
+        const item = {
           key: 'ko:bronze',
           type: 'knockout',
           roundIdx: 0,
@@ -718,7 +908,12 @@ export function PlayerPortalBanner({
             roundIdx: totalR - 1,
             isBronze: true,
           }),
-        });
+        };
+        if (bm.saved) {
+          myCompletedPoolMatches.push(item);
+        } else {
+          myPoolMatches.push(item);
+        }
       }
     }
   } else if (targetLower && bracket?.rounds) {
@@ -734,14 +929,13 @@ export function PlayerPortalBanner({
 
     bracket.rounds.forEach((round, rIdx) => {
       round.forEach((m, mIdx) => {
-        if (m.isBye || m.status === 'complete' || !m.games) return;
+        if (m.isBye || !m.games) return;
         const matchLabel = `${m.matchNumber ? `#${m.matchNumber} ` : ''}${teamMap.get(m.teamAId) || 'Team A'} vs ${teamMap.get(m.teamBId) || 'Team B'}`;
         m.games.forEach((g, gIdx) => {
-          if (g.saved) return;
           const inA = sideHasPlayer(g.pairA);
           const inB = sideHasPlayer(g.pairB);
           if (!inA && !inB) return;
-          myMlpGames.push({
+          const item = {
             key: `mlp:${rIdx}:${mIdx}:${g.id}`,
             round: rIdx,
             idx: mIdx,
@@ -753,7 +947,12 @@ export function PlayerPortalBanner({
             roundSortOrder: rIdx + 1,
             namesA: (g.pairA || []).map(getPlayerName).join(' & '),
             namesB: (g.pairB || []).map(getPlayerName).join(' & '),
-          });
+          };
+          if (g.saved || m.status === 'complete') {
+            myCompletedMlpGames.push(item);
+          } else {
+            myMlpGames.push(item);
+          }
         });
       });
     });
@@ -832,6 +1031,7 @@ export function PlayerPortalBanner({
 
   const featuredItems = allItems.filter(isFeaturedItem);
   const upcomingItems = allItems.filter((item) => !isFeaturedItem(item));
+  const completedItems = isTournament ? myCompletedPoolMatches : myCompletedMlpGames;
 
   const resolvedTab = activePlayerTab === 'pools' && !hasPools ? 'knockout' : activePlayerTab;
 
@@ -848,6 +1048,12 @@ export function PlayerPortalBanner({
       label: 'Upcoming',
       count: upcomingItems.length,
       icon: Clock,
+    },
+    {
+      id: 'completed',
+      label: 'Completed',
+      count: completedItems.length,
+      icon: CheckCircle2,
     },
     ...(hasPools ? [{ id: 'pools', label: 'Pools', icon: Swords }] : []),
     {
@@ -928,7 +1134,7 @@ export function PlayerPortalBanner({
         )}
 
         {/* Player View Tabs */}
-        <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-2xl p-1">
+        <div className="flex items-center gap-1 bg-slate-950/80 border border-slate-800 rounded-2xl p-1 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = resolvedTab === tab.id;
@@ -1041,6 +1247,30 @@ export function PlayerPortalBanner({
               </div>
             );
           })()
+        )}
+        {resolvedTab === 'completed' && (
+          <div className="space-y-3">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl px-3.5 py-2.5 flex items-center gap-2 text-xs text-amber-200">
+              <ShieldAlert size={15} className="text-amber-400 shrink-0" />
+              <span>
+                Dispute a score? Please see a <strong className="text-white">scorekeeper</strong> to have it reviewed and updated.
+              </span>
+            </div>
+
+            {completedItems.length === 0 ? (
+              <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 text-center">
+                <p className="text-xs text-slate-400 italic">
+                  No completed matches yet for <strong className="text-slate-200">{loggedInPlayerName}</strong>.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {completedItems.map((item) => (
+                  <CompletedMatchCard key={item.key} item={item} isTournament={isTournament} />
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
