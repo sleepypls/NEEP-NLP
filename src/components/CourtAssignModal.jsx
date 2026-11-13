@@ -241,9 +241,16 @@ export function MlpCourtAssignModal({
     .map((g, idx) => ({ game: g, index: idx }))
     .filter(({ game }) => !game.saved && !game.inProgress);
 
+  function getPlayerName(id) {
+    const val = playersById[id];
+    if (typeof val === 'string' && val.trim()) return val;
+    if (val && typeof val === 'object' && val.name) return val.name;
+    return `Player ${id}`;
+  }
+
   function gameLabel({ game, index }) {
-    const namesA = (game.pairA || []).map((id) => playersById[id]?.name || '?').join(' & ');
-    const namesB = (game.pairB || []).map((id) => playersById[id]?.name || '?').join(' & ');
+    const namesA = (game.pairA || []).map(getPlayerName).join(' & ');
+    const namesB = (game.pairB || []).map(getPlayerName).join(' & ');
     return `Game ${index + 1}: ${namesA} vs ${namesB}`;
   }
 
