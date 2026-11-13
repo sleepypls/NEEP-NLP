@@ -17,6 +17,7 @@ import { RoomCreatedModal } from './components/RoomCreatedModal';
 import { AdminPortalView } from './components/AdminPortalView';
 import { PoolSetupView } from './components/PoolSetupView';
 import { PoolPlayView } from './components/PoolPlayView';
+import { ScorekeeperDashboardView } from './components/ScorekeeperDashboardView';
 import {
   generatePoolsAndSchedule,
   generateKnockoutBracket,
@@ -948,12 +949,18 @@ export default function App() {
   }
 
   function handleSaveGame(gameId, scoreA, scoreB) {
-    const { round, idx } = activePath;
+    if (!activePath) return;
+    handleSaveGameAt(activePath.round, activePath.idx, gameId, scoreA, scoreB);
+  }
+
+  function handleSaveGameAt(round, idx, gameId, scoreA, scoreB) {
     const match = bracket.rounds[round][idx];
     const teamA = teams.find((t) => t.id === match.teamAId);
     const teamB = teams.find((t) => t.id === match.teamBId);
     const updatedGames = match.games.map((g) =>
-      g.id === gameId ? { ...g, scoreA: Number(scoreA), scoreB: Number(scoreB), saved: true, inProgress: false } : g
+      g.id === gameId
+        ? { ...g, scoreA: Number(scoreA), scoreB: Number(scoreB), saved: true, inProgress: false, liveStartedAt: null }
+        : g
     );
     const gamesWonA = updatedGames.filter((g) => g.saved && g.scoreA > g.scoreB).length;
     const gamesWonB = updatedGames.filter((g) => g.saved && g.scoreB > g.scoreA).length;
@@ -1015,13 +1022,23 @@ export default function App() {
   }
 
   function handleToggleGameInProgress(gameId) {
-    if (!activePath || !bracket) return;
-    const { round, idx } = activePath;
-    const match = bracket.rounds[round][idx];
-    if (!match.games) return;
-    const updatedGames = match.games.map((g) =>
-      g.id === gameId ? { ...g, inProgress: !g.inProgress } : g
-    );
+    if (!activePath) return;
+    handleToggleGameInProgressAt(activePath.round, activePath.idx, gameId);
+  }
+
+  function handleToggleGameInProgressAt(round, idx, gameId) {
+    if (!bracket) return;
+    const match = bracket.rounds[round]?.[idx];
+    if (!match?.games) return;
+    const updatedGames = match.games.map((g) => {
+      if (g.id !== gameId || g.saved) return g;
+      const nextLive = !g.inProgress;
+      return {
+        ...g,
+        inProgress: nextLive,
+        liveStartedAt: nextLive ? (g.liveStartedAt || Date.now()) : null,
+      };
+    });
     const nb = JSON.parse(JSON.stringify(bracket));
     nb.rounds[round][idx].games = updatedGames;
     setBracket(nb);
@@ -1044,18 +1061,26 @@ export default function App() {
   }
 
   function handleBatchAssignMlpCourtsAndLive(assignments) {
-    if (!activePath || !bracket || !Array.isArray(assignments) || assignments.length === 0) return;
-    const { round, idx } = activePath;
-    const match = bracket.rounds[round][idx];
-    if (!match.games) return;
-    const mapByGameId = new Map(assignments.map((a) => [a.gameId, a.court]));
-    const updatedGames = match.games.map((g) =>
-      mapByGameId.has(g.id)
-        ? { ...g, court: Number(mapByGameId.get(g.id)), inProgress: true }
-        : g
-    );
+    if (!bracket || !Array.isArray(assignments) || assignments.length === 0) return;
     const nb = JSON.parse(JSON.stringify(bracket));
-    nb.rounds[round][idx].games = updatedGames;
+    const now = Date.now();
+    assignments.forEach((a) => {
+      const r = a.round !== undefined ? a.round : activePath?.round;
+      const i = a.idx !== undefined ? a.idx : activePath?.idx;
+      if (r === undefined || i === undefined) return;
+      const match = nb.rounds[r]?.[i];
+      if (!match?.games) return;
+      match.games = match.games.map((g) =>
+        g.id === a.gameId
+          ? {
+              ...g,
+              court: Number(a.court),
+              inProgress: true,
+              liveStartedAt: g.liveStartedAt || now,
+            }
+          : g
+      );
+    });
     setBracket(nb);
     broadcastTournamentChange({ bracket: nb });
   }
@@ -1931,6 +1956,7 @@ export default function App() {
                   winnerId: winnerId || null,
                   saved: Boolean(winnerId),
                   inProgress: false,
+                  liveStartedAt: null,
                 }
               : m
           ),
@@ -1951,7 +1977,12 @@ export default function App() {
           ...pool,
           matches: pool.matches.map((m) => {
             if (m.id !== matchId || m.saved) return m;
-            return { ...m, inProgress: !m.inProgress };
+            const nextLive = !m.inProgress;
+            return {
+              ...m,
+              inProgress: nextLive,
+              liveStartedAt: nextLive ? (m.liveStartedAt || Date.now()) : null,
+            };
           }),
         };
       }),
@@ -2035,6 +2066,7 @@ export default function App() {
           winnerId: winnerId || null,
           saved: Boolean(winnerId),
           inProgress: false,
+          liveStartedAt: null,
         },
         bronzeId: winnerId || null,
       };
@@ -2053,6 +2085,7 @@ export default function App() {
                       winnerId: winnerId || null,
                       saved: Boolean(winnerId),
                       inProgress: false,
+                      liveStartedAt: null,
                     }
               )
         ),
@@ -2070,11 +2103,13 @@ export default function App() {
     if (!poolTournament || !poolTournament.knockout) return;
     let updatedKnockout = { ...poolTournament.knockout };
     if (isBronze && updatedKnockout.bronzeMatch && !updatedKnockout.bronzeMatch.saved) {
+      const nextLive = !updatedKnockout.bronzeMatch.inProgress;
       updatedKnockout = {
         ...updatedKnockout,
         bronzeMatch: {
           ...updatedKnockout.bronzeMatch,
-          inProgress: !updatedKnockout.bronzeMatch.inProgress,
+          inProgress: nextLive,
+          liveStartedAt: nextLive ? (updatedKnockout.bronzeMatch.liveStartedAt || Date.now()) : null,
         },
       };
     } else if (!isBronze) {
@@ -2083,11 +2118,15 @@ export default function App() {
         rounds: updatedKnockout.rounds.map((r, rI) =>
           rI !== roundIdx
             ? r
-            : r.map((m, mI) =>
-                mI !== matchIdx || m.saved
-                  ? m
-                  : { ...m, inProgress: !m.inProgress }
-              )
+            : r.map((m, mI) => {
+                if (mI !== matchIdx || m.saved) return m;
+                const nextLive = !m.inProgress;
+                return {
+                  ...m,
+                  inProgress: nextLive,
+                  liveStartedAt: nextLive ? (m.liveStartedAt || Date.now()) : null,
+                };
+              })
         ),
       };
     }
@@ -2112,6 +2151,7 @@ export default function App() {
 
   function handleBatchAssignPoolCourtsAndLive(assignments) {
     if (!poolTournament || !Array.isArray(assignments) || assignments.length === 0) return;
+    const now = Date.now();
     const poolAssignMap = new Map();
     const koAssignMap = new Map();
     let bronzeAssign = null;
@@ -2130,7 +2170,12 @@ export default function App() {
       matches: (pool.matches || []).map((m) => {
         const key = `${pool.id}:${m.id}`;
         if (!poolAssignMap.has(key)) return m;
-        return { ...m, court: Number(poolAssignMap.get(key)), inProgress: true };
+        return {
+          ...m,
+          court: Number(poolAssignMap.get(key)),
+          inProgress: true,
+          liveStartedAt: m.liveStartedAt || now,
+        };
       }),
     }));
 
@@ -2143,7 +2188,12 @@ export default function App() {
           r.map((m, mIdx) => {
             const key = `${rIdx}:${mIdx}`;
             if (!koAssignMap.has(key)) return m;
-            return { ...m, court: Number(koAssignMap.get(key)), inProgress: true };
+            return {
+              ...m,
+              court: Number(koAssignMap.get(key)),
+              inProgress: true,
+              liveStartedAt: m.liveStartedAt || now,
+            };
           })
         );
       }
@@ -2152,6 +2202,7 @@ export default function App() {
           ...nextKnockout.bronzeMatch,
           court: Number(bronzeAssign),
           inProgress: true,
+          liveStartedAt: nextKnockout.bronzeMatch.liveStartedAt || now,
         };
       }
     }
@@ -2815,6 +2866,33 @@ export default function App() {
             onBatchAssignCourtsLive={handleBatchAssignPoolCourtsAndLive}
             onOpenSetup={() => setView('poolSetup')}
             isAdmin={isAdmin}
+          />
+        )}
+
+        {view === 'scorekeeper' && (
+          <ScorekeeperDashboardView
+            isAdmin={isAdmin}
+            tournamentStyle={tournamentStyle}
+            numCourts={
+              tournamentStyle === 'tournament'
+                ? poolTournament?.numCourts || poolNumCourts
+                : numCourts
+            }
+            poolTournament={poolTournament}
+            onSavePoolMatch={handleSavePoolMatch}
+            onTogglePoolMatchLive={handleTogglePoolMatchLive}
+            onSaveKnockoutMatch={handleSaveKnockoutMatch}
+            onToggleKnockoutMatchLive={handleToggleKnockoutMatchLive}
+            onBatchAssignPoolCourtsLive={handleBatchAssignPoolCourtsAndLive}
+            bracket={bracket}
+            teams={teams}
+            playersById={playersById}
+            onSaveMlpGameAt={handleSaveGameAt}
+            onToggleMlpGameLiveAt={handleToggleGameInProgressAt}
+            onBatchAssignMlpCourtsLive={handleBatchAssignMlpCourtsAndLive}
+            onBack={() =>
+              setView(tournamentStyle === 'tournament' ? 'poolPlay' : 'bracket')
+            }
           />
         )}
       </main>

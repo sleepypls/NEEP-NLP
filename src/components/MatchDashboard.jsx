@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { generateMatchScoresCSV, triggerCsvDownload } from '../utils/tournament';
 import { MlpCourtAssignModal } from './CourtAssignModal';
+import { LiveTimer } from './LiveTimer';
 
 function TeamDot({ color, className = '' }) {
   return (
@@ -116,8 +117,9 @@ function GameRow({
             )}
 
             {game.inProgress && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-pulse">
                 <Play size={10} className="fill-current" /> IN PROGRESS
+                {game.liveStartedAt && <LiveTimer startedAt={game.liveStartedAt} className="text-[10px] text-cyan-200" />}
               </span>
             )}
 
@@ -535,6 +537,8 @@ export function MatchDashboard({
         isOpen={isCourtAssignOpen}
         onClose={() => setIsCourtAssignOpen(false)}
         games={match.games}
+        bracket={bracket}
+        teams={teams}
         numCourts={numCourts}
         playersById={playersById}
         onApply={(assignments) => onBatchAssignCourtsLive && onBatchAssignCourtsLive(assignments)}

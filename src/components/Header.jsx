@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Users, LogOut } from 'lucide-react';
+import { Trophy, Swords, Share2, Cloud, RotateCcw, Trash2, ShieldCheck, Eye, KeyRound, Lock, Users, LogOut, LayoutGrid } from 'lucide-react';
 import { isCloudEnabled } from '../services/firebase';
 import { APP_VERSION } from '../version';
 
@@ -86,6 +86,18 @@ export function Header({
                 >
                   <Swords size={13} /> Pools &amp; Bracket
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => setView('scorekeeper')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                      view === 'scorekeeper'
+                        ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <LayoutGrid size={13} /> Scorekeeper
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -117,6 +129,18 @@ export function Header({
                 >
                   <Trophy size={13} /> Leaderboard
                 </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => setView('scorekeeper')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                      view === 'scorekeeper'
+                        ? 'bg-[#d7f24c] text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <LayoutGrid size={13} /> Scorekeeper
+                  </button>
+                )}
               </>
             )}
           </nav>
@@ -269,6 +293,18 @@ export function Header({
               >
                 <Swords size={13} /> Pools &amp; Bracket
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setView('scorekeeper')}
+                  className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    view === 'scorekeeper'
+                      ? 'text-[#d7f24c] border-b-2 border-[#d7f24c] bg-[#d7f24c]/5'
+                      : 'text-slate-500'
+                  }`}
+                >
+                  <LayoutGrid size={13} /> Scorekeeper
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -300,6 +336,18 @@ export function Header({
               >
                 <Trophy size={13} /> Leaderboard
               </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setView('scorekeeper')}
+                  className={`flex-1 py-2 text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                    view === 'scorekeeper'
+                      ? 'text-[#d7f24c] border-b-2 border-[#d7f24c] bg-[#d7f24c]/5'
+                      : 'text-slate-500'
+                  }`}
+                >
+                  <LayoutGrid size={13} /> Scorekeeper
+                </button>
+              )}
             </>
           )}
         </div>

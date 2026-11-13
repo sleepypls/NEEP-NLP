@@ -30,6 +30,7 @@ import {
 import { triggerCsvDownload } from '../utils/tournament';
 import { EditPoolMatchModal } from './EditPoolMatchModal';
 import { PoolCourtAssignModal } from './CourtAssignModal';
+import { LiveTimer } from './LiveTimer';
 
 function MatchScoreEditor({
   match,
@@ -110,6 +111,7 @@ function MatchScoreEditor({
           {match.inProgress && !match.saved && (
             <span className="text-[10px] font-bold bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
               <Flame size={10} /> LIVE
+              {match.liveStartedAt && <LiveTimer startedAt={match.liveStartedAt} className="text-[10px] text-slate-950 font-black" />}
             </span>
           )}
           {match.saved && (

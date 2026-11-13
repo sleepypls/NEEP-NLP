@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Flame, RefreshCw, AlertTriangle, Check } from 'lucide-react';
 import { buildPoolCourtSuggestions, getEntryDisplayName } from '../utils/poolTournament';
+import { LiveTimer } from './LiveTimer';
 
 export function PoolCourtAssignModal({
   isOpen,
@@ -107,6 +108,12 @@ export function PoolCourtAssignModal({
                       <span className="text-slate-200 truncate flex-1">
                         {nA} vs {nB}
                       </span>
+                      {match.liveStartedAt && (
+                        <LiveTimer
+                          startedAt={match.liveStartedAt}
+                          className="text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-full shrink-0"
+                        />
+                      )}
                       <span className="text-[10px] text-slate-400 shrink-0">{stage}</span>
                     </div>
                   );
@@ -218,19 +225,58 @@ export function MlpCourtAssignModal({
   isOpen,
   onClose,
   games = [],
+  bracket = null,
+  teams = [],
   numCourts = 2,
   playersById = {},
   onApply,
 }) {
   const [selections, setSelections] = useState({});
 
+  function getPlayerName(id) {
+    const val = playersById[id];
+    if (typeof val === 'string' && val.trim()) return val;
+    if (val && typeof val === 'object' && val.name) return val.name;
+    return `Player ${id}`;
+  }
+
   const totalCourts = Math.max(1, Number(numCourts) || 2);
   const liveByCourt = new Map();
-  games.forEach((g, idx) => {
-    if (g.inProgress && !g.saved && g.court) {
-      liveByCourt.set(Number(g.court), { game: g, index: idx });
-    }
-  });
+
+  // Scan ALL matches in bracket (if provided) so courts live in any match are marked occupied
+  if (bracket && Array.isArray(bracket.rounds)) {
+    const teamMap = new Map((teams || []).map((t) => [t.id, t.name]));
+    bracket.rounds.forEach((round) => {
+      round.forEach((m) => {
+        (m.games || []).forEach((g, gIdx) => {
+          if (g.inProgress && !g.saved && g.court) {
+            const ct = Number(g.court);
+            const tA = teamMap.get(m.teamAId) || 'Team A';
+            const tB = teamMap.get(m.teamBId) || 'Team B';
+            const nA = (g.pairA || []).map(getPlayerName).join(' & ');
+            const nB = (g.pairB || []).map(getPlayerName).join(' & ');
+            liveByCourt.set(ct, {
+              game: g,
+              label: `G${gIdx + 1}: ${nA} vs ${nB}`,
+              sublabel: `${tA} vs ${tB}`,
+            });
+          }
+        });
+      });
+    });
+  } else {
+    games.forEach((g, idx) => {
+      if (g.inProgress && !g.saved && g.court) {
+        const nA = (g.pairA || []).map(getPlayerName).join(' & ');
+        const nB = (g.pairB || []).map(getPlayerName).join(' & ');
+        liveByCourt.set(Number(g.court), {
+          game: g,
+          label: `Game ${idx + 1}: ${nA} vs ${nB}`,
+          sublabel: 'Active Match',
+        });
+      }
+    });
+  }
 
   const freeCourts = [];
   for (let c = 1; c <= totalCourts; c++) {
@@ -240,13 +286,6 @@ export function MlpCourtAssignModal({
   const eligibleGames = games
     .map((g, idx) => ({ game: g, index: idx }))
     .filter(({ game }) => !game.saved && !game.inProgress);
-
-  function getPlayerName(id) {
-    const val = playersById[id];
-    if (typeof val === 'string' && val.trim()) return val;
-    if (val && typeof val === 'object' && val.name) return val.name;
-    return `Player ${id}`;
-  }
 
   function gameLabel({ game, index }) {
     const namesA = (game.pairA || []).map(getPlayerName).join(' & ');
@@ -315,6 +354,36 @@ export function MlpCourtAssignModal({
         </div>
 
         <div className="overflow-y-auto space-y-4 pr-1 flex-1">
+          {liveByCourt.size > 0 && (
+            <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-2xl p-3 space-y-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-300 block">
+                Currently On Court (Live)
+              </span>
+              {Array.from(liveByCourt.entries())
+                .sort((a, b) => a[0] - b[0])
+                .map(([courtNum, { game, label, sublabel }]) => (
+                  <div
+                    key={courtNum}
+                    className="flex items-center justify-between gap-2 text-xs bg-slate-950/60 border border-cyan-500/20 rounded-xl px-2.5 py-1.5"
+                  >
+                    <span className="font-mono font-bold text-cyan-300 shrink-0">
+                      Court {courtNum}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-slate-200 truncate">{label}</div>
+                      {sublabel && <div className="text-[10px] text-slate-500 truncate">{sublabel}</div>}
+                    </div>
+                    {game.liveStartedAt && (
+                      <LiveTimer
+                        startedAt={game.liveStartedAt}
+                        className="text-[10px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded-full shrink-0"
+                      />
+                    )}
+                  </div>
+                ))}
+            </div>
+          )}
+
           {freeCourts.length === 0 ? (
             <div className="text-center py-6 bg-slate-950/50 border border-slate-800 rounded-2xl text-xs text-slate-400">
               All {totalCourts} courts already have live games in progress.
